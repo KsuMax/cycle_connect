@@ -1,0 +1,85 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { Map, Newspaper, Plus, User } from "lucide-react";
+
+const NAV_ITEMS = [
+  { href: "/", label: "Лента", icon: Newspaper },
+  { href: "/routes", label: "Маршруты", icon: Map },
+  { href: "/routes/new", label: "", icon: Plus, isAction: true },
+  { href: "/profile", label: "Профиль", icon: User },
+];
+
+export function Header() {
+  const pathname = usePathname();
+
+  return (
+    <header className="sticky top-0 z-50 bg-white border-b border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+      <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+        {/* Logo */}
+        <Link href="/" className="shrink-0 select-none">
+          <span className="text-[1.35rem] font-extrabold tracking-tight">
+            <span style={{ color: "#1C1C1E" }}>Cycle</span><span style={{ color: "#F4632A" }}>Connect</span>
+          </span>
+        </Link>
+
+        {/* Navigation */}
+        <nav className="flex items-center gap-1">
+          {NAV_ITEMS.map(({ href, label, icon: Icon, isAction }) => {
+            const isActive = href === "/" ? pathname === "/" : pathname.startsWith(href) && href !== "/";
+
+            if (isAction) {
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className="mx-2 w-9 h-9 rounded-full flex items-center justify-center transition-colors"
+                  style={{ backgroundColor: "#F4632A" }}
+                  title="Создать мероприятие"
+                >
+                  <Icon size={18} color="white" strokeWidth={2.5} />
+                </Link>
+              );
+            }
+
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                  isActive
+                    ? "text-[#F4632A] bg-[#FFF0EB]"
+                    : "text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1]"
+                )}
+              >
+                <Icon size={16} strokeWidth={isActive ? 2.5 : 2} />
+                <span className="hidden sm:inline">{label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Auth */}
+        <div className="flex items-center gap-2 shrink-0">
+          <Link
+            href="/auth/login"
+            className="text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+            style={{ color: "#71717A" }}
+          >
+            Войти
+          </Link>
+          <Link
+            href="/auth/register"
+            className="text-sm font-medium px-3 py-1.5 rounded-lg transition-colors text-white"
+            style={{ backgroundColor: "#1C1C1E" }}
+          >
+            Регистрация
+          </Link>
+        </div>
+      </div>
+    </header>
+  );
+}
