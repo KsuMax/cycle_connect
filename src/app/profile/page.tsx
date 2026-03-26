@@ -87,7 +87,7 @@ export default function ProfilePage() {
 
   const profileUser = {
     id: user?.id ?? "",
-    name: profile?.name ?? user?.email ?? "Участник",
+    name: profile?.name || "Участник",
     initials,
     color: "#7C5CFC",
     bio: profile?.bio ?? undefined,

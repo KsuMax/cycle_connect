@@ -9,11 +9,12 @@ import { RouteComments } from "@/components/routes/RouteComments";
 import { useFavorites } from "@/lib/context/FavoritesContext";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { MOCK_ROUTES, MOCK_EVENTS, MOCK_COMMENTS } from "@/lib/data/mock";
+import { MOCK_COMMENTS } from "@/lib/data/mock";
 import { DifficultyBadge, Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { EventCard } from "@/components/events/EventCard";
-import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2 } from "lucide-react";
 import type { Route, RouteType } from "@/types";
 import type { DbRoute } from "@/lib/supabase";
 
@@ -63,12 +64,14 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
   const { id } = use(params);
   const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
+  const router = useRouter();
 
   const [route, setRoute] = useState<Route | null>(null);
   const [loading, setLoading] = useState(true);
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [going, setGoing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -82,10 +85,6 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
         const r = dbToRoute(data);
         setRoute(r);
         setLikeCount(r.likes);
-      } else {
-        // fallback to mock
-        const mock = MOCK_ROUTES.find((r) => r.id === id);
-        if (mock) { setRoute(mock); setLikeCount(mock.likes); }
       }
       setLoading(false);
     }
@@ -106,8 +105,14 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
   if (!route) return notFound();
 
   const isAuthor = user?.id === route.author.id;
-  const relatedEvents = MOCK_EVENTS.filter((e) => e.route.id === route.id);
   const comments = MOCK_COMMENTS?.[route.id] ?? [];
+
+  const handleDelete = async () => {
+    if (!confirm("Удалить маршрут? Это действие нельзя отменить.")) return;
+    setDeleting(true);
+    await supabase.from("routes").delete().eq("id", route.id);
+    router.push("/routes");
+  };
 
   const handleLike = async () => {
     setLiked((prev) => !prev);
@@ -239,10 +244,16 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
               </div>
 
               {isAuthor && (
-                <Link href={`/routes/${route.id}/edit`}
-                  className="mt-3 w-full py-2 rounded-xl border border-[#E4E4E7] text-sm text-[#71717A] flex items-center justify-center gap-2 hover:bg-[#F5F4F1] transition-colors">
-                  <Pencil size={14} /> Редактировать
-                </Link>
+                <div className="mt-3 flex gap-2">
+                  <Link href={`/routes/${route.id}/edit`}
+                    className="flex-1 py-2 rounded-xl border border-[#E4E4E7] text-sm text-[#71717A] flex items-center justify-center gap-2 hover:bg-[#F5F4F1] transition-colors">
+                    <Pencil size={14} /> Редактировать
+                  </Link>
+                  <button onClick={handleDelete} disabled={deleting}
+                    className="py-2 px-3 rounded-xl border border-red-200 text-sm text-red-500 flex items-center justify-center gap-1.5 hover:bg-red-50 transition-colors disabled:opacity-50">
+                    <Trash2 size={14} /> {deleting ? "..." : "Удалить"}
+                  </button>
+                </div>
               )}
             </div>
 
@@ -271,15 +282,6 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
               </div>
             </Link>
 
-            {/* Related events */}
-            {relatedEvents.length > 0 && (
-              <div>
-                <h3 className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-3">Ближайшие поездки</h3>
-                <div className="space-y-3">
-                  {relatedEvents.map((event) => <EventCard key={event.id} event={event} compact />)}
-                </div>
-              </div>
-            )}
           </aside>
         </div>
       </main>

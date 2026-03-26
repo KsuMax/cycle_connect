@@ -3,13 +3,12 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Map, Newspaper, Plus, User, LogOut } from "lucide-react";
+import { Map, Newspaper, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/context/AuthContext";
 
 const NAV_ITEMS = [
   { href: "/", label: "Лента", icon: Newspaper },
   { href: "/routes", label: "Маршруты", icon: Map },
-  { href: "/routes/new", label: "", icon: Plus, isAction: true },
 ];
 
 export function Header() {
@@ -39,19 +38,8 @@ export function Header() {
 
         {/* Navigation */}
         <nav className="flex items-center gap-1">
-          {NAV_ITEMS.map(({ href, label, icon: Icon, isAction }) => {
+          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
             const isActive = href === "/" ? pathname === "/" : pathname.startsWith(href) && href !== "/";
-
-            if (isAction) {
-              return (
-                <Link key={href} href={href}
-                  className="mx-2 w-9 h-9 rounded-full flex items-center justify-center transition-colors"
-                  style={{ backgroundColor: "#F4632A" }} title="Добавить маршрут">
-                  <Icon size={18} color="white" strokeWidth={2.5} />
-                </Link>
-              );
-            }
-
             return (
               <Link key={href} href={href}
                 className={cn(

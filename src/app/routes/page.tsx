@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { RouteCard } from "@/components/routes/RouteCard";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { Search, SlidersHorizontal, X, Plus } from "lucide-react";
+import Link from "next/link";
 import type { Difficulty, RouteType, Route } from "@/types";
 import { supabase, type DbRoute } from "@/lib/supabase";
-import { MOCK_ROUTES } from "@/lib/data/mock";
+import { useAuth } from "@/lib/context/AuthContext";
 
 const DIFFICULTIES: { value: Difficulty | "all"; label: string }[] = [
   { value: "all", label: "Все" },
@@ -57,6 +58,7 @@ function dbRouteToRoute(r: DbRoute): Route {
 }
 
 export default function RoutesPage() {
+  const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty | "all">("all");
   const [selectedTypes, setSelectedTypes] = useState<RouteType[]>([]);
@@ -73,11 +75,8 @@ export default function RoutesPage() {
         .select("*, author:profiles(*), route_images(url)")
         .order("created_at", { ascending: false });
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         setRoutes(data.map(dbRouteToRoute));
-      } else {
-        // fallback to mock while DB is empty
-        setRoutes(MOCK_ROUTES);
       }
       setLoading(false);
     }
@@ -112,9 +111,19 @@ export default function RoutesPage() {
     <div className="min-h-screen bg-[#F5F4F1]">
       <Header />
       <main className="max-w-6xl mx-auto px-4 py-8">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-[#1C1C1E] mb-1">Маршруты</h1>
-          <p className="text-[#71717A] text-sm">Найди идеальный маршрут для следующей поездки</p>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-[#1C1C1E] mb-1">Маршруты</h1>
+            <p className="text-[#71717A] text-sm">Найди идеальный маршрут для следующей поездки</p>
+          </div>
+          {user && (
+            <Link href="/routes/new"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors hover:opacity-90"
+              style={{ backgroundColor: "#F4632A" }}>
+              <Plus size={16} />
+              <span className="hidden sm:inline">Добавить маршрут</span>
+            </Link>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
