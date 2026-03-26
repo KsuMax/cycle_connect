@@ -32,6 +32,7 @@ export interface Route {
   likes: number;
   mapmagic_url?: string;
   mapmagic_embed?: string; // iframe-ready URL
+  cover_url?: string;
   images?: string[];
   created_at: string;
 }

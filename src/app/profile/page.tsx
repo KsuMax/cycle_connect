@@ -43,6 +43,7 @@ function dbToRoute(r: DbRoute): Route {
     likes: r.likes_count,
     mapmagic_url: r.mapmagic_url ?? undefined,
     mapmagic_embed: r.mapmagic_embed ?? undefined,
+    cover_url: r.cover_url ?? undefined,
     images: r.route_images?.map((img: { url: string }) => img.url),
     created_at: r.created_at,
   };

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { MapPin, Link as LinkIcon, ChevronRight, AlertCircle } from "lucide-react";
 import { ImageUpload } from "@/components/routes/ImageUpload";
+import { CoverUpload } from "@/components/routes/CoverUpload";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import type { RouteType, Difficulty } from "@/types";
@@ -36,6 +37,8 @@ export default function NewRoutePage() {
   const [duration, setDuration] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [routeTypes, setRouteTypes] = useState<RouteType[]>([]);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -102,7 +105,20 @@ export default function NewRoutePage() {
       return;
     }
 
-    // 2. Upload images to Supabase Storage
+    // 2. Upload cover image
+    if (coverFile) {
+      const ext = coverFile.name.split(".").pop();
+      const path = `${routeData.id}/cover.${ext}`;
+      const { data: uploadData } = await supabase.storage
+        .from("route-images")
+        .upload(path, coverFile, { upsert: true });
+      if (uploadData) {
+        const { data: { publicUrl } } = supabase.storage.from("route-images").getPublicUrl(path);
+        await supabase.from("routes").update({ cover_url: publicUrl }).eq("id", routeData.id);
+      }
+    }
+
+    // 3. Upload images to Supabase Storage
     for (const file of imageFiles) {
       const ext = file.name.split(".").pop();
       const path = `${routeData.id}/${Date.now()}.${ext}`;
@@ -123,7 +139,7 @@ export default function NewRoutePage() {
       }
     }
 
-    // 3. Update author's routes_count
+    // 4. Update author's routes_count
     await supabase
       .from("profiles")
       .update({ routes_count: (profile?.routes_count ?? 0) + 1 })
@@ -243,6 +259,13 @@ export default function NewRoutePage() {
                   className="w-full px-3 py-2 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors" />
               </div>
             </div>
+          </div>
+
+          {/* Cover */}
+          <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+            <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">Обложка</label>
+            <p className="text-xs text-[#71717A] mb-3">Горизонтальное фото — отображается в карточке маршрута</p>
+            <CoverUpload value={coverPreview} onChange={(preview, file) => { setCoverPreview(preview); setCoverFile(file); }} />
           </div>
 
           {/* Photos */}

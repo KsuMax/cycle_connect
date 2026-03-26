@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { MapPin, Link as LinkIcon, ChevronRight, AlertCircle, ChevronLeft } from "lucide-react";
 import { ImageUpload } from "@/components/routes/ImageUpload";
+import { CoverUpload } from "@/components/routes/CoverUpload";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import type { RouteType, Difficulty } from "@/types";
@@ -41,6 +42,8 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
   const [duration, setDuration] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [routeTypes, setRouteTypes] = useState<RouteType[]>([]);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
   const [existingImages, setExistingImages] = useState<{ url: string; storage_path: string }[]>([]);
   const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
   const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
@@ -77,6 +80,7 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
       setDuration(data.duration_min ? String(data.duration_min) : "");
       setDifficulty(data.difficulty ?? "medium");
       setRouteTypes(data.route_types ?? []);
+      setCoverPreview(data.cover_url ?? null);
       setExistingImages(data.route_images ?? []);
       setLoading(false);
     }
@@ -133,6 +137,22 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
       setError("Не удалось сохранить изменения. Попробуй ещё раз.");
       setSubmitting(false);
       return;
+    }
+
+    // Upload cover if changed
+    if (coverFile) {
+      const ext = coverFile.name.split(".").pop();
+      const path = `${id}/cover.${ext}`;
+      const { data: uploadData } = await supabase.storage
+        .from("route-images")
+        .upload(path, coverFile, { upsert: true });
+      if (uploadData) {
+        const { data: { publicUrl } } = supabase.storage.from("route-images").getPublicUrl(path);
+        await supabase.from("routes").update({ cover_url: publicUrl }).eq("id", id);
+      }
+    } else if (coverPreview === null) {
+      // Cover was removed
+      await supabase.from("routes").update({ cover_url: null }).eq("id", id);
     }
 
     for (const file of newImageFiles) {
@@ -293,6 +313,13 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
                   className="w-full px-3 py-2 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors" />
               </div>
             </div>
+          </div>
+
+          {/* Cover */}
+          <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+            <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">Обложка</label>
+            <p className="text-xs text-[#71717A] mb-3">Горизонтальное фото — отображается в карточке маршрута</p>
+            <CoverUpload value={coverPreview} onChange={(preview, file) => { setCoverPreview(preview); setCoverFile(file); }} />
           </div>
 
           {/* Existing photos */}

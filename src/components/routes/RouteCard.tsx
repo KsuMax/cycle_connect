@@ -6,6 +6,7 @@ import { Bike, Mountain, Clock, Heart, ChevronRight } from "lucide-react";
 import { DifficultyBadge, Badge } from "@/components/ui/Badge";
 import { AvatarGroup } from "@/components/ui/Avatar";
 import { cn } from "@/lib/utils";
+import { useLikes } from "@/lib/context/LikesContext";
 import type { Route, RouteType } from "@/types";
 
 const ROUTE_TYPE_LABELS: Record<RouteType, string> = {
@@ -28,13 +29,15 @@ interface RouteCardProps {
 }
 
 export function RouteCard({ route, compact = false }: RouteCardProps) {
-  const [liked, setLiked] = useState(false);
+  const { isLiked, toggleLike } = useLikes();
   const [likeCount, setLikeCount] = useState(route.likes);
+  const liked = isLiked(route.id);
 
-  const handleLike = (e: React.MouseEvent) => {
+  const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
-    setLiked((prev) => !prev);
-    setLikeCount((prev) => (liked ? prev - 1 : prev + 1));
+    const prev = likeCount;
+    setLikeCount(liked ? prev - 1 : prev + 1);
+    await toggleLike(route.id, prev);
   };
 
   return (
@@ -44,27 +47,32 @@ export function RouteCard({ route, compact = false }: RouteCardProps) {
           "bg-white rounded-2xl overflow-hidden transition-all duration-200",
           "border border-[#E4E4E7] hover:border-[#D1D1D6]"
         )}
-        style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)", }}
+        style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}
       >
-        {/* Map preview */}
-        <div className="relative bg-gradient-to-br from-[#E6FAF9] to-[#D1FAF7] overflow-hidden" style={{ height: compact ? 140 : 180 }}>
-          {/* Decorative route line */}
-          <svg className="absolute inset-0 w-full h-full" viewBox="0 0 400 180" preserveAspectRatio="none">
-            <path
-              d={route.difficulty === "hard"
-                ? "M 40,140 Q 100,40 160,100 Q 220,160 280,60 Q 340,20 370,80"
-                : route.difficulty === "medium"
-                ? "M 30,120 Q 120,60 200,100 Q 280,140 370,70"
-                : "M 30,110 Q 150,80 250,100 Q 320,110 370,90"
-              }
-              fill="none"
-              stroke={route.difficulty === "hard" ? "#7C5CFC" : route.difficulty === "medium" ? "#F4632A" : "#0BBFB5"}
-              strokeWidth="3"
-              strokeLinecap="round"
-            />
-            <circle cx="30" cy={route.difficulty === "hard" ? 140 : route.difficulty === "medium" ? 120 : 110} r="5" fill="#22C55E" />
-            <circle cx="370" cy={route.difficulty === "hard" ? 80 : route.difficulty === "medium" ? 70 : 90} r="5" fill="#F4632A" />
-          </svg>
+        {/* Cover or placeholder */}
+        <div className="relative overflow-hidden" style={{ height: compact ? 140 : 180 }}>
+          {route.cover_url ? (
+            <img src={route.cover_url} alt={route.title} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-[#E6FAF9] to-[#D1FAF7]">
+              <svg className="absolute inset-0 w-full h-full" viewBox="0 0 400 180" preserveAspectRatio="none">
+                <path
+                  d={route.difficulty === "hard"
+                    ? "M 40,140 Q 100,40 160,100 Q 220,160 280,60 Q 340,20 370,80"
+                    : route.difficulty === "medium"
+                    ? "M 30,120 Q 120,60 200,100 Q 280,140 370,70"
+                    : "M 30,110 Q 150,80 250,100 Q 320,110 370,90"
+                  }
+                  fill="none"
+                  stroke={route.difficulty === "hard" ? "#7C5CFC" : route.difficulty === "medium" ? "#F4632A" : "#0BBFB5"}
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                />
+                <circle cx="30" cy={route.difficulty === "hard" ? 140 : route.difficulty === "medium" ? 120 : 110} r="5" fill="#22C55E" />
+                <circle cx="370" cy={route.difficulty === "hard" ? 80 : route.difficulty === "medium" ? 70 : 90} r="5" fill="#F4632A" />
+              </svg>
+            </div>
+          )}
 
           {/* Region label */}
           <div className="absolute top-3 left-3">
@@ -142,7 +150,7 @@ export function RouteCard({ route, compact = false }: RouteCardProps) {
                 {likeCount}
               </button>
               <span className="flex items-center gap-0.5 text-xs font-medium text-[#F4632A]">
-                Еду <ChevronRight size={13} />
+                Смотреть <ChevronRight size={13} />
               </span>
             </div>
           </div>

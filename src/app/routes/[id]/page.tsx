@@ -6,6 +6,7 @@ import { Header } from "@/components/layout/Header";
 import { RouteGallery } from "@/components/routes/RouteGallery";
 import { RouteComments } from "@/components/routes/RouteComments";
 import { useFavorites } from "@/lib/context/FavoritesContext";
+import { useLikes } from "@/lib/context/LikesContext";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { MOCK_COMMENTS } from "@/lib/data/mock";
@@ -54,6 +55,7 @@ function dbToRoute(r: DbRoute): Route {
     likes: r.likes_count,
     mapmagic_url: r.mapmagic_url ?? undefined,
     mapmagic_embed: r.mapmagic_embed ?? undefined,
+    cover_url: r.cover_url ?? undefined,
     images: r.route_images?.map((img: { url: string }) => img.url),
     created_at: r.created_at,
   };
@@ -63,12 +65,12 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
   const { id } = use(params);
   const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
+  const { isLiked, toggleLike } = useLikes();
   const router = useRouter();
 
   const [route, setRoute] = useState<Route | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [going, setGoing] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -128,12 +130,12 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
     router.push("/routes");
   };
 
+  const liked = isLiked(route.id);
+
   const handleLike = async () => {
-    setLiked((prev) => !prev);
-    setLikeCount((prev) => liked ? prev - 1 : prev + 1);
-    if (user) {
-      await supabase.from("routes").update({ likes_count: liked ? likeCount - 1 : likeCount + 1 }).eq("id", route.id);
-    }
+    const prev = likeCount;
+    setLikeCount(liked ? prev - 1 : prev + 1);
+    await toggleLike(route.id, prev);
   };
 
   return (
@@ -239,7 +241,7 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
                   style={going
                     ? { backgroundColor: "#F4632A", color: "white" }
                     : { backgroundColor: "#1C1C1E", color: "white" }}>
-                  {going ? "Еду ✓" : "Я еду"}
+                  {going ? "Катанул ✓" : "Катнуть"}
                 </button>
                 <button onClick={() => toggleFavorite(route.id)}
                   className="w-10 h-10 rounded-xl border flex items-center justify-center transition-colors"

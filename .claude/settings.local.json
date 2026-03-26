@@ -34,7 +34,12 @@
       "Bash(find /Users/ksumax/Documents/Projects/cycle_connect/node_modules/next -name source-map* -type f)",
       "Bash(node -e \"require\\(''source-map''\\)\")",
       "Bash(node -e \"require\\(''''./node_modules/next/dist/server/font-utils''''\\)\")",
-      "mcp__3997d5b4-8154-4297-b84c-c05c289186b7__deploy_to_vercel"
+      "mcp__3997d5b4-8154-4297-b84c-c05c289186b7__deploy_to_vercel",
+      "Bash(./node_modules/.bin/tsc --noEmit)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(/Users/ksumax/Documents/Projects/cycle_connect/node_modules/.bin/tsc --noEmit --project /Users/ksumax/Documents/Projects/cycle_connect/tsconfig.json)",
+      "Bash(find /Users/ksumax/Documents/Projects/cycle_connect/node_modules/lucide-react/dist -name *.js)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:d[k] for k in [''''main'''',''''module'''',''''exports''''] if k in d}, indent=2\\)\\)\")"
     ]
   }
 }

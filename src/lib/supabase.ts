@@ -34,6 +34,7 @@ export interface DbRoute {
   tags: string[];
   mapmagic_url: string | null;
   mapmagic_embed: string | null;
+  cover_url: string | null;
   likes_count: number;
   riders_today: number;
   created_at: string;

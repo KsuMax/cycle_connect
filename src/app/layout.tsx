@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { FavoritesProvider } from "@/lib/context/FavoritesContext";
+import { LikesProvider } from "@/lib/context/LikesContext";
 import { AuthProvider } from "@/lib/context/AuthContext";
 
 export const metadata: Metadata = {
@@ -16,7 +17,7 @@ export default function RootLayout({
   return (
     <html lang="ru" className="h-full">
       <body className="min-h-full flex flex-col">
-        <AuthProvider><FavoritesProvider>{children}</FavoritesProvider></AuthProvider>
+        <AuthProvider><LikesProvider><FavoritesProvider>{children}</FavoritesProvider></LikesProvider></AuthProvider>
       </body>
     </html>
   );
