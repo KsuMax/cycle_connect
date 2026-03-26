@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, use, useEffect } from "react";
-import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { RouteGallery } from "@/components/routes/RouteGallery";
@@ -68,6 +67,7 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
 
   const [route, setRoute] = useState<Route | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [going, setGoing] = useState(false);
@@ -85,6 +85,8 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
         const r = dbToRoute(data);
         setRoute(r);
         setLikeCount(r.likes);
+      } else {
+        setFetchError(error?.message ?? "Маршрут не найден");
       }
       setLoading(false);
     }
@@ -102,7 +104,19 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  if (!route) return notFound();
+  if (!route) {
+    return (
+      <div className="min-h-screen bg-[#F5F4F1]">
+        <Header />
+        <main className="max-w-6xl mx-auto px-4 py-8 text-center">
+          <div className="text-4xl mb-3">🗺️</div>
+          <h2 className="text-xl font-bold text-[#1C1C1E] mb-2">Маршрут не найден</h2>
+          {fetchError && <p className="text-sm text-[#71717A] mb-2 font-mono">{fetchError}</p>}
+          <Link href="/routes" className="text-sm text-[#F4632A] hover:underline">← Все маршруты</Link>
+        </main>
+      </div>
+    );
+  }
 
   const isAuthor = user?.id === route.author.id;
   const comments = MOCK_COMMENTS?.[route.id] ?? [];
