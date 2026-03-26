@@ -22,7 +22,11 @@ export default function LoginPage() {
 
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-      setError("Неверный email или пароль");
+      if (error.message.toLowerCase().includes("email not confirmed")) {
+        setError("Email не подтверждён. Проверь почту и перейди по ссылке в письме.");
+      } else {
+        setError("Неверный email или пароль");
+      }
       setLoading(false);
       return;
     }

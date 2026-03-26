@@ -10,6 +10,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export interface DbProfile {
   id: string;
   name: string;
+  username: string | null;
   bio: string | null;
   km_total: number;
   routes_count: number;

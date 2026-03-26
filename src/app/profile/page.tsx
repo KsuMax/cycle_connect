@@ -130,6 +130,7 @@ export default function ProfilePage() {
               <div className="flex items-start justify-between">
                 <div>
                   <h1 className="text-xl font-bold text-[#1C1C1E]">{profileUser.name}</h1>
+                  {profile?.username && <p className="text-sm font-medium mt-0.5" style={{ color: "#F4632A" }}>@{profile.username}</p>}
                   <p className="text-sm text-[#71717A] mt-0.5">{user.email}</p>
                   {profileUser.bio && <p className="text-sm text-[#71717A] mt-1">{profileUser.bio}</p>}
                 </div>
