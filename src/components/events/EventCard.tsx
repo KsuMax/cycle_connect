@@ -9,6 +9,7 @@ import type { CycleEvent } from "@/types";
 
 interface EventCardProps {
   event: CycleEvent;
+  compact?: boolean;
 }
 
 export function EventCard({ event }: EventCardProps) {
