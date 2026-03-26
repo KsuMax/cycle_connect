@@ -72,7 +72,7 @@ export default function RoutesPage() {
     async function load() {
       const { data, error } = await supabase
         .from("routes")
-        .select("*, author:profiles(*), route_images(url)")
+        .select("*, author:profiles!author_id(*), route_images(url)")
         .order("created_at", { ascending: false });
 
       if (!error && data) {

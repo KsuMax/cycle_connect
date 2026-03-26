@@ -89,13 +89,13 @@ export default function FeedPage() {
 
   useEffect(() => {
     supabase.from("routes")
-      .select("*, author:profiles(*), route_images(url)")
+      .select("*, author:profiles!author_id(*), route_images(url)")
       .order("likes_count", { ascending: false })
       .limit(4)
       .then(({ data }) => { if (data) setRoutes(data.map(dbToRoute)); });
 
     supabase.from("events")
-      .select("*, organizer:profiles(*), route:routes(*), event_days(*), event_participants(user_id)")
+      .select("*, organizer:profiles!organizer_id(*), route:routes(*), event_days(*), event_participants(user_id)")
       .order("created_at", { ascending: false })
       .limit(2)
       .then(({ data }) => { if (data) setEvents(data.map(dbToEvent)); });

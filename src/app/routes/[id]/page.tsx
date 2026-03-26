@@ -77,7 +77,7 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
     async function load() {
       const { data, error } = await supabase
         .from("routes")
-        .select("*, author:profiles(*), route_images(url)")
+        .select("*, author:profiles!author_id(*), route_images(url)")
         .eq("id", id)
         .single();
 
