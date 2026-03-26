@@ -33,6 +33,7 @@ export default function NewRoutePage() {
   const [region, setRegion] = useState("");
   const [distance, setDistance] = useState("");
   const [elevation, setElevation] = useState("");
+  const [duration, setDuration] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [routeTypes, setRouteTypes] = useState<RouteType[]>([]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -81,7 +82,7 @@ export default function NewRoutePage() {
         region: region.trim(),
         distance_km: parseFloat(distance) || 0,
         elevation_m: parseInt(elevation) || 0,
-        duration_min: 0,
+        duration_min: parseInt(duration) || 0,
         difficulty,
         surface: [],
         bike_types: [],
@@ -220,7 +221,7 @@ export default function NewRoutePage() {
           {/* Details */}
           <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
             <label className="block text-sm font-semibold text-[#1C1C1E] mb-3">Детали</label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-[#71717A] mb-1 block flex items-center gap-1"><MapPin size={11} /> Регион</label>
                 <input type="text" placeholder="Карелия" value={region} onChange={(e) => setRegion(e.target.value)}
@@ -234,6 +235,11 @@ export default function NewRoutePage() {
               <div>
                 <label className="text-xs text-[#71717A] mb-1 block">Набор высоты, м</label>
                 <input type="number" placeholder="450" value={elevation} onChange={(e) => setElevation(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors" />
+              </div>
+              <div>
+                <label className="text-xs text-[#71717A] mb-1 block">Время, мин</label>
+                <input type="number" placeholder="240" value={duration} onChange={(e) => setDuration(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors" />
               </div>
             </div>
