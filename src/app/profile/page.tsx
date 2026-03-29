@@ -6,8 +6,8 @@ import { Header } from "@/components/layout/Header";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useFavorites } from "@/lib/context/FavoritesContext";
+import { useRides } from "@/lib/context/RidesContext";
 import { supabase } from "@/lib/supabase";
-import { MOCK_ROUTES } from "@/lib/data/mock";
 import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import type { Route, RouteType } from "@/types";
@@ -60,72 +60,99 @@ export default function ProfilePage() {
   const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
   const { favorites } = useFavorites();
+  const { rides, ridesLoaded } = useRides();
+
   const [activeTab, setActiveTab] = useState<Tab>("routes");
   const [eventsSubTab, setEventsSubTab] = useState<EventsSubTab>("rides");
+
   const [myRoutes, setMyRoutes] = useState<Route[]>([]);
   const [loadingRoutes, setLoadingRoutes] = useState(true);
+
   const [ridesData, setRidesData] = useState<Route[]>([]);
   const [loadingRides, setLoadingRides] = useState(true);
+
+  const [favoriteRoutes, setFavoriteRoutes] = useState<Route[]>([]);
+  const [loadingFavorites, setLoadingFavorites] = useState(false);
+
   const [myEvents, setMyEvents] = useState<ProfileEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/auth/login");
-    }
+    if (!authLoading && !user) router.push("/auth/login");
   }, [user, authLoading, router]);
 
+  // Load my routes
   useEffect(() => {
     if (!user) return;
-
-    async function loadMyRoutes() {
-      const { data } = await supabase
-        .from("routes")
-        .select("*, author:profiles!author_id(*), route_images(url)")
-        .eq("author_id", user!.id)
-        .order("created_at", { ascending: false });
-      if (data) setMyRoutes(data.map(dbToRoute));
-      setLoadingRoutes(false);
-    }
-
-    async function loadRides() {
-      const { data: rideRows } = await supabase
-        .from("route_rides")
-        .select("route_id")
-        .eq("user_id", user!.id);
-      const routeIds = rideRows?.map((r: { route_id: string }) => r.route_id) ?? [];
-      if (routeIds.length > 0) {
-        const { data } = await supabase
-          .from("routes")
-          .select("*, author:profiles!author_id(*), route_images(url)")
-          .in("id", routeIds);
-        if (data) setRidesData(data.map(dbToRoute));
-      }
-      setLoadingRides(false);
-    }
-
-    async function loadEvents() {
-      const { data: participantRows } = await supabase
-        .from("event_participants")
-        .select("event_id")
-        .eq("user_id", user!.id);
-      const eventIds = participantRows?.map((p: { event_id: string }) => p.event_id) ?? [];
-      if (eventIds.length > 0) {
-        const { data } = await supabase
-          .from("events")
-          .select("id, title, start_date, organizer:profiles!organizer_id(name)")
-          .in("id", eventIds);
-        if (data) setMyEvents(data as unknown as ProfileEvent[]);
-      }
-      setLoadingEvents(false);
-    }
-
-    loadMyRoutes();
-    loadRides();
-    loadEvents();
+    supabase
+      .from("routes")
+      .select("*, author:profiles!author_id(*), route_images(url)")
+      .eq("author_id", user.id)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (data) setMyRoutes(data.map(dbToRoute));
+        setLoadingRoutes(false);
+      });
   }, [user]);
 
-  const favoriteRoutes = MOCK_ROUTES.filter((r) => favorites.has(r.id));
+  // Load ridden routes from context rides Set (which handles Supabase + localStorage fallback)
+  useEffect(() => {
+    if (!user || !ridesLoaded) return;
+    const routeIds = Array.from(rides);
+    if (routeIds.length === 0) {
+      setRidesData([]);
+      setLoadingRides(false);
+      return;
+    }
+    supabase
+      .from("routes")
+      .select("*, author:profiles!author_id(*), route_images(url)")
+      .in("id", routeIds)
+      .then(({ data }) => {
+        if (data) setRidesData(data.map(dbToRoute));
+        setLoadingRides(false);
+      });
+  }, [rides, ridesLoaded, user]);
+
+  // Load favorite routes from Supabase (favorites Set contains real IDs, not mock)
+  useEffect(() => {
+    if (!user) return;
+    const ids = Array.from(favorites);
+    if (ids.length === 0) {
+      setFavoriteRoutes([]);
+      return;
+    }
+    setLoadingFavorites(true);
+    supabase
+      .from("routes")
+      .select("*, author:profiles!author_id(*), route_images(url)")
+      .in("id", ids)
+      .then(({ data }) => {
+        if (data) setFavoriteRoutes(data.map(dbToRoute));
+        setLoadingFavorites(false);
+      });
+  }, [favorites, user]);
+
+  // Load participated events
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("event_participants")
+      .select("event_id")
+      .eq("user_id", user.id)
+      .then(async ({ data: participantRows }) => {
+        const eventIds = participantRows?.map((p: { event_id: string }) => p.event_id) ?? [];
+        if (eventIds.length > 0) {
+          const { data } = await supabase
+            .from("events")
+            .select("id, title, start_date, organizer:profiles!organizer_id(name)")
+            .in("id", eventIds);
+          if (data) setMyEvents(data as unknown as ProfileEvent[]);
+        }
+        setLoadingEvents(false);
+      });
+  }, [user]);
+
   const ridesKm = loadingRides
     ? (profile?.km_total ?? 0)
     : ridesData.reduce((sum, r) => sum + r.distance_km, 0);
@@ -180,7 +207,7 @@ export default function ProfilePage() {
               <div className="flex gap-6 mt-4">
                 {[
                   { value: Math.round(ridesKm).toLocaleString(), label: "км всего", color: "#F4632A" },
-                  { value: myRoutes.length, label: "маршрутов", color: "#7C5CFC" },
+                  { value: myRoutes.length,                       label: "маршрутов", color: "#7C5CFC" },
                   { value: loadingRides ? "..." : ridesData.length, label: "поездок", color: "#0BBFB5" },
                 ].map(({ value, label, color }) => (
                   <div key={label} className="text-center">
@@ -234,7 +261,11 @@ export default function ProfilePage() {
 
         {activeTab === "favorites" && (
           <section>
-            {favoriteRoutes.length > 0 ? (
+            {loadingFavorites ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[1, 2].map((i) => <div key={i} className="h-64 bg-white rounded-2xl animate-pulse border border-[#E4E4E7]" />)}
+              </div>
+            ) : favoriteRoutes.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {favoriteRoutes.map((route) => <RouteCard key={route.id} route={route} />)}
               </div>
