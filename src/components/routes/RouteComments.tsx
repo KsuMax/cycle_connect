@@ -1,21 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Heart, Send } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
-import { MOCK_USERS } from "@/lib/data/mock";
-import type { Comment } from "@/types";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/context/AuthContext";
+import type { User } from "@/types";
+
+interface CommentData {
+  id: string;
+  author: User;
+  text: string;
+  created_at: string;
+  likes: number;
+}
 
 interface RouteCommentsProps {
   routeId: string;
-  initialComments: Comment[];
 }
 
 function timeAgo(dateStr: string): string {
   const date = new Date(dateStr);
-  const now = new Date("2026-03-25");
-  const days = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-  if (days === 0) return "сегодня";
+  const now = new Date();
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (seconds < 60) return "только что";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} мин. назад`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} ч. назад`;
+  const days = Math.floor(hours / 24);
   if (days === 1) return "вчера";
   if (days < 7) return `${days} дн. назад`;
   if (days < 30) return `${Math.floor(days / 7)} нед. назад`;
@@ -23,23 +36,71 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(days / 365)} г. назад`;
 }
 
-export function RouteComments({ initialComments }: RouteCommentsProps) {
-  const [comments, setComments] = useState<Comment[]>(initialComments);
+type DbCommentRow = {
+  id: string;
+  text: string;
+  created_at: string;
+  author: { id: string; name: string; km_total: number; routes_count: number; events_count: number } | null;
+};
+
+function dbToComment(row: DbCommentRow): CommentData {
+  const name = row.author?.name ?? "Участник";
+  return {
+    id: row.id,
+    text: row.text,
+    created_at: row.created_at,
+    likes: 0,
+    author: {
+      id: row.author?.id ?? "",
+      name,
+      initials: name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase(),
+      color: "#7C5CFC",
+      km_total: row.author?.km_total ?? 0,
+      routes_count: row.author?.routes_count ?? 0,
+      events_count: row.author?.events_count ?? 0,
+    },
+  };
+}
+
+export function RouteComments({ routeId }: RouteCommentsProps) {
+  const { user, profile } = useAuth();
+  const [comments, setComments] = useState<CommentData[]>([]);
+  const [loading, setLoading] = useState(true);
   const [text, setText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
 
-  const handleSubmit = () => {
+  const loadComments = useCallback(async () => {
+    const { data } = await supabase
+      .from("route_comments")
+      .select("id, text, created_at, author:profiles!author_id(id, name, km_total, routes_count, events_count)")
+      .eq("route_id", routeId)
+      .order("created_at", { ascending: true });
+
+    if (data) setComments((data as DbCommentRow[]).map(dbToComment));
+    setLoading(false);
+  }, [routeId]);
+
+  useEffect(() => {
+    loadComments();
+  }, [loadComments]);
+
+  const handleSubmit = async () => {
     const trimmed = text.trim();
-    if (!trimmed) return;
-    const newComment: Comment = {
-      id: `c-${Date.now()}`,
-      author: MOCK_USERS[0], // текущий пользователь (мок)
-      text: trimmed,
-      created_at: "2026-03-25",
-      likes: 0,
-    };
-    setComments((prev) => [...prev, newComment]);
-    setText("");
+    if (!trimmed || !user || submitting) return;
+
+    setSubmitting(true);
+    const { data, error } = await supabase
+      .from("route_comments")
+      .insert({ route_id: routeId, author_id: user.id, text: trimmed })
+      .select("id, text, created_at, author:profiles!author_id(id, name, km_total, routes_count, events_count)")
+      .single();
+
+    if (!error && data) {
+      setComments((prev) => [...prev, dbToComment(data as DbCommentRow)]);
+      setText("");
+    }
+    setSubmitting(false);
   };
 
   const toggleLike = (id: string) => {
@@ -55,6 +116,18 @@ export function RouteComments({ initialComments }: RouteCommentsProps) {
     );
   };
 
+  const currentUserAvatar: User | null = profile
+    ? {
+        id: user!.id,
+        name: profile.name,
+        initials: profile.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase(),
+        color: "#7C5CFC",
+        km_total: profile.km_total,
+        routes_count: profile.routes_count,
+        events_count: profile.events_count,
+      }
+    : null;
+
   return (
     <div className="bg-white rounded-2xl border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
       <div className="px-6 py-4 border-b border-[#F5F4F1] flex items-center gap-2">
@@ -66,7 +139,10 @@ export function RouteComments({ initialComments }: RouteCommentsProps) {
 
       {/* Comments list */}
       <div className="divide-y divide-[#F5F4F1]">
-        {comments.length === 0 && (
+        {loading && (
+          <div className="px-6 py-6 text-center text-[#A1A1AA] text-sm">Загрузка...</div>
+        )}
+        {!loading && comments.length === 0 && (
           <div className="px-6 py-8 text-center text-[#A1A1AA] text-sm">
             Будь первым, кто оставит комментарий 💬
           </div>
@@ -95,34 +171,42 @@ export function RouteComments({ initialComments }: RouteCommentsProps) {
 
       {/* Input */}
       <div className="px-6 py-4 border-t border-[#F5F4F1]">
-        <div className="flex gap-3 items-end">
-          <Avatar user={MOCK_USERS[0]} size="sm" />
-          <div className="flex-1 relative">
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit();
-                }
-              }}
-              placeholder="Напиши комментарий..."
-              rows={1}
-              className="w-full pr-10 pl-4 py-2.5 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors resize-none leading-relaxed"
-              style={{ minHeight: 42 }}
-            />
-            <button
-              onClick={handleSubmit}
-              disabled={!text.trim()}
-              className="absolute right-3 bottom-2.5 transition-opacity"
-              style={{ color: text.trim() ? "#F4632A" : "#D1D1D6" }}
-            >
-              <Send size={16} />
-            </button>
-          </div>
-        </div>
-        <p className="text-xs text-[#A1A1AA] mt-2 ml-10">Enter — отправить, Shift+Enter — перенос строки</p>
+        {user && currentUserAvatar ? (
+          <>
+            <div className="flex gap-3 items-end">
+              <Avatar user={currentUserAvatar} size="sm" />
+              <div className="flex-1 relative">
+                <textarea
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSubmit();
+                    }
+                  }}
+                  placeholder="Напиши комментарий..."
+                  rows={1}
+                  className="w-full pr-10 pl-4 py-2.5 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors resize-none leading-relaxed"
+                  style={{ minHeight: 42 }}
+                />
+                <button
+                  onClick={handleSubmit}
+                  disabled={!text.trim() || submitting}
+                  className="absolute right-3 bottom-2.5 transition-opacity"
+                  style={{ color: text.trim() && !submitting ? "#F4632A" : "#D1D1D6" }}
+                >
+                  <Send size={16} />
+                </button>
+              </div>
+            </div>
+            <p className="text-xs text-[#A1A1AA] mt-2 ml-10">Enter — отправить, Shift+Enter — перенос строки</p>
+          </>
+        ) : (
+          <p className="text-sm text-center text-[#A1A1AA]">
+            <a href="/auth/login" className="text-[#F4632A] hover:underline">Войди</a>, чтобы оставить комментарий
+          </p>
+        )}
       </div>
     </div>
   );
