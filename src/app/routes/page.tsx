@@ -66,6 +66,7 @@ export default function RoutesPage() {
   const [maxDistance, setMaxDistance] = useState(300);
   const [region, setRegion] = useState("Все регионы");
   const [showFilters, setShowFilters] = useState(false);
+  const [sortBy, setSortBy] = useState<"newest" | "oldest">("newest");
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -97,6 +98,14 @@ export default function RoutesPage() {
     if (route.distance_km > maxDistance) return false;
     if (region !== "Все регионы" && route.region !== region) return false;
     return true;
+  }).sort((a, b) => {
+    if (sortBy === "newest") {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }
+    if (sortBy === "oldest") {
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    }
+    return 0;
   });
 
   const hasActiveFilters = difficulty !== "all" || maxDistance < 300 || region !== "Все регионы" || selectedTypes.length > 0;
@@ -138,6 +147,23 @@ export default function RoutesPage() {
                     <X size={12} /> Сбросить
                   </button>
                 )}
+              </div>
+
+              <div className="mb-5">
+                <label className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-2 block">Сортировка</label>
+                <select 
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="w-full px-3 py-2 rounded-xl border border-[#E4E4E7] bg-white text-sm outline-none focus:border-[#F4632A] transition-colors appearance-none cursor-pointer"
+                  style={{ 
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23A1A1AA' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 12px center',
+                  }}
+                >
+                  <option value="newest">По дате (сначала новые)</option>
+                  <option value="oldest">По дате (сначала старые)</option>
+                </select>
               </div>
 
               <div className="mb-5">
@@ -219,6 +245,22 @@ export default function RoutesPage() {
 
             {showFilters && (
               <div className="lg:hidden bg-white rounded-2xl p-4 border border-[#E4E4E7] mb-4 space-y-4">
+                <div>
+                  <div className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-2">Сортировка</div>
+                  <select 
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as any)}
+                    className="w-full px-3 py-2 rounded-xl border border-[#E4E4E7] bg-white text-sm outline-none focus:border-[#F4632A] transition-colors appearance-none cursor-pointer"
+                    style={{ 
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23A1A1AA' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right 12px center',
+                    }}
+                  >
+                    <option value="newest">По дате (сначала новые)</option>
+                    <option value="oldest">По дате (сначала старые)</option>
+                  </select>
+                </div>
                 <div>
                   <div className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-2">Сложность</div>
                   <div className="flex flex-wrap gap-2">
