@@ -12,6 +12,7 @@ import {
   ChevronLeft, Calendar, Bike, Heart,
   Share2, Users, MapPin, ExternalLink, Flag, ChevronRight, Pencil,
 } from "lucide-react";
+import { AuthTooltip } from "@/components/ui/AuthTooltip";
 import type { User, Route, EventDay, RouteType } from "@/types";
 
 interface EventData {
@@ -388,9 +389,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               )}
 
-              <Button variant={going ? "outline" : "secondary"} size="lg" className="w-full mb-3" onClick={handleGoingToggle}>
-                {going ? "✓ Ты едешь!" : "Я поеду →"}
-              </Button>
+              <AuthTooltip disabled={!user} className="w-full mb-3">
+                <Button variant={going ? "outline" : "secondary"} size="lg" className="w-full" onClick={handleGoingToggle}>
+                  {going ? "✓ Ты едешь!" : "Я поеду →"}
+                </Button>
+              </AuthTooltip>
 
               {event.route && (
                 <Link href={`/routes/${event.route.id}`}
@@ -400,12 +403,14 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               )}
 
               <div className="flex gap-2">
-                <button
-                  onClick={() => { setLiked(!liked); setLikeCount(liked ? likeCount - 1 : likeCount + 1); }}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-[#E4E4E7] text-sm transition-colors hover:bg-[#F5F4F1]"
-                  style={{ color: liked ? "#F4632A" : "#71717A" }}>
-                  <Heart size={14} fill={liked ? "#F4632A" : "none"} /> {likeCount}
-                </button>
+                <AuthTooltip disabled={!user} className="flex-1">
+                  <button
+                    onClick={() => { setLiked(!liked); setLikeCount(liked ? likeCount - 1 : likeCount + 1); }}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-[#E4E4E7] text-sm transition-colors hover:bg-[#F5F4F1]"
+                    style={{ color: liked ? "#F4632A" : "#71717A" }}>
+                    <Heart size={14} fill={liked ? "#F4632A" : "none"} /> {likeCount}
+                  </button>
+                </AuthTooltip>
                 <button className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-[#E4E4E7] text-sm text-[#71717A] hover:bg-[#F5F4F1] transition-colors">
                   <Share2 size={14} /> Поделиться
                 </button>

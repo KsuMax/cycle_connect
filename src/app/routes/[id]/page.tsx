@@ -14,6 +14,7 @@ import { DifficultyBadge, Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { EventCard } from "@/components/events/EventCard";
 import { useRouter } from "next/navigation";
+import { AuthTooltip } from "@/components/ui/AuthTooltip";
 import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2 } from "lucide-react";
 import type { Route, RouteType } from "@/types";
 import type { DbRoute } from "@/lib/supabase";
@@ -236,27 +237,33 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
 
               {/* Actions */}
               <div className="flex gap-2">
-                <button onClick={() => toggleRide(route.id, route.distance_km)}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors"
-                  style={hasRidden(route.id)
-                    ? { backgroundColor: "#F4632A", color: "white" }
-                    : { backgroundColor: "#1C1C1E", color: "white" }}>
-                  {hasRidden(route.id) ? "Катанул ✓" : "Катнуть"}
-                </button>
-                <button onClick={() => toggleFavorite(route.id)}
-                  className="w-10 h-10 rounded-xl border flex items-center justify-center transition-colors"
-                  style={isFavorite(route.id)
-                    ? { backgroundColor: "#FFF0EB", borderColor: "#F4632A", color: "#F4632A" }
-                    : { backgroundColor: "white", borderColor: "#E4E4E7", color: "#A1A1AA" }}>
-                  <Bookmark size={16} fill={isFavorite(route.id) ? "#F4632A" : "none"} />
-                </button>
-                <button onClick={handleLike}
-                  className="w-10 h-10 rounded-xl border flex items-center justify-center transition-colors gap-1 text-xs font-medium"
-                  style={liked
-                    ? { backgroundColor: "#FFF0EB", borderColor: "#F4632A", color: "#F4632A" }
-                    : { backgroundColor: "white", borderColor: "#E4E4E7", color: "#A1A1AA" }}>
-                  <Heart size={14} fill={liked ? "#F4632A" : "none"} />
-                </button>
+                <AuthTooltip disabled={!user} className="flex-1">
+                  <button onClick={() => toggleRide(route.id, route.distance_km)}
+                    className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors"
+                    style={hasRidden(route.id)
+                      ? { backgroundColor: "#F4632A", color: "white" }
+                      : { backgroundColor: "#1C1C1E", color: "white" }}>
+                    {hasRidden(route.id) ? "Катанул ✓" : "Катнуть"}
+                  </button>
+                </AuthTooltip>
+                <AuthTooltip disabled={!user}>
+                  <button onClick={() => toggleFavorite(route.id)}
+                    className="w-10 h-10 rounded-xl border flex items-center justify-center transition-colors"
+                    style={isFavorite(route.id)
+                      ? { backgroundColor: "#FFF0EB", borderColor: "#F4632A", color: "#F4632A" }
+                      : { backgroundColor: "white", borderColor: "#E4E4E7", color: "#A1A1AA" }}>
+                    <Bookmark size={16} fill={isFavorite(route.id) ? "#F4632A" : "none"} />
+                  </button>
+                </AuthTooltip>
+                <AuthTooltip disabled={!user}>
+                  <button onClick={handleLike}
+                    className="w-10 h-10 rounded-xl border flex items-center justify-center transition-colors gap-1 text-xs font-medium"
+                    style={liked
+                      ? { backgroundColor: "#FFF0EB", borderColor: "#F4632A", color: "#F4632A" }
+                      : { backgroundColor: "white", borderColor: "#E4E4E7", color: "#A1A1AA" }}>
+                    <Heart size={14} fill={liked ? "#F4632A" : "none"} />
+                  </button>
+                </AuthTooltip>
               </div>
 
               {isAuthor && (
