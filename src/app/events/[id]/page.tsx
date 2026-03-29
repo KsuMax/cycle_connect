@@ -38,6 +38,7 @@ function dbToUser(p: Record<string, unknown>, color = "#7C5CFC"): User {
     name,
     initials: name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase(),
     color,
+    avatar_url: (p.avatar_url as string | null) ?? null,
     km_total: (p.km_total as number) ?? 0,
     routes_count: (p.routes_count as number) ?? 0,
     events_count: (p.events_count as number) ?? 0,

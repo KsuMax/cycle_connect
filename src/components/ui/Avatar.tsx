@@ -17,14 +17,17 @@ export function Avatar({ user, size = "md", className }: AvatarProps) {
   return (
     <div
       className={cn(
-        "rounded-full flex items-center justify-center font-semibold text-white shrink-0",
+        "rounded-full overflow-hidden flex items-center justify-center font-semibold text-white shrink-0",
         SIZE_CLASSES[size],
         className
       )}
       style={{ backgroundColor: user.color }}
       title={user.name}
     >
-      {user.initials}
+      {user.avatar_url
+        ? <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+        : user.initials
+      }
     </div>
   );
 }

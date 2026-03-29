@@ -43,6 +43,7 @@ function dbToRoute(r: DbRoute): Route {
       name: r.author?.name ?? "Участник",
       initials: (r.author?.name ?? "?").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase(),
       color: "#F4632A",
+      avatar_url: r.author?.avatar_url ?? null,
       km_total: r.author?.km_total ?? 0,
       routes_count: r.author?.routes_count ?? 0,
       events_count: r.author?.events_count ?? 0,

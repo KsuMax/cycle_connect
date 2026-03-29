@@ -40,7 +40,7 @@ type DbCommentRow = {
   id: string;
   text: string;
   created_at: string;
-  author: { id: string; name: string; km_total: number; routes_count: number; events_count: number } | null;
+  author: { id: string; name: string; avatar_url?: string | null; km_total: number; routes_count: number; events_count: number } | null;
 };
 
 function dbToComment(row: DbCommentRow): CommentData {
@@ -55,6 +55,7 @@ function dbToComment(row: DbCommentRow): CommentData {
       name,
       initials: name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase(),
       color: "#7C5CFC",
+      avatar_url: row.author?.avatar_url ?? null,
       km_total: row.author?.km_total ?? 0,
       routes_count: row.author?.routes_count ?? 0,
       events_count: row.author?.events_count ?? 0,
@@ -73,7 +74,7 @@ export function RouteComments({ routeId }: RouteCommentsProps) {
   const loadComments = useCallback(async () => {
     const { data } = await supabase
       .from("route_comments")
-      .select("id, text, created_at, author:profiles!author_id(id, name, km_total, routes_count, events_count)")
+      .select("id, text, created_at, author:profiles!author_id(id, name, avatar_url, km_total, routes_count, events_count)")
       .eq("route_id", routeId)
       .order("created_at", { ascending: true });
 
@@ -93,7 +94,7 @@ export function RouteComments({ routeId }: RouteCommentsProps) {
     const { data, error } = await supabase
       .from("route_comments")
       .insert({ route_id: routeId, author_id: user.id, text: trimmed })
-      .select("id, text, created_at, author:profiles!author_id(id, name, km_total, routes_count, events_count)")
+      .select("id, text, created_at, author:profiles!author_id(id, name, avatar_url, km_total, routes_count, events_count)")
       .single();
 
     if (!error && data) {
@@ -122,6 +123,7 @@ export function RouteComments({ routeId }: RouteCommentsProps) {
         name: profile.name,
         initials: profile.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase(),
         color: "#7C5CFC",
+        avatar_url: profile.avatar_url ?? null,
         km_total: profile.km_total,
         routes_count: profile.routes_count,
         events_count: profile.events_count,
