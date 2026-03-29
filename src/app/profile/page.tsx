@@ -80,6 +80,7 @@ export default function ProfilePage() {
 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -169,14 +170,24 @@ export default function ProfilePage() {
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (!["jpg", "jpeg", "png", "webp"].includes(ext ?? "")) return;
     setUploadingAvatar(true);
+    setAvatarError(null);
+    // Use timestamp to bust cache on re-upload
     const path = `${user.id}/avatar.${ext}`;
-    const { error: uploadError } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
-    if (!uploadError) {
+    const { error: uploadError } = await supabase.storage.from("avatars").upload(path, file, { upsert: true, cacheControl: "0" });
+    if (uploadError) {
+      setAvatarError(uploadError.message);
+    } else {
       const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path);
-      await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", user.id);
-      setAvatarUrl(publicUrl);
+      const urlWithBust = `${publicUrl}?t=${Date.now()}`;
+      const { error: updateError } = await supabase.from("profiles").update({ avatar_url: urlWithBust }).eq("id", user.id);
+      if (updateError) {
+        setAvatarError(updateError.message);
+      } else {
+        setAvatarUrl(urlWithBust);
+      }
     }
     setUploadingAvatar(false);
+    e.target.value = "";
   };
 
   const ridesKm = loadingRides
@@ -239,6 +250,11 @@ export default function ProfilePage() {
                 className="hidden"
                 onChange={handleAvatarUpload}
               />
+              {avatarError && (
+                <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-red-500 font-medium">
+                  {avatarError}
+                </div>
+              )}
             </div>
             <div className="flex-1">
               <div className="flex items-start justify-between">

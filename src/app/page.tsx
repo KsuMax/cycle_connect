@@ -136,7 +136,7 @@ export default function FeedPage() {
                     <Calendar size={18} style={{ color: "#7C5CFC" }} />
                     Ближайшие поездки
                   </h2>
-                  <Link href="/events" className="text-sm hover:underline" style={{ color: "#F4632A" }}>Все</Link>
+                  <Link href="/routes?tab=events" className="text-sm hover:underline" style={{ color: "#F4632A" }}>Все</Link>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
                   {events.map((event) => <EventCard key={event.id} event={event} />)}

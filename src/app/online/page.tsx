@@ -29,7 +29,7 @@ export default function OnlinePage() {
         </h1>
         <p className="text-sm font-semibold tracking-widest uppercase mb-8"
           style={{ color: "#7C5CFC" }}>
-          Скоро в мобильном приложении
+          Однажды в мобильном приложении ты сможешь
         </p>
 
         {/* Cards with features */}
@@ -56,7 +56,7 @@ export default function OnlinePage() {
           style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}
         >
           <p className="text-[#1C1C1E] leading-relaxed mb-4">
-            Когда появится мобильное приложение, ты сможешь видеть всех велосипедистов онлайн,
+            Однажды в мобильном приложении ты сможешь видеть всех велосипедистов онлайн,
             видеть, кто едет по маршруту и где он находится, присоединяться к велоклубам и кататься
             по самым красивым маршрутам.
           </p>
