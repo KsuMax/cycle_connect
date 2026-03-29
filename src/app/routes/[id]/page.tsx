@@ -10,7 +10,6 @@ import { useLikes } from "@/lib/context/LikesContext";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useRides } from "@/lib/context/RidesContext";
 import { supabase } from "@/lib/supabase";
-import { MOCK_COMMENTS } from "@/lib/data/mock";
 import { DifficultyBadge, Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { EventCard } from "@/components/events/EventCard";
@@ -122,7 +121,6 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   const isAuthor = user?.id === route.author.id;
-  const comments = MOCK_COMMENTS?.[route.id] ?? [];
 
   const handleDelete = async () => {
     if (!confirm("Удалить маршрут? Это действие нельзя отменить.")) return;
@@ -185,7 +183,7 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
             )}
 
             {/* Comments */}
-            <RouteComments routeId={route.id} initialComments={comments} />
+            <RouteComments routeId={route.id} />
           </div>
 
           {/* Right */}

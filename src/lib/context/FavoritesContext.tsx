@@ -1,43 +1,60 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "./AuthContext";
 
 const STORAGE_KEY = "cc_favorites";
 
 interface FavoritesContextValue {
   favorites: Set<string>;
-  toggleFavorite: (routeId: string) => void;
+  toggleFavorite: (routeId: string) => Promise<void>;
   isFavorite: (routeId: string) => boolean;
 }
 
 const FavoritesContext = createContext<FavoritesContextValue | null>(null);
 
 export function FavoritesProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
 
-  // Load from localStorage on mount
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) setFavorites(new Set(JSON.parse(stored)));
-    } catch {}
-  }, []);
+    if (user) {
+      supabase
+        .from("route_favorites")
+        .select("route_id")
+        .eq("user_id", user.id)
+        .then(({ data }) => {
+          if (data) setFavorites(new Set(data.map((r: { route_id: string }) => r.route_id)));
+        });
+    } else {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        setFavorites(stored ? new Set(JSON.parse(stored)) : new Set());
+      } catch {
+        setFavorites(new Set());
+      }
+    }
+  }, [user]);
 
-  // Persist on every change
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(favorites)));
-  }, [favorites]);
+  const toggleFavorite = useCallback(async (routeId: string) => {
+    const wasFavorite = favorites.has(routeId);
+    const next = new Set(favorites);
+    wasFavorite ? next.delete(routeId) : next.add(routeId);
+    setFavorites(next);
 
-  const toggleFavorite = (routeId: string) => {
-    setFavorites((prev) => {
-      const next = new Set(prev);
-      if (next.has(routeId)) next.delete(routeId);
-      else next.add(routeId);
-      return next;
-    });
-  };
+    if (user) {
+      if (wasFavorite) {
+        await supabase.from("route_favorites").delete().eq("user_id", user.id).eq("route_id", routeId);
+      } else {
+        await supabase.from("route_favorites").insert({ user_id: user.id, route_id: routeId });
+      }
+    } else {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(next)));
+    }
+  }, [user, favorites]);
 
-  const isFavorite = (routeId: string) => favorites.has(routeId);
+  const isFavorite = useCallback((routeId: string) => favorites.has(routeId), [favorites]);
 
   return (
     <FavoritesContext.Provider value={{ favorites, toggleFavorite, isFavorite }}>
