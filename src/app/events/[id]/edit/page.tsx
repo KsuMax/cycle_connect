@@ -219,9 +219,12 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
               </div>
               <div>
                 <label className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-1.5 block">Описание</label>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Расскажи об этой поездке..." rows={3}
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors resize-none" />
+                <DayEditor
+                  key="event-description"
+                  content={description}
+                  placeholder="Расскажи об этой поездке..."
+                  onChange={(html) => setDescription(html)}
+                />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

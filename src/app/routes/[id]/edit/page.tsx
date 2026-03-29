@@ -6,6 +6,7 @@ import { Header } from "@/components/layout/Header";
 import { MapPin, Link as LinkIcon, ChevronRight, AlertCircle, ChevronLeft } from "lucide-react";
 import { ImageUpload } from "@/components/routes/ImageUpload";
 import { CoverUpload } from "@/components/routes/CoverUpload";
+import { DayEditor } from "@/components/events/DayEditor";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import type { RouteType, Difficulty } from "@/types";
@@ -344,10 +345,12 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
           {/* Description */}
           <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
             <label className="block text-sm font-semibold text-[#1C1C1E] mb-2">Описание</label>
-            <textarea placeholder="Расскажи о маршруте: что увидит велосипедист, какое покрытие, особенности..."
-              value={description} onChange={(e) => setDescription(e.target.value)}
-              rows={4}
-              className="w-full px-4 py-2.5 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors resize-none" />
+            <DayEditor
+              key="route-description"
+              content={description}
+              placeholder="Расскажи о маршруте: что увидит велосипедист, какое покрытие, особенности..."
+              onChange={(html) => setDescription(html)}
+            />
           </div>
 
           <button type="submit" disabled={!canSubmit}

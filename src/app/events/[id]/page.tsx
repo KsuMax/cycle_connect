@@ -251,7 +251,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             {event.description && (
               <div className="bg-white rounded-2xl p-6 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
                 <h2 className="font-semibold text-[#1C1C1E] mb-3">О поездке</h2>
-                <p className="text-[#71717A] text-sm leading-relaxed">{event.description}</p>
+                <div className="prose prose-sm max-w-none text-[#71717A] leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: event.description }} />
               </div>
             )}
 
