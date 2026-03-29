@@ -171,13 +171,13 @@ export default function ProfilePage() {
     if (!["jpg", "jpeg", "png", "webp"].includes(ext ?? "")) return;
     setUploadingAvatar(true);
     setAvatarError(null);
-    // Use timestamp to bust cache on re-upload
-    const path = `${user.id}/avatar.${ext}`;
-    const { error: uploadError } = await supabase.storage.from("avatars").upload(path, file, { upsert: true, cacheControl: "0" });
+    // Use route-images bucket (already has permissive policies)
+    const path = `avatars/${user.id}/avatar.${ext}`;
+    const { error: uploadError } = await supabase.storage.from("route-images").upload(path, file, { upsert: true, cacheControl: "0" });
     if (uploadError) {
       setAvatarError(uploadError.message);
     } else {
-      const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path);
+      const { data: { publicUrl } } = supabase.storage.from("route-images").getPublicUrl(path);
       const urlWithBust = `${publicUrl}?t=${Date.now()}`;
       const { error: updateError } = await supabase.from("profiles").update({ avatar_url: urlWithBust }).eq("id", user.id);
       if (updateError) {
