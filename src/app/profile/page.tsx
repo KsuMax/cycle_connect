@@ -4,17 +4,24 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { RouteCard } from "@/components/routes/RouteCard";
-import { Avatar } from "@/components/ui/Avatar";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useFavorites } from "@/lib/context/FavoritesContext";
 import { supabase } from "@/lib/supabase";
 import { MOCK_ROUTES } from "@/lib/data/mock";
-import { Bike, Map, Calendar, Settings, Bookmark, LogIn } from "lucide-react";
+import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import type { Route, RouteType } from "@/types";
 import type { DbRoute } from "@/lib/supabase";
 
 type Tab = "routes" | "favorites" | "events";
+type EventsSubTab = "rides" | "events_list";
+
+interface ProfileEvent {
+  id: string;
+  title: string;
+  start_date: string | null;
+  organizer: { name: string } | null;
+}
 
 function dbToRoute(r: DbRoute): Route {
   return {
@@ -54,8 +61,13 @@ export default function ProfilePage() {
   const router = useRouter();
   const { favorites } = useFavorites();
   const [activeTab, setActiveTab] = useState<Tab>("routes");
+  const [eventsSubTab, setEventsSubTab] = useState<EventsSubTab>("rides");
   const [myRoutes, setMyRoutes] = useState<Route[]>([]);
   const [loadingRoutes, setLoadingRoutes] = useState(true);
+  const [ridesData, setRidesData] = useState<Route[]>([]);
+  const [loadingRides, setLoadingRides] = useState(true);
+  const [myEvents, setMyEvents] = useState<ProfileEvent[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -65,42 +77,68 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!user) return;
+
     async function loadMyRoutes() {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("routes")
         .select("*, author:profiles!author_id(*), route_images(url)")
         .eq("author_id", user!.id)
         .order("created_at", { ascending: false });
-
-      if (!error && data) {
-        setMyRoutes(data.map(dbToRoute));
-      }
+      if (data) setMyRoutes(data.map(dbToRoute));
       setLoadingRoutes(false);
     }
+
+    async function loadRides() {
+      const { data: rideRows } = await supabase
+        .from("route_rides")
+        .select("route_id")
+        .eq("user_id", user!.id);
+      const routeIds = rideRows?.map((r: { route_id: string }) => r.route_id) ?? [];
+      if (routeIds.length > 0) {
+        const { data } = await supabase
+          .from("routes")
+          .select("*, author:profiles!author_id(*), route_images(url)")
+          .in("id", routeIds);
+        if (data) setRidesData(data.map(dbToRoute));
+      }
+      setLoadingRides(false);
+    }
+
+    async function loadEvents() {
+      const { data: participantRows } = await supabase
+        .from("event_participants")
+        .select("event_id")
+        .eq("user_id", user!.id);
+      const eventIds = participantRows?.map((p: { event_id: string }) => p.event_id) ?? [];
+      if (eventIds.length > 0) {
+        const { data } = await supabase
+          .from("events")
+          .select("id, title, start_date, organizer:profiles!organizer_id(name)")
+          .in("id", eventIds);
+        if (data) setMyEvents(data as unknown as ProfileEvent[]);
+      }
+      setLoadingEvents(false);
+    }
+
     loadMyRoutes();
+    loadRides();
+    loadEvents();
   }, [user]);
 
   const favoriteRoutes = MOCK_ROUTES.filter((r) => favorites.has(r.id));
+  const ridesKm = loadingRides
+    ? (profile?.km_total ?? 0)
+    : ridesData.reduce((sum, r) => sum + r.distance_km, 0);
+  const tripsCount = ridesData.length + myEvents.length;
 
   const initials = profile?.name
     ? profile.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
     : user?.email?.[0].toUpperCase() ?? "?";
 
-  const profileUser = {
-    id: user?.id ?? "",
-    name: profile?.name || "Участник",
-    initials,
-    color: "#7C5CFC",
-    bio: profile?.bio ?? undefined,
-    km_total: profile?.km_total ?? 0,
-    routes_count: profile?.routes_count ?? 0,
-    events_count: profile?.events_count ?? 0,
-  };
-
   const TABS: { id: Tab; label: string; icon: React.ReactNode; count: number }[] = [
     { id: "routes",    label: "Мои маршруты", icon: <Map size={15} />,      count: myRoutes.length },
     { id: "favorites", label: "Избранное",    icon: <Bookmark size={15} />, count: favoriteRoutes.length },
-    { id: "events",    label: "Поездки",      icon: <Calendar size={15} />, count: profileUser.events_count },
+    { id: "events",    label: "Поездки",      icon: <Calendar size={15} />, count: tripsCount },
   ];
 
   if (authLoading) {
@@ -130,10 +168,10 @@ export default function ProfilePage() {
             <div className="flex-1">
               <div className="flex items-start justify-between">
                 <div>
-                  <h1 className="text-xl font-bold text-[#1C1C1E]">{profileUser.name}</h1>
+                  <h1 className="text-xl font-bold text-[#1C1C1E]">{profile?.name || "Участник"}</h1>
                   {profile?.username && <p className="text-sm font-medium mt-0.5" style={{ color: "#F4632A" }}>@{profile.username}</p>}
                   <p className="text-sm text-[#71717A] mt-0.5">{user.email}</p>
-                  {profileUser.bio && <p className="text-sm text-[#71717A] mt-1">{profileUser.bio}</p>}
+                  {profile?.bio && <p className="text-sm text-[#71717A] mt-1">{profile.bio}</p>}
                 </div>
                 <button className="flex items-center gap-1.5 text-sm text-[#71717A] hover:text-[#1C1C1E] transition-colors p-2 rounded-lg hover:bg-[#F5F4F1]">
                   <Settings size={16} /><span className="hidden sm:inline">Настройки</span>
@@ -141,9 +179,9 @@ export default function ProfilePage() {
               </div>
               <div className="flex gap-6 mt-4">
                 {[
-                  { value: profileUser.km_total.toLocaleString(), label: "км всего", color: "#F4632A" },
+                  { value: Math.round(ridesKm).toLocaleString(), label: "км всего", color: "#F4632A" },
                   { value: myRoutes.length, label: "маршрутов", color: "#7C5CFC" },
-                  { value: profileUser.events_count, label: "поездок", color: "#0BBFB5" },
+                  { value: loadingRides ? "..." : ridesData.length, label: "поездок", color: "#0BBFB5" },
                 ].map(({ value, label, color }) => (
                   <div key={label} className="text-center">
                     <div className="text-xl font-bold" style={{ color }}>{value}</div>
@@ -208,10 +246,83 @@ export default function ProfilePage() {
         )}
 
         {activeTab === "events" && (
-          <EmptyState icon={<Calendar size={40} />} title="Нет поездок"
-            text="Присоединись к мероприятию или создай своё"
-            action={<Link href="/events/new" className="mt-4 inline-block text-sm font-medium px-4 py-2 rounded-xl text-white" style={{ backgroundColor: "#F4632A" }}>Создать мероприятие</Link>}
-          />
+          <section>
+            {/* Sub-tabs */}
+            <div className="flex gap-1 bg-white rounded-xl p-1 border border-[#E4E4E7] mb-5" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+              {([
+                { id: "rides" as const,       label: "Катанул",     icon: <Bike size={14} />,     count: ridesData.length },
+                { id: "events_list" as const, label: "Мероприятия", icon: <Calendar size={14} />, count: myEvents.length },
+              ]).map((sub) => (
+                <button key={sub.id} onClick={() => setEventsSubTab(sub.id)}
+                  className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-all"
+                  style={eventsSubTab === sub.id ? { backgroundColor: "#1C1C1E", color: "white" } : { color: "#71717A" }}>
+                  {sub.icon}
+                  {sub.label}
+                  {sub.count > 0 && (
+                    <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full"
+                      style={eventsSubTab === sub.id
+                        ? { backgroundColor: "rgba(255,255,255,0.2)", color: "white" }
+                        : { backgroundColor: "#F5F4F1", color: "#71717A" }}>
+                      {sub.count}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {eventsSubTab === "rides" && (
+              loadingRides ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {[1, 2].map((i) => <div key={i} className="h-64 bg-white rounded-2xl animate-pulse border border-[#E4E4E7]" />)}
+                </div>
+              ) : ridesData.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {ridesData.map((route) => <RouteCard key={route.id} route={route} />)}
+                </div>
+              ) : (
+                <EmptyState icon={<Bike size={40} />} title="Нет прокатанных маршрутов"
+                  text='Нажми "Катнуть" на странице маршрута, чтобы отметить его'
+                  action={<Link href="/routes" className="mt-4 inline-block text-sm font-medium px-4 py-2 rounded-xl text-white" style={{ backgroundColor: "#F4632A" }}>К маршрутам</Link>}
+                />
+              )
+            )}
+
+            {eventsSubTab === "events_list" && (
+              loadingEvents ? (
+                <div className="space-y-3">
+                  {[1, 2].map((i) => <div key={i} className="h-20 bg-white rounded-2xl animate-pulse border border-[#E4E4E7]" />)}
+                </div>
+              ) : myEvents.length > 0 ? (
+                <div className="space-y-3">
+                  {myEvents.map((ev) => (
+                    <Link key={ev.id} href={`/events/${ev.id}`}
+                      className="flex items-center gap-4 bg-white rounded-2xl p-4 border border-[#E4E4E7] hover:border-[#F4632A] transition-colors"
+                      style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: "#FFF0EB" }}>
+                        <Calendar size={18} style={{ color: "#F4632A" }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm text-[#1C1C1E] truncate">{ev.title}</div>
+                        <div className="text-xs text-[#A1A1AA] mt-0.5">
+                          {ev.start_date
+                            ? new Date(ev.start_date).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })
+                            : "Дата не указана"}
+                          {ev.organizer?.name && ` · ${ev.organizer.name}`}
+                        </div>
+                      </div>
+                      <ChevronRight size={16} className="text-[#A1A1AA] shrink-0" />
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState icon={<Calendar size={40} />} title="Нет мероприятий"
+                  text="Присоединись к мероприятию или создай своё"
+                  action={<Link href="/events/new" className="mt-4 inline-block text-sm font-medium px-4 py-2 rounded-xl text-white" style={{ backgroundColor: "#F4632A" }}>Создать мероприятие</Link>}
+                />
+              )
+            )}
+          </section>
         )}
       </main>
     </div>

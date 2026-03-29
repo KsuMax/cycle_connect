@@ -236,7 +236,7 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
 
               {/* Actions */}
               <div className="flex gap-2">
-                <button onClick={() => toggleRide(route.id)}
+                <button onClick={() => toggleRide(route.id, route.distance_km)}
                   className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors"
                   style={hasRidden(route.id)
                     ? { backgroundColor: "#F4632A", color: "white" }
