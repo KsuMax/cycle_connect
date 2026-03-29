@@ -12,6 +12,7 @@ import {
   ChevronLeft, Calendar, Bike, Heart,
   Share2, Users, MapPin, ExternalLink, Flag, ChevronRight, Pencil,
 } from "lucide-react";
+import { formatDate } from "@/lib/utils";
 import { AuthTooltip } from "@/components/ui/AuthTooltip";
 import type { User, Route, EventDay, RouteType } from "@/types";
 
@@ -220,7 +221,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   {event.start_date && (
                     <span className="flex items-center gap-1.5">
                       <Calendar size={14} />
-                      {event.start_date}{isMultiDay && event.end_date ? ` — ${event.end_date}` : ""}
+                      {formatDate(event.start_date)}{isMultiDay && event.end_date ? ` — ${formatDate(event.end_date)}` : ""}
                     </span>
                   )}
                   {totalKm > 0 && <span className="flex items-center gap-1.5"><Bike size={14} /> {totalKm} км всего</span>}
@@ -279,7 +280,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         <div className="flex-1 min-w-0">
                           <div className="font-semibold text-[#1C1C1E] text-sm mb-0.5">{day.title}</div>
                           <div className="flex items-center gap-3 text-xs text-[#71717A]">
-                            {day.date && <span>{day.date}</span>}
+                            {day.date && <span>{formatDate(day.date)}</span>}
                             {day.distance_km > 0 && <span className="flex items-center gap-1"><Bike size={11} /> {day.distance_km} км</span>}
                             {day.start_point && (
                               <span className="hidden sm:flex items-center gap-1">
@@ -353,7 +354,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   <div className="flex justify-between text-sm">
                     <span className="text-[#71717A]">Даты</span>
                     <span className="font-medium text-[#1C1C1E]">
-                      {event.start_date}{isMultiDay && event.end_date ? ` — ${event.end_date}` : ""}
+                      {formatDate(event.start_date)}{isMultiDay && event.end_date ? ` — ${formatDate(event.end_date)}` : ""}
                     </span>
                   </div>
                 )}

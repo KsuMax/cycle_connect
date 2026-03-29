@@ -12,6 +12,7 @@ export interface DbProfile {
   name: string;
   username: string | null;
   bio: string | null;
+  avatar_url: string | null;
   km_total: number;
   routes_count: number;
   events_count: number;
