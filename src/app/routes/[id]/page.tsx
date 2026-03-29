@@ -8,6 +8,7 @@ import { RouteComments } from "@/components/routes/RouteComments";
 import { useFavorites } from "@/lib/context/FavoritesContext";
 import { useLikes } from "@/lib/context/LikesContext";
 import { useAuth } from "@/lib/context/AuthContext";
+import { useRides } from "@/lib/context/RidesContext";
 import { supabase } from "@/lib/supabase";
 import { MOCK_COMMENTS } from "@/lib/data/mock";
 import { DifficultyBadge, Badge } from "@/components/ui/Badge";
@@ -66,13 +67,13 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
   const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { isLiked, toggleLike } = useLikes();
+  const { hasRidden, toggleRide } = useRides();
   const router = useRouter();
 
   const [route, setRoute] = useState<Route | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [likeCount, setLikeCount] = useState(0);
-  const [going, setGoing] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -236,12 +237,12 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
 
               {/* Actions */}
               <div className="flex gap-2">
-                <button onClick={() => setGoing(!going)}
+                <button onClick={() => toggleRide(route.id)}
                   className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors"
-                  style={going
+                  style={hasRidden(route.id)
                     ? { backgroundColor: "#F4632A", color: "white" }
                     : { backgroundColor: "#1C1C1E", color: "white" }}>
-                  {going ? "Катанул ✓" : "Катнуть"}
+                  {hasRidden(route.id) ? "Катанул ✓" : "Катнуть"}
                 </button>
                 <button onClick={() => toggleFavorite(route.id)}
                   className="w-10 h-10 rounded-xl border flex items-center justify-center transition-colors"
