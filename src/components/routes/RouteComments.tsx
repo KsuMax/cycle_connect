@@ -77,7 +77,7 @@ export function RouteComments({ routeId }: RouteCommentsProps) {
       .eq("route_id", routeId)
       .order("created_at", { ascending: true });
 
-    if (data) setComments((data as DbCommentRow[]).map(dbToComment));
+    if (data) setComments((data as unknown as DbCommentRow[]).map(dbToComment));
     setLoading(false);
   }, [routeId]);
 
@@ -97,7 +97,7 @@ export function RouteComments({ routeId }: RouteCommentsProps) {
       .single();
 
     if (!error && data) {
-      setComments((prev) => [...prev, dbToComment(data as DbCommentRow)]);
+      setComments((prev) => [...prev, dbToComment(data as unknown as DbCommentRow)]);
       setText("");
     }
     setSubmitting(false);
