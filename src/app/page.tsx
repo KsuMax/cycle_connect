@@ -29,6 +29,7 @@ function dbToRoute(r: DbRoute): Route {
       name: r.author?.name ?? "Участник",
       initials: (r.author?.name ?? "?").split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
       color: "#F4632A",
+      avatar_url: r.author?.avatar_url ?? null,
       km_total: r.author?.km_total ?? 0,
       routes_count: r.author?.routes_count ?? 0,
       events_count: r.author?.events_count ?? 0,
@@ -55,6 +56,7 @@ function dbToEvent(e: DbEvent): CycleEvent {
       name: e.organizer?.name ?? "Организатор",
       initials: (e.organizer?.name ?? "?").split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
       color: "#7C5CFC",
+      avatar_url: e.organizer?.avatar_url ?? null,
       km_total: 0,
       routes_count: 0,
       events_count: 0,
@@ -145,7 +147,7 @@ export default function FeedPage() {
                     <Calendar size={18} style={{ color: "#7C5CFC" }} />
                     Ближайшие поездки
                   </h2>
-                  <Link href="/routes" className="text-sm hover:underline" style={{ color: "#F4632A" }}>Все</Link>
+                  <Link href="/routes?tab=events" className="text-sm hover:underline" style={{ color: "#F4632A" }}>Все</Link>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
                   {events.map((event) => <EventCard key={event.id} event={event} />)}

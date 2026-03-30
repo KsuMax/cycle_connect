@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Calendar, Bike, Heart, Users, ChevronRight } from "lucide-react";
 import { AvatarGroup } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
+import { formatDate } from "@/lib/utils";
 import type { CycleEvent } from "@/types";
 
 interface EventCardProps {
@@ -69,7 +70,7 @@ export function EventCard({ event }: EventCardProps) {
           <div className="flex items-center gap-3 text-xs text-[#71717A] mb-3">
             <span className="flex items-center gap-1">
               <Calendar size={12} />
-              {event.start_date}
+              {formatDate(event.start_date)}
             </span>
             <span className="flex items-center gap-1">
               <Bike size={12} />

@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Map, Newspaper, LogOut } from "lucide-react";
+import { Map, Newspaper, LogOut, Globe } from "lucide-react";
 import { useAuth } from "@/lib/context/AuthContext";
 
 const NAV_ITEMS = [
   { href: "/", label: "Лента", icon: Newspaper },
   { href: "/routes", label: "Маршруты", icon: Map },
+  { href: "/online", label: "Онлайн", icon: Globe },
 ];
 
 export function Header() {
@@ -62,9 +63,12 @@ export function Header() {
                   "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
                   pathname === "/profile" ? "text-[#F4632A] bg-[#FFF0EB]" : "text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1]"
                 )}>
-                <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                <div className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center text-xs font-bold text-white shrink-0"
                   style={{ backgroundColor: "#7C5CFC" }}>
-                  {initials}
+                  {profile?.avatar_url
+                    ? <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                    : initials
+                  }
                 </div>
                 <span className="hidden sm:inline">{profile?.name ?? "Профиль"}</span>
               </Link>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { EventCard } from "@/components/events/EventCard";
@@ -45,6 +46,7 @@ function dbRouteToRoute(r: DbRoute): Route {
       name: r.author?.name ?? "Участник",
       initials: (r.author?.name ?? "?").split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
       color: "#F4632A",
+      avatar_url: r.author?.avatar_url ?? null,
       km_total: r.author?.km_total ?? 0,
       routes_count: r.author?.routes_count ?? 0,
       events_count: r.author?.events_count ?? 0,
@@ -71,15 +73,14 @@ function dbToEvent(e: DbEvent): CycleEvent {
       name: e.organizer?.name ?? "Организатор",
       initials: (e.organizer?.name ?? "?").split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
       color: "#7C5CFC",
-      km_total: 0,
-      routes_count: 0,
-      events_count: 0,
+      avatar_url: e.organizer?.avatar_url ?? null,
+      km_total: 0, routes_count: 0, events_count: 0,
     },
     route: e.route ? dbRouteToRoute(e.route as DbRoute) : {
       id: "", title: "", description: "", region: "", distance_km: 0,
       elevation_m: 0, duration_min: 0, difficulty: "medium" as const,
       surface: [], bike_types: [], route_types: [], tags: [],
-      author: { id: "", name: "", initials: "", color: "", km_total: 0, routes_count: 0, events_count: 0 },
+      author: { id: "", name: "", initials: "", color: "", avatar_url: null, km_total: 0, routes_count: 0, events_count: 0 },
       riders_today: 0, likes: 0, created_at: "",
     },
     days: e.event_days?.map((d) => ({
@@ -98,6 +99,7 @@ function dbToEvent(e: DbEvent): CycleEvent {
         name,
         initials: name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
         color: "#7C5CFC",
+        avatar_url: p.profile?.avatar_url ?? null,
         km_total: p.profile?.km_total ?? 0,
         routes_count: p.profile?.routes_count ?? 0,
         events_count: p.profile?.events_count ?? 0,
@@ -109,9 +111,18 @@ function dbToEvent(e: DbEvent): CycleEvent {
   };
 }
 
-export default function RoutesPage() {
+function RoutesPageInner() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"routes" | "events">("routes");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const activeTab = searchParams.get("tab") === "events" ? "events" : "routes";
+
+  const setTab = useCallback((tab: "routes" | "events") => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "events") params.set("tab", "events");
+    else params.delete("tab");
+    router.replace(`/routes?${params.toString()}`);
+  }, [searchParams, router]);
 
   // ── Routes state ──────────────────────────────────────────────────────────
   const [search, setSearch] = useState("");
@@ -175,10 +186,11 @@ export default function RoutesPage() {
     if (route.distance_km > maxDistance) return false;
     if (region !== "Все регионы" && route.region !== region) return false;
     return true;
-  }).sort((a, b) => {
-    if (sortBy === "newest") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-  });
+  }).sort((a, b) =>
+    sortBy === "oldest"
+      ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      : new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
 
   const hasActiveRouteFilters = difficulty !== "all" || maxDistance < 300 || region !== "Все регионы" || selectedTypes.length > 0;
 
@@ -236,7 +248,7 @@ export default function RoutesPage() {
             <p className="text-[#71717A] text-sm">
               {activeTab === "routes"
                 ? "Найди идеальный маршрут для следующей поездки"
-                : "Присоединяйся к предстоящим велопоездкам"}
+                : "Ближайшие велопоходы и групповые поездки"}
             </p>
           </div>
           {user && activeTab === "routes" && (
@@ -260,7 +272,7 @@ export default function RoutesPage() {
         {/* Tabs */}
         <div className="flex gap-1 mb-6 bg-white border border-[#E4E4E7] rounded-xl p-1 w-fit" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
           <button
-            onClick={() => setActiveTab("routes")}
+            onClick={() => setTab("routes")}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
             style={activeTab === "routes"
               ? { backgroundColor: "#1C1C1E", color: "white" }
@@ -269,7 +281,7 @@ export default function RoutesPage() {
             Маршруты
           </button>
           <button
-            onClick={() => setActiveTab("events")}
+            onClick={() => setTab("events")}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
             style={activeTab === "events"
               ? { backgroundColor: "#1C1C1E", color: "white" }
@@ -637,5 +649,13 @@ export default function RoutesPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function RoutesPage() {
+  return (
+    <Suspense>
+      <RoutesPageInner />
+    </Suspense>
   );
 }

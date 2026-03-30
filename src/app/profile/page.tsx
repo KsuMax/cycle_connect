@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { RouteCard } from "@/components/routes/RouteCard";
@@ -8,7 +8,8 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useFavorites } from "@/lib/context/FavoritesContext";
 import { useRides } from "@/lib/context/RidesContext";
 import { supabase } from "@/lib/supabase";
-import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight } from "lucide-react";
+import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera } from "lucide-react";
+import { formatDate } from "@/lib/utils";
 import Link from "next/link";
 import type { Route, RouteType } from "@/types";
 import type { DbRoute } from "@/lib/supabase";
@@ -42,6 +43,7 @@ function dbToRoute(r: DbRoute): Route {
       name: r.author?.name ?? "Участник",
       initials: (r.author?.name ?? "?").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase(),
       color: "#F4632A",
+      avatar_url: r.author?.avatar_url ?? null,
       km_total: r.author?.km_total ?? 0,
       routes_count: r.author?.routes_count ?? 0,
       events_count: r.author?.events_count ?? 0,
@@ -76,6 +78,11 @@ export default function ProfilePage() {
 
   const [myEvents, setMyEvents] = useState<ProfileEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
+
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/auth/login");
@@ -153,6 +160,36 @@ export default function ProfilePage() {
       });
   }, [user]);
 
+  // Sync avatarUrl from profile
+  useEffect(() => {
+    setAvatarUrl(profile?.avatar_url ?? null);
+  }, [profile]);
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    if (!["jpg", "jpeg", "png", "webp"].includes(ext ?? "")) return;
+    setUploadingAvatar(true);
+    setAvatarError(null);
+    const path = `${user.id}/avatar.${ext}`;
+    const { error: uploadError } = await supabase.storage.from("avatars").upload(path, file, { upsert: true, cacheControl: "0" });
+    if (uploadError) {
+      setAvatarError(uploadError.message);
+    } else {
+      const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path);
+      const urlWithBust = `${publicUrl}?t=${Date.now()}`;
+      const { error: updateError } = await supabase.from("profiles").update({ avatar_url: urlWithBust }).eq("id", user.id);
+      if (updateError) {
+        setAvatarError(updateError.message);
+      } else {
+        setAvatarUrl(urlWithBust);
+      }
+    }
+    setUploadingAvatar(false);
+    e.target.value = "";
+  };
+
   const ridesKm = loadingRides
     ? (profile?.km_total ?? 0)
     : ridesData.reduce((sum, r) => sum + r.distance_km, 0);
@@ -188,9 +225,36 @@ export default function ProfilePage() {
         {/* Profile header */}
         <div className="bg-white rounded-2xl p-6 border border-[#E4E4E7] mb-6" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
           <div className="flex items-start gap-5">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-bold text-white shrink-0"
-              style={{ backgroundColor: "#7C5CFC" }}>
-              {initials}
+            <div className="relative shrink-0 group">
+              <div className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center text-xl font-bold text-white"
+                style={{ backgroundColor: "#7C5CFC" }}>
+                {avatarUrl
+                  ? <img src={avatarUrl} alt="Аватар" className="w-full h-full object-cover" />
+                  : initials
+                }
+              </div>
+              <button
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                className="absolute inset-0 rounded-2xl flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                title="Загрузить фото">
+                {uploadingAvatar
+                  ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  : <Camera size={18} className="text-white" />
+                }
+              </button>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={handleAvatarUpload}
+              />
+              {avatarError && (
+                <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-red-500 font-medium">
+                  {avatarError}
+                </div>
+              )}
             </div>
             <div className="flex-1">
               <div className="flex items-start justify-between">
@@ -336,9 +400,7 @@ export default function ProfilePage() {
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-sm text-[#1C1C1E] truncate">{ev.title}</div>
                         <div className="text-xs text-[#A1A1AA] mt-0.5">
-                          {ev.start_date
-                            ? new Date(ev.start_date).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })
-                            : "Дата не указана"}
+                          {ev.start_date ? formatDate(ev.start_date) : "Дата не указана"}
                           {ev.organizer?.name && ` · ${ev.organizer.name}`}
                         </div>
                       </div>

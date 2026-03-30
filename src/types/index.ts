@@ -9,6 +9,7 @@ export interface User {
   initials: string;
   color: string; // tailwind bg color class
   bio?: string;
+  avatar_url?: string | null;
   km_total: number;
   routes_count: number;
   events_count: number;
