@@ -17,6 +17,8 @@ export interface DbProfile {
   routes_count: number;
   events_count: number;
   created_at: string;
+  website?: string | null;
+  strava_url?: string | null;
 }
 
 export interface DbRoute {

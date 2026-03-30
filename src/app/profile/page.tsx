@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useFavorites } from "@/lib/context/FavoritesContext";
 import { useRides } from "@/lib/context/RidesContext";
 import { supabase } from "@/lib/supabase";
-import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera } from "lucide-react";
+import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
 import type { Route, RouteType } from "@/types";
@@ -263,10 +263,33 @@ export default function ProfilePage() {
                   {profile?.username && <p className="text-sm font-medium mt-0.5" style={{ color: "#F4632A" }}>@{profile.username}</p>}
                   <p className="text-sm text-[#71717A] mt-0.5">{user.email}</p>
                   {profile?.bio && <p className="text-sm text-[#71717A] mt-1">{profile.bio}</p>}
+                  {(profile?.website || profile?.strava_url) && (
+                    <div className="flex items-center gap-3 mt-2 flex-wrap">
+                      {profile.website && (
+                        <a href={profile.website} target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs text-[#7C5CFC] hover:underline">
+                          <Globe size={12} />
+                          {(() => { try { return new URL(profile.website!).hostname.replace("www.", ""); } catch { return profile.website; } })()}
+                          <ExternalLink size={10} />
+                        </a>
+                      )}
+                      {profile.strava_url && (
+                        <a href={profile.strava_url} target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs font-medium hover:underline"
+                          style={{ color: "#FC4C02" }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
+                          </svg>
+                          Strava
+                          <ExternalLink size={10} />
+                        </a>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <button className="flex items-center gap-1.5 text-sm text-[#71717A] hover:text-[#1C1C1E] transition-colors p-2 rounded-lg hover:bg-[#F5F4F1]">
+                <Link href="/profile/settings" className="flex items-center gap-1.5 text-sm text-[#71717A] hover:text-[#1C1C1E] transition-colors p-2 rounded-lg hover:bg-[#F5F4F1]">
                   <Settings size={16} /><span className="hidden sm:inline">Настройки</span>
-                </button>
+                </Link>
               </div>
               <div className="flex gap-6 mt-4">
                 {[
