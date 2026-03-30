@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { Calendar, Bike, Heart, Users, ChevronRight } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Calendar, Bike, Heart, ChevronRight } from "lucide-react";
 import { AvatarGroup } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { formatDate } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/context/AuthContext";
 import type { CycleEvent } from "@/types";
 
 interface EventCardProps {
@@ -14,19 +16,39 @@ interface EventCardProps {
 }
 
 export function EventCard({ event }: EventCardProps) {
+  const { user } = useAuth();
+
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(event.likes);
   const [going, setGoing] = useState(false);
+  const [goingBusy, setGoingBusy] = useState(false);
 
-  const handleLike = (e: React.MouseEvent) => {
+  // Sync going state whenever user or participants change
+  useEffect(() => {
+    setGoing(user ? event.participants.some((p) => p.id === user.id) : false);
+  }, [user?.id, event.id, event.participants]);
+
+  const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
-    setLiked((prev) => !prev);
-    setLikeCount((prev) => (liked ? prev - 1 : prev + 1));
+    const wasLiked = liked;
+    const newCount = wasLiked ? likeCount - 1 : likeCount + 1;
+    setLiked(!wasLiked);
+    setLikeCount(newCount);
+    await supabase.from("events").update({ likes_count: newCount }).eq("id", event.id);
   };
 
-  const handleGoing = (e: React.MouseEvent) => {
+  const handleGoing = async (e: React.MouseEvent) => {
     e.preventDefault();
-    setGoing((prev) => !prev);
+    if (!user || goingBusy) return;
+    setGoingBusy(true);
+    const wasGoing = going;
+    setGoing(!wasGoing);
+    if (wasGoing) {
+      await supabase.from("event_participants").delete().eq("event_id", event.id).eq("user_id", user.id);
+    } else {
+      await supabase.from("event_participants").insert({ event_id: event.id, user_id: user.id });
+    }
+    setGoingBusy(false);
   };
 
   const isMultiDay = event.days.length > 1;
@@ -90,13 +112,11 @@ export function EventCard({ event }: EventCardProps) {
 
           {/* Footer */}
           <div className="flex items-center justify-between pt-2 border-t border-[#F5F4F1]">
-            <div className="flex items-center gap-3">
-              <AvatarGroup
-                users={event.participants}
-                max={3}
-                label={`${event.participants.length}${event.max_participants ? `/${event.max_participants}` : ""} едут`}
-              />
-            </div>
+            <AvatarGroup
+              users={event.participants}
+              max={3}
+              label={`${event.participants.length}${event.max_participants ? `/${event.max_participants}` : ""} едут`}
+            />
 
             <div className="flex items-center gap-2">
               <button
@@ -110,7 +130,8 @@ export function EventCard({ event }: EventCardProps) {
 
               <button
                 onClick={handleGoing}
-                className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+                disabled={goingBusy}
+                className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-70"
                 style={going
                   ? { backgroundColor: "#0BBFB5", color: "white" }
                   : { backgroundColor: "#1C1C1E", color: "white" }

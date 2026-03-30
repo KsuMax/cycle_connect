@@ -424,7 +424,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 <div className="flex-1">
                   <AuthTooltip disabled={!user} className="w-full">
                     <button
-                      onClick={() => { setLiked(!liked); setLikeCount(liked ? likeCount - 1 : likeCount + 1); }}
+                      onClick={async () => {
+                        const wasLiked = liked;
+                        const newCount = wasLiked ? likeCount - 1 : likeCount + 1;
+                        setLiked(!wasLiked);
+                        setLikeCount(newCount);
+                        await supabase.from("events").update({ likes_count: newCount }).eq("id", event.id);
+                      }}
                       className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-[#E4E4E7] text-sm transition-colors hover:bg-[#F5F4F1]"
                       style={{ color: liked ? "#F4632A" : "#71717A" }}>
                       <Heart size={14} fill={liked ? "#F4632A" : "none"} /> {likeCount}

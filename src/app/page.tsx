@@ -84,6 +84,7 @@ function dbToEvent(e: DbEvent): CycleEvent {
         name,
         initials: name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
         color: "#7C5CFC",
+        avatar_url: p.profile?.avatar_url ?? null,
         km_total: p.profile?.km_total ?? 0,
         routes_count: p.profile?.routes_count ?? 0,
         events_count: p.profile?.events_count ?? 0,
