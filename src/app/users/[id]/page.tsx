@@ -256,15 +256,22 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
               {/* Stats */}
               <div className="flex gap-6 mt-4 flex-wrap">
                 {[
-                  { value: Math.round(profile.km_total).toLocaleString(), label: "км всего", color: "#F4632A" },
-                  { value: routes.length,          label: "маршрутов", color: "#7C5CFC" },
-                  { value: followersCount,          label: "подписчиков", color: "#0BBFB5" },
-                  { value: followingCount,          label: "подписок", color: "#A1A1AA" },
-                ].map(({ value, label, color }) => (
-                  <div key={label} className="text-center">
-                    <div className="text-xl font-bold" style={{ color }}>{value}</div>
-                    <div className="text-xs text-[#71717A]">{label}</div>
-                  </div>
+                  { value: Math.round(profile.km_total).toLocaleString(), label: "км всего", color: "#F4632A", href: null },
+                  { value: routes.length, label: "маршрутов", color: "#7C5CFC", href: null },
+                  { value: followersCount, label: "подписчиков", color: "#0BBFB5", href: `/users/${id}/followers` },
+                  { value: followingCount, label: "подписок", color: "#A1A1AA", href: `/users/${id}/following` },
+                ].map(({ value, label, color, href }) => (
+                  href ? (
+                    <Link key={label} href={href} className="text-center group">
+                      <div className="text-xl font-bold group-hover:underline" style={{ color }}>{value}</div>
+                      <div className="text-xs text-[#71717A]">{label}</div>
+                    </Link>
+                  ) : (
+                    <div key={label} className="text-center">
+                      <div className="text-xl font-bold" style={{ color }}>{value}</div>
+                      <div className="text-xs text-[#71717A]">{label}</div>
+                    </div>
+                  )
                 ))}
               </div>
             </div>
