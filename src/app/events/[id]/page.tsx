@@ -114,6 +114,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [likeCount, setLikeCount] = useState(0);
   const [going, setGoing] = useState(false);
   const [activeDay, setActiveDay] = useState<number | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -141,6 +142,19 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     }
     load();
   }, [id, user]);
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    if (navigator.share) {
+      try { await navigator.share({ title: event?.title ?? "Мероприятие", url }); } catch { /* dismissed */ }
+    } else {
+      try {
+        await navigator.clipboard.writeText(url);
+        setShareCopied(true);
+        setTimeout(() => setShareCopied(false), 2000);
+      } catch { /* ignore */ }
+    }
+  };
 
   const handleGoingToggle = async () => {
     if (!user || !event) return;
@@ -389,11 +403,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               )}
 
-              <AuthTooltip disabled={!user} className="w-full mb-3">
-                <Button variant={going ? "outline" : "secondary"} size="lg" className="w-full" onClick={handleGoingToggle}>
-                  {going ? "✓ Ты едешь!" : "Я поеду →"}
-                </Button>
-              </AuthTooltip>
+              <div className="mb-3">
+                <AuthTooltip disabled={!user} className="w-full">
+                  <Button variant={going ? "outline" : "secondary"} size="lg" className="w-full" onClick={handleGoingToggle}>
+                    {going ? "✓ Ты едешь!" : "Я поеду →"}
+                  </Button>
+                </AuthTooltip>
+              </div>
 
               {event.route && (
                 <Link href={`/routes/${event.route.id}`}
@@ -403,17 +419,23 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               )}
 
               <div className="flex gap-2">
-                <AuthTooltip disabled={!user} className="flex-1">
+                <div className="flex-1">
+                  <AuthTooltip disabled={!user} className="w-full">
+                    <button
+                      onClick={() => { setLiked(!liked); setLikeCount(liked ? likeCount - 1 : likeCount + 1); }}
+                      className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-[#E4E4E7] text-sm transition-colors hover:bg-[#F5F4F1]"
+                      style={{ color: liked ? "#F4632A" : "#71717A" }}>
+                      <Heart size={14} fill={liked ? "#F4632A" : "none"} /> {likeCount}
+                    </button>
+                  </AuthTooltip>
+                </div>
+                <div className="flex-1">
                   <button
-                    onClick={() => { setLiked(!liked); setLikeCount(liked ? likeCount - 1 : likeCount + 1); }}
-                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-[#E4E4E7] text-sm transition-colors hover:bg-[#F5F4F1]"
-                    style={{ color: liked ? "#F4632A" : "#71717A" }}>
-                    <Heart size={14} fill={liked ? "#F4632A" : "none"} /> {likeCount}
+                    onClick={handleShare}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-[#E4E4E7] text-sm text-[#71717A] hover:bg-[#F5F4F1] transition-colors">
+                    <Share2 size={14} /> {shareCopied ? "Скопировано!" : "Поделиться"}
                   </button>
-                </AuthTooltip>
-                <button className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-[#E4E4E7] text-sm text-[#71717A] hover:bg-[#F5F4F1] transition-colors">
-                  <Share2 size={14} /> Поделиться
-                </button>
+                </div>
               </div>
             </div>
           </aside>

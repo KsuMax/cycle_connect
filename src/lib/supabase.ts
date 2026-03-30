@@ -58,7 +58,7 @@ export interface DbEvent {
   organizer?: DbProfile;
   route?: DbRoute;
   event_days?: DbEventDay[];
-  event_participants?: { user_id: string }[];
+  event_participants?: { user_id: string; profile?: DbProfile | null }[];
 }
 
 export interface DbEventDay {

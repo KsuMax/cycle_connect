@@ -75,9 +75,18 @@ function dbToEvent(e: DbEvent): CycleEvent {
       end_point: d.end_point ?? "",
       description: d.description ?? "",
     })) ?? [],
-    participants: e.event_participants?.map((p) => ({
-      id: p.user_id, name: "", initials: "", color: "#7C5CFC", km_total: 0, routes_count: 0, events_count: 0,
-    })) ?? [],
+    participants: e.event_participants?.map((p) => {
+      const name = p.profile?.name ?? "Участник";
+      return {
+        id: p.user_id,
+        name,
+        initials: name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
+        color: "#7C5CFC",
+        km_total: p.profile?.km_total ?? 0,
+        routes_count: p.profile?.routes_count ?? 0,
+        events_count: p.profile?.events_count ?? 0,
+      };
+    }) ?? [],
     max_participants: e.max_participants ?? undefined,
     likes: e.likes_count,
     created_at: e.created_at,
@@ -96,7 +105,7 @@ export default function FeedPage() {
       .then(({ data }) => { if (data) setRoutes(data.map(dbToRoute)); });
 
     supabase.from("events")
-      .select("*, organizer:profiles!organizer_id(*), route:routes(*), event_days(*), event_participants(user_id)")
+      .select("*, organizer:profiles!organizer_id(*), route:routes(*), event_days(*), event_participants(user_id, profile:profiles!user_id(*))")
       .order("created_at", { ascending: false })
       .limit(2)
       .then(({ data }) => { if (data) setEvents(data.map(dbToEvent)); });
@@ -136,7 +145,7 @@ export default function FeedPage() {
                     <Calendar size={18} style={{ color: "#7C5CFC" }} />
                     Ближайшие поездки
                   </h2>
-                  <Link href="/events" className="text-sm hover:underline" style={{ color: "#F4632A" }}>Все</Link>
+                  <Link href="/routes" className="text-sm hover:underline" style={{ color: "#F4632A" }}>Все</Link>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
                   {events.map((event) => <EventCard key={event.id} event={event} />)}
