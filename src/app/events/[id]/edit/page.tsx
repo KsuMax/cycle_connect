@@ -8,7 +8,7 @@ import { DayEditor } from "@/components/events/DayEditor";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { Plus, Trash2, ChevronLeft, Calendar, Bike, AlertCircle } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, Calendar, Bike, AlertCircle, Lock } from "lucide-react";
 
 interface DayForm {
   id: string;
@@ -44,6 +44,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   const [routeId, setRouteId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [maxParticipants, setMaxParticipants] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
   const [days, setDays] = useState<DayForm[]>([]);
   const [routes, setRoutes] = useState<RouteOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,6 +77,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         setRouteId(ev.route_id ?? "");
         setStartDate(ev.start_date ?? "");
         setMaxParticipants(ev.max_participants ? String(ev.max_participants) : "");
+        setIsPrivate(ev.is_private ?? false);
 
         const loadedDays: DayForm[] = (ev.event_days ?? [])
           .sort((a: { day_number: number }, b: { day_number: number }) => a.day_number - b.day_number)
@@ -128,6 +130,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         start_date: startDate || null,
         end_date: endDate,
         max_participants: parseInt(maxParticipants) || null,
+        is_private: isPrivate,
       })
       .eq("id", id);
 
@@ -242,6 +245,22 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                     placeholder="Без ограничений"
                     className="w-full px-3 py-2.5 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors" />
                 </div>
+              </div>
+
+              {/* Private toggle */}
+              <div className="flex items-center justify-between pt-1">
+                <div>
+                  <div className="text-sm font-medium text-[#1C1C1E] flex items-center gap-1.5">
+                    <Lock size={13} className="text-[#71717A]" /> Закрытое мероприятие
+                  </div>
+                  <div className="text-xs text-[#71717A]">Не отображается в списках — доступно только по прямой ссылке</div>
+                </div>
+                <button type="button" onClick={() => setIsPrivate(!isPrivate)}
+                  className="relative w-11 h-6 rounded-full transition-colors shrink-0 ml-4"
+                  style={{ backgroundColor: isPrivate ? "#7C5CFC" : "#D1D5DB" }}>
+                  <div className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+                    style={{ transform: isPrivate ? "translateX(20px)" : "translateX(0)" }} />
+                </button>
               </div>
             </div>
           </div>

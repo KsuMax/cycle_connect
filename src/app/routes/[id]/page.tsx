@@ -15,9 +15,18 @@ import { Avatar } from "@/components/ui/Avatar";
 import { EventCard } from "@/components/events/EventCard";
 import { useRouter } from "next/navigation";
 import { AuthTooltip } from "@/components/ui/AuthTooltip";
-import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2 } from "lucide-react";
+import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users } from "lucide-react";
+import { formatDate } from "@/lib/utils";
 import type { Route, RouteType } from "@/types";
 import type { DbRoute } from "@/lib/supabase";
+
+interface RelatedEvent {
+  id: string;
+  title: string;
+  start_date: string | null;
+  is_private: boolean;
+  participants: { user_id: string }[];
+}
 
 const ROUTE_TYPE_LABELS: Record<RouteType, string> = {
   road: "Шоссе", gravel: "Гревел", mtb: "МТБ", urban: "Городской",
@@ -76,6 +85,7 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [likeCount, setLikeCount] = useState(0);
   const [deleting, setDeleting] = useState(false);
+  const [relatedEvents, setRelatedEvents] = useState<RelatedEvent[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -95,6 +105,21 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
       setLoading(false);
     }
     load();
+  }, [id]);
+
+  // Load upcoming events for this route
+  useEffect(() => {
+    const today = new Date().toISOString().split("T")[0];
+    supabase
+      .from("events")
+      .select("id, title, start_date, is_private, participants:event_participants(user_id)")
+      .eq("route_id", id)
+      .gte("start_date", today)
+      .order("start_date", { ascending: true })
+      .limit(5)
+      .then(({ data }) => {
+        if (data) setRelatedEvents(data as RelatedEvent[]);
+      });
   }, [id]);
 
   if (loading) {
@@ -292,6 +317,43 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               </div>
             </div>
+
+            {/* Upcoming events linked to this route */}
+            {relatedEvents.filter(ev =>
+              !ev.is_private || (user && ev.participants.some(p => p.user_id === user.id))
+            ).length > 0 && (
+              <div className="bg-white rounded-2xl p-4 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+                <h3 className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                  <Calendar size={12} /> Ближайшие мероприятия
+                </h3>
+                <div className="space-y-1">
+                  {relatedEvents
+                    .filter(ev => !ev.is_private || (user && ev.participants.some(p => p.user_id === user.id)))
+                    .map(ev => (
+                      <Link key={ev.id} href={`/events/${ev.id}`}
+                        className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-[#F5F4F1] transition-colors group">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                          style={{ background: "linear-gradient(135deg, #0BBFB5 0%, #7C5CFC 100%)" }}>
+                          {ev.is_private
+                            ? <Lock size={12} className="text-white" />
+                            : <Calendar size={12} className="text-white" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-[#1C1C1E] truncate group-hover:text-[#F4632A] transition-colors">
+                            {ev.title}
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-[#A1A1AA]">
+                            {ev.start_date && <span>{formatDate(ev.start_date)}</span>}
+                            <span className="flex items-center gap-0.5">
+                              <Users size={10} /> {ev.participants.length}
+                            </span>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                </div>
+              </div>
+            )}
 
             {/* Create event */}
             <Link href={`/events/new?route=${route.id}`}

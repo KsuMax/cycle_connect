@@ -11,7 +11,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useEventLikes } from "@/lib/context/EventLikesContext";
 import {
   ChevronLeft, Calendar, Bike, Heart,
-  Share2, Users, MapPin, ExternalLink, Flag, ChevronRight, Pencil,
+  Share2, Users, MapPin, ExternalLink, Flag, ChevronRight, Pencil, Lock,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { AuthTooltip } from "@/components/ui/AuthTooltip";
@@ -25,6 +25,7 @@ interface EventData {
   end_date: string | null;
   max_participants: number | null;
   likes_count: number;
+  is_private: boolean;
   organizer_id: string;
   organizer: User;
   route: Route | null;
@@ -99,6 +100,7 @@ function dbToEvent(data: any): EventData {
     end_date: data.end_date,
     max_participants: data.max_participants,
     likes_count: data.likes_count ?? 0,
+    is_private: data.is_private ?? false,
     organizer_id: data.organizer_id,
     organizer: data.organizer ? dbToUser(data.organizer) : { id: data.organizer_id, name: "Организатор", initials: "О", color: "#7C5CFC", km_total: 0, routes_count: 0, events_count: 0 },
     route,
@@ -231,6 +233,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 <div className="flex flex-wrap items-center gap-2 mb-3">
                   {isMultiDay && <Badge className="bg-white/20 text-white border-0">🏕️ {event.days.length}-дневный велопоход</Badge>}
                   {event.route?.region && <Badge className="bg-white/20 text-white border-0">📍 {event.route.region}</Badge>}
+                  {event.is_private && (
+                    <Badge className="bg-white/20 text-white border-0 flex items-center gap-1">
+                      <Lock size={10} /> Закрытое
+                    </Badge>
+                  )}
                 </div>
                 <h1 className="text-3xl font-bold mb-2 leading-tight">{event.title}</h1>
                 <div className="flex flex-wrap items-center gap-4 text-white/80 text-sm">
@@ -364,6 +371,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   <div className="font-medium text-[#1C1C1E]">{event.organizer.name}</div>
                 </div>
               </div>
+
+              {event.is_private && (
+                <div className="flex items-center gap-1.5 text-xs text-[#71717A] bg-[#F5F4F1] rounded-lg px-3 py-2 mb-4">
+                  <Lock size={11} /> Доступно только по прямой ссылке
+                </div>
+              )}
 
               <div className="space-y-2.5 mb-5">
                 {event.start_date && (

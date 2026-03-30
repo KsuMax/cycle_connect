@@ -106,6 +106,7 @@ function dbToEvent(e: DbEvent): CycleEvent {
       };
     }) ?? [],
     max_participants: e.max_participants ?? undefined,
+    is_private: e.is_private ?? false,
     likes: e.likes_count,
     created_at: e.created_at,
   };
@@ -203,6 +204,7 @@ function RoutesPageInner() {
 
   // ── Events filtering / sorting ────────────────────────────────────────────
   const filteredEvents = events.filter((ev) => {
+    if (ev.is_private && !(user != null && ev.participants.some(p => p.id === user.id))) return false;
     if (eventSearch && !ev.title.toLowerCase().includes(eventSearch.toLowerCase())) return false;
     if (eventStartFrom && ev.start_date && ev.start_date < eventStartFrom) return false;
     if (eventStartTo && ev.start_date && ev.start_date > eventStartTo) return false;

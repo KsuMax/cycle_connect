@@ -8,6 +8,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Bike, TrendingUp, Calendar } from "lucide-react";
 import Link from "next/link";
 import { supabase, type DbRoute, type DbEvent } from "@/lib/supabase";
+import { useAuth } from "@/lib/context/AuthContext";
 import type { Route, CycleEvent, RouteType } from "@/types";
 
 function dbToRoute(r: DbRoute): Route {
@@ -91,12 +92,14 @@ function dbToEvent(e: DbEvent): CycleEvent {
       };
     }) ?? [],
     max_participants: e.max_participants ?? undefined,
+    is_private: e.is_private ?? false,
     likes: e.likes_count,
     created_at: e.created_at,
   };
 }
 
 export default function FeedPage() {
+  const { user } = useAuth();
   const [routes, setRoutes] = useState<Route[]>([]);
   const [events, setEvents] = useState<CycleEvent[]>([]);
 
@@ -141,20 +144,25 @@ export default function FeedPage() {
             </div>
 
             {/* Upcoming events */}
-            {events.length > 0 && (
-              <section>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-semibold text-[#1C1C1E] flex items-center gap-2">
-                    <Calendar size={18} style={{ color: "#7C5CFC" }} />
-                    Ближайшие поездки
-                  </h2>
-                  <Link href="/routes?tab=events" className="text-sm hover:underline" style={{ color: "#F4632A" }}>Все</Link>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
-                  {events.map((event) => <EventCard key={event.id} event={event} />)}
-                </div>
-              </section>
-            )}
+            {(() => {
+              const visibleEvents = events.filter(ev =>
+                !ev.is_private || (user != null && ev.participants.some(p => p.id === user.id))
+              );
+              return visibleEvents.length > 0 ? (
+                <section>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-semibold text-[#1C1C1E] flex items-center gap-2">
+                      <Calendar size={18} style={{ color: "#7C5CFC" }} />
+                      Ближайшие поездки
+                    </h2>
+                    <Link href="/routes?tab=events" className="text-sm hover:underline" style={{ color: "#F4632A" }}>Все</Link>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
+                    {visibleEvents.map((event) => <EventCard key={event.id} event={event} />)}
+                  </div>
+                </section>
+              ) : null;
+            })()}
 
             {/* Popular routes */}
             {routes.length > 0 && (

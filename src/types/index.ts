@@ -61,6 +61,7 @@ export interface CycleEvent {
   participants: User[];
   likes: number;
   max_participants?: number;
+  is_private?: boolean;
   created_at: string;
 }
 

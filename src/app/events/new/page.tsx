@@ -46,6 +46,7 @@ function CreateEventForm() {
   const [routeId, setRouteId] = useState(preselectedRouteId);
   const [startDate, setStartDate] = useState("");
   const [maxParticipants, setMaxParticipants] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
   const [days, setDays] = useState<DayForm[]>([newDay(0)]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -94,6 +95,7 @@ function CreateEventForm() {
         start_date: startDate || null,
         end_date: days.length > 1 && days[days.length - 1].date ? days[days.length - 1].date : startDate || null,
         max_participants: parseInt(maxParticipants) || null,
+        is_private: isPrivate,
         likes_count: 0,
       })
       .select()
@@ -199,6 +201,20 @@ function CreateEventForm() {
                     placeholder="Без ограничений"
                     className="w-full px-3 py-2.5 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors" />
                 </div>
+              </div>
+
+              {/* Private toggle */}
+              <div className="flex items-center justify-between pt-1">
+                <div>
+                  <div className="text-sm font-medium text-[#1C1C1E]">Закрытое мероприятие</div>
+                  <div className="text-xs text-[#71717A]">Не отображается в списках — доступно только по прямой ссылке</div>
+                </div>
+                <button type="button" onClick={() => setIsPrivate(!isPrivate)}
+                  className="relative w-11 h-6 rounded-full transition-colors shrink-0 ml-4"
+                  style={{ backgroundColor: isPrivate ? "#7C5CFC" : "#D1D5DB" }}>
+                  <div className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+                    style={{ transform: isPrivate ? "translateX(20px)" : "translateX(0)" }} />
+                </button>
               </div>
             </div>
           </div>
