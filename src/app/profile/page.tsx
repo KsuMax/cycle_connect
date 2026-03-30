@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useFavorites } from "@/lib/context/FavoritesContext";
 import { useRides } from "@/lib/context/RidesContext";
 import { supabase } from "@/lib/supabase";
-import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink } from "lucide-react";
+import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink, Users } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
 import type { Route, RouteType } from "@/types";
@@ -83,6 +83,9 @@ export default function ProfilePage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/auth/login");
@@ -164,6 +167,21 @@ export default function ProfilePage() {
   useEffect(() => {
     setAvatarUrl(profile?.avatar_url ?? null);
   }, [profile]);
+
+  // Load followers/following counts
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("user_follows")
+      .select("follower_id", { count: "exact", head: true })
+      .eq("following_id", user.id)
+      .then(({ count }) => setFollowersCount(count ?? 0));
+    supabase
+      .from("user_follows")
+      .select("following_id", { count: "exact", head: true })
+      .eq("follower_id", user.id)
+      .then(({ count }) => setFollowingCount(count ?? 0));
+  }, [user]);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -291,11 +309,13 @@ export default function ProfilePage() {
                   <Settings size={16} /><span className="hidden sm:inline">Настройки</span>
                 </Link>
               </div>
-              <div className="flex gap-6 mt-4">
+              <div className="flex gap-6 mt-4 flex-wrap">
                 {[
                   { value: Math.round(ridesKm).toLocaleString(), label: "км всего", color: "#F4632A" },
                   { value: myRoutes.length,                       label: "маршрутов", color: "#7C5CFC" },
                   { value: loadingRides ? "..." : ridesData.length, label: "поездок", color: "#0BBFB5" },
+                  { value: followersCount,                        label: "подписчиков", color: "#A1A1AA" },
+                  { value: followingCount,                        label: "подписок", color: "#A1A1AA" },
                 ].map(({ value, label, color }) => (
                   <div key={label} className="text-center">
                     <div className="text-xl font-bold" style={{ color }}>{value}</div>

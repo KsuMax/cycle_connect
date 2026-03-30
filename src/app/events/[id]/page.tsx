@@ -336,10 +336,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               </h2>
               <div className="flex flex-wrap gap-3">
                 {event.participants.map((p) => (
-                  <div key={p.id} className="flex items-center gap-2">
+                  <Link key={p.id} href={`/users/${p.id}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
                     <Avatar user={p} size="sm" />
                     <span className="text-sm text-[#1C1C1E]">{p.name}</span>
-                  </div>
+                  </Link>
                 ))}
                 {event.participants.length === 0 && (
                   <p className="text-sm text-[#A1A1AA]">Пока никто не записался</p>
@@ -364,13 +364,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           <aside>
             <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7] sticky top-24"
               style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-              <div className="flex items-center gap-3 mb-4 pb-4 border-b border-[#F5F4F1]">
+              <Link href={`/users/${event.organizer.id}`} className="flex items-center gap-3 mb-4 pb-4 border-b border-[#F5F4F1] hover:opacity-80 transition-opacity">
                 <Avatar user={event.organizer} size="md" />
                 <div>
                   <div className="text-xs text-[#71717A]">Организатор</div>
                   <div className="font-medium text-[#1C1C1E]">{event.organizer.name}</div>
                 </div>
-              </div>
+              </Link>
 
               {event.is_private && (
                 <div className="flex items-center gap-1.5 text-xs text-[#71717A] bg-[#F5F4F1] rounded-lg px-3 py-2 mb-4">

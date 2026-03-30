@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { Heart, Send } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { supabase } from "@/lib/supabase";
@@ -151,10 +152,12 @@ export function RouteComments({ routeId }: RouteCommentsProps) {
         )}
         {comments.map((comment) => (
           <div key={comment.id} className="px-6 py-4 flex gap-3">
-            <Avatar user={comment.author} size="sm" />
+            <Link href={`/users/${comment.author.id}`} className="shrink-0 hover:opacity-80 transition-opacity">
+              <Avatar user={comment.author} size="sm" />
+            </Link>
             <div className="flex-1 min-w-0">
               <div className="flex items-baseline gap-2 mb-1">
-                <span className="text-sm font-semibold text-[#1C1C1E]">{comment.author.name}</span>
+                <Link href={`/users/${comment.author.id}`} className="text-sm font-semibold text-[#1C1C1E] hover:text-[#F4632A] transition-colors">{comment.author.name}</Link>
                 <span className="text-xs text-[#A1A1AA]">{timeAgo(comment.created_at)}</span>
               </div>
               <p className="text-sm text-[#3F3F46] leading-relaxed">{comment.text}</p>
