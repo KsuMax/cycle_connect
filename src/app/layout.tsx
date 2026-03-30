@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { FavoritesProvider } from "@/lib/context/FavoritesContext";
 import { LikesProvider } from "@/lib/context/LikesContext";
+import { EventLikesProvider } from "@/lib/context/EventLikesContext";
 import { AuthProvider } from "@/lib/context/AuthContext";
 import { RidesProvider } from "@/lib/context/RidesContext";
 
@@ -18,7 +19,7 @@ export default function RootLayout({
   return (
     <html lang="ru" className="h-full">
       <body className="min-h-full flex flex-col">
-        <AuthProvider><LikesProvider><FavoritesProvider><RidesProvider>{children}</RidesProvider></FavoritesProvider></LikesProvider></AuthProvider>
+        <AuthProvider><LikesProvider><EventLikesProvider><FavoritesProvider><RidesProvider>{children}</RidesProvider></FavoritesProvider></EventLikesProvider></LikesProvider></AuthProvider>
       </body>
     </html>
   );

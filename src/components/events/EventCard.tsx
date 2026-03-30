@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { formatDate } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/context/AuthContext";
+import { useEventLikes } from "@/lib/context/EventLikesContext";
 import type { CycleEvent } from "@/types";
 
 interface EventCardProps {
@@ -17,11 +18,18 @@ interface EventCardProps {
 
 export function EventCard({ event }: EventCardProps) {
   const { user } = useAuth();
+  const { isLiked, toggleLike } = useEventLikes();
 
-  const [liked, setLiked] = useState(false);
+  const liked = isLiked(event.id);
+  // likeCount tracks the displayed count, initialized from DB and updated optimistically
   const [likeCount, setLikeCount] = useState(event.likes);
   const [going, setGoing] = useState(false);
   const [goingBusy, setGoingBusy] = useState(false);
+
+  // Keep likeCount in sync when event.likes changes (e.g. parent re-fetches)
+  useEffect(() => {
+    setLikeCount(event.likes);
+  }, [event.likes]);
 
   // Sync going state whenever user or participants change
   useEffect(() => {
@@ -30,11 +38,10 @@ export function EventCard({ event }: EventCardProps) {
 
   const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
-    const wasLiked = liked;
-    const newCount = wasLiked ? likeCount - 1 : likeCount + 1;
-    setLiked(!wasLiked);
+    if (!user) return;
+    const newCount = liked ? likeCount - 1 : likeCount + 1;
     setLikeCount(newCount);
-    await supabase.from("events").update({ likes_count: newCount }).eq("id", event.id);
+    await toggleLike(event.id, likeCount);
   };
 
   const handleGoing = async (e: React.MouseEvent) => {
@@ -100,7 +107,7 @@ export function EventCard({ event }: EventCardProps) {
             </span>
           </div>
 
-          {/* Days preview — always reserves space so cards stay equal height */}
+          {/* Days preview */}
           <div className="flex gap-1.5 mb-3 flex-1 items-end">
             {isMultiDay ? event.days.map((day) => (
               <div key={day.day} className="flex-1 text-center">

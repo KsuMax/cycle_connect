@@ -8,6 +8,7 @@ import { DifficultyBadge, Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/context/AuthContext";
+import { useEventLikes } from "@/lib/context/EventLikesContext";
 import {
   ChevronLeft, Calendar, Bike, Heart,
   Share2, Users, MapPin, ExternalLink, Flag, ChevronRight, Pencil,
@@ -109,10 +110,10 @@ function dbToEvent(data: any): EventData {
 export default function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { user } = useAuth();
+  const { isLiked, toggleLike } = useEventLikes();
   const [event, setEvent] = useState<EventData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [going, setGoing] = useState(false);
   const [activeDay, setActiveDay] = useState<number | null>(null);
@@ -425,15 +426,14 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   <AuthTooltip disabled={!user} className="w-full">
                     <button
                       onClick={async () => {
-                        const wasLiked = liked;
-                        const newCount = wasLiked ? likeCount - 1 : likeCount + 1;
-                        setLiked(!wasLiked);
-                        setLikeCount(newCount);
-                        await supabase.from("events").update({ likes_count: newCount }).eq("id", event.id);
+                        if (!user) return;
+                        const wasLiked = isLiked(event.id);
+                        setLikeCount((c) => wasLiked ? c - 1 : c + 1);
+                        await toggleLike(event.id, likeCount);
                       }}
                       className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-[#E4E4E7] text-sm transition-colors hover:bg-[#F5F4F1]"
-                      style={{ color: liked ? "#F4632A" : "#71717A" }}>
-                      <Heart size={14} fill={liked ? "#F4632A" : "none"} /> {likeCount}
+                      style={{ color: isLiked(event.id) ? "#F4632A" : "#71717A" }}>
+                      <Heart size={14} fill={isLiked(event.id) ? "#F4632A" : "none"} /> {likeCount}
                     </button>
                   </AuthTooltip>
                 </div>
