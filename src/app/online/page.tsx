@@ -29,22 +29,23 @@ export default function OnlinePage() {
         </h1>
         <p className="text-sm font-semibold tracking-widest uppercase mb-8"
           style={{ color: "#7C5CFC" }}>
-          Однажды в мобильном приложении ты сможешь
+          однажды мы встретимся в мобильном приложении
         </p>
 
         {/* Cards with features */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full mb-10">
           {[
-            { icon: "📍", text: "Видеть всех велосипедистов онлайн и следить, кто едет по маршруту" },
-            { icon: "🤝", text: "Присоединяться к велоклубам и поездкам прямо на ходу" },
-            { icon: "🆘", text: "Кнопка SOS — все велосипедисты в округе получат твой сигнал" },
-          ].map(({ icon, text }) => (
+            { icon: "📍", title: "Кто едет рядом", text: "Смотри, где катаются другие велосипедисты и какие маршруты они выбирают" },
+            { icon: "🤝", title: "Присоединяйся к покатушкам", text: "Находи маршруты рядом и присоединяйся прямо сейчас" },
+            { icon: "🚨", title: "SOS, если нужна помощь", text: "Отправь сигнал — и велосипедисты поблизости узнают, что тебе нужна помощь" },
+          ].map(({ icon, title, text }) => (
             <div
               key={icon}
               className="bg-white rounded-2xl p-5 border border-[#E4E4E7] text-left"
               style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}
             >
               <div className="text-2xl mb-3">{icon}</div>
+              <p className="text-sm font-semibold text-[#1C1C1E] mb-1">{title}</p>
               <p className="text-sm text-[#71717A] leading-relaxed">{text}</p>
             </div>
           ))}
@@ -56,20 +57,19 @@ export default function OnlinePage() {
           style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}
         >
           <p className="text-[#1C1C1E] leading-relaxed mb-4">
-            Однажды в мобильном приложении ты сможешь видеть всех велосипедистов онлайн,
-            видеть, кто едет по маршруту и где он находится, присоединяться к велоклубам и кататься
-            по самым красивым маршрутам.
+            В мобильном приложении ты сможешь видеть, где катаются другие велосипедисты,
+            отслеживать маршруты и находить компанию прямо во время поездки.
           </p>
           <p className="text-[#1C1C1E] leading-relaxed mb-4">
-            Ты сможешь присоединяться к поездкам на ходу, следить за друзьями и находить компанию
-            прямо во время катания. А если тебе нужна помощь, ты сможешь нажать кнопку SOS, и все
-            велосипедисты в округе получат твой сигнал.
+            Хочешь поехать не один? Просто присоединяйся к ближайшей поездке или велоклубу.
           </p>
           <p className="text-[#1C1C1E] leading-relaxed mb-4">
-            CycleConnect станет местом, где маршруты оживают, а поездки больше не проходят
-            в одиночку 🚴‍♀️
+            Нужна помощь — нажми SOS, и велосипедисты рядом получат сигнал.
           </p>
-          <p className="text-[#A1A1AA] text-sm">Но пока ты просто видишь этот текст :)</p>
+          <p className="text-[#1C1C1E] leading-relaxed mb-4">
+            CycleConnect — место, где поездки становятся живыми, а маршруты объединяют людей 🚴‍♀️
+          </p>
+          <p className="text-[#A1A1AA] text-sm">Пока ты просто читаешь этот текст. Но скоро всё оживёт 😉</p>
         </div>
 
         {/* Decorative map dots */}
