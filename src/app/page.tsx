@@ -124,7 +124,7 @@ export default function FeedPage() {
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-8">
 
           {/* Feed */}
-          <div className="space-y-6">
+          <div className="space-y-8">
             {/* Welcome banner */}
             <div className="rounded-2xl p-6 text-white relative overflow-hidden"
               style={{ background: "linear-gradient(135deg, #F4632A 0%, #7C5CFC 100%)" }}>
@@ -158,11 +158,14 @@ export default function FeedPage() {
               return visibleEvents.length > 0 ? (
                 <section>
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-semibold text-[#1C1C1E] flex items-center gap-2">
-                      <Calendar size={18} style={{ color: "#7C5CFC" }} />
-                      Ближайшие поездки
-                    </h2>
-                    <Link href="/routes?tab=events" className="text-sm hover:underline" style={{ color: "#F4632A" }}>Все</Link>
+                    <div className="flex items-center gap-3">
+                      <div className="w-1 h-6 rounded-full" style={{ backgroundColor: "#7C5CFC" }} />
+                      <h2 className="text-lg font-bold text-[#1C1C1E] flex items-center gap-2">
+                        <Calendar size={18} style={{ color: "#7C5CFC" }} />
+                        Ближайшие поездки
+                      </h2>
+                    </div>
+                    <Link href="/routes?tab=events" className="text-sm font-medium hover:underline" style={{ color: "#F4632A" }}>Все →</Link>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
                     {visibleEvents.map((event) => <EventCard key={event.id} event={event} />)}
@@ -189,11 +192,14 @@ export default function FeedPage() {
             {routes.length > 0 && (
               <section>
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-semibold text-[#1C1C1E] flex items-center gap-2">
-                    <TrendingUp size={18} style={{ color: "#F4632A" }} />
-                    Популярные маршруты
-                  </h2>
-                  <Link href="/routes" className="text-sm hover:underline" style={{ color: "#F4632A" }}>Все маршруты</Link>
+                  <div className="flex items-center gap-3">
+                    <div className="w-1 h-6 rounded-full" style={{ backgroundColor: "#F4632A" }} />
+                    <h2 className="text-lg font-bold text-[#1C1C1E] flex items-center gap-2">
+                      <TrendingUp size={18} style={{ color: "#F4632A" }} />
+                      Популярные маршруты
+                    </h2>
+                  </div>
+                  <Link href="/routes" className="text-sm font-medium hover:underline" style={{ color: "#F4632A" }}>Все →</Link>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {routes.map((route) => <RouteCard key={route.id} route={route} />)}

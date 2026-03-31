@@ -253,20 +253,20 @@ function RoutesPageInner() {
                 : "Ближайшие велопоходы и групповые поездки"}
             </p>
           </div>
-          {user && activeTab === "routes" && (
-            <Link href="/routes/new"
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors hover:opacity-90"
+          {activeTab === "routes" && (
+            <Link href={user ? "/routes/new" : "/auth/login"}
+              className="flex items-center gap-2 px-4 min-h-[44px] rounded-xl text-sm font-semibold text-white transition-colors hover:opacity-90"
               style={{ backgroundColor: "#F4632A" }}>
               <Plus size={16} />
-              <span className="hidden sm:inline">Добавить маршрут</span>
+              Добавить маршрут
             </Link>
           )}
-          {user && activeTab === "events" && (
-            <Link href="/events/new"
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors hover:opacity-90"
+          {activeTab === "events" && (
+            <Link href={user ? "/events/new" : "/auth/login"}
+              className="flex items-center gap-2 px-4 min-h-[44px] rounded-xl text-sm font-semibold text-white transition-colors hover:opacity-90"
               style={{ backgroundColor: "#7C5CFC" }}>
               <Plus size={16} />
-              <span className="hidden sm:inline">Создать мероприятие</span>
+              Создать мероприятие
             </Link>
           )}
         </div>
