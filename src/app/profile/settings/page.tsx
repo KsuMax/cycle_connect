@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { ArrowLeft, Eye, EyeOff, Check, X } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Check, X, LogOut } from "lucide-react";
 import Link from "next/link";
 
 function getPasswordStrength(password: string): { score: number; label: string; color: string } {
@@ -34,7 +34,7 @@ const PASSWORD_REQUIREMENTS = [
 const INPUT_CLS = "w-full px-3 py-2.5 rounded-xl border border-[#E4E4E7] bg-white text-sm text-[#1C1C1E] placeholder-[#A1A1AA] outline-none focus:border-[#F4632A] transition-colors";
 
 export default function SettingsPage() {
-  const { user, profile, loading: authLoading, refreshProfile } = useAuth();
+  const { user, profile, loading: authLoading, refreshProfile, signOut } = useAuth();
   const router = useRouter();
 
   const [name, setName] = useState("");
@@ -325,6 +325,16 @@ export default function SettingsPage() {
             {saving ? "Сохранение…" : "Сохранить изменения"}
           </button>
         </form>
+
+        <div className="mt-4 mb-24 sm:mb-8">
+          <button
+            type="button"
+            onClick={async () => { await signOut(); router.push("/"); router.refresh(); }}
+            className="w-full py-3 rounded-xl border border-[#E4E4E7] bg-white text-sm font-semibold text-[#EF4444] flex items-center justify-center gap-2 hover:bg-red-50 hover:border-red-200 transition-colors">
+            <LogOut size={16} />
+            Выйти из аккаунта
+          </button>
+        </div>
       </main>
 
     </div>
