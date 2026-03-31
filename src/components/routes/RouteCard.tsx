@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Bike, Mountain, Clock, Heart, ChevronRight } from "lucide-react";
 import { DifficultyBadge, Badge } from "@/components/ui/Badge";
 import { AvatarGroup } from "@/components/ui/Avatar";
 import { cn } from "@/lib/utils";
 import { useLikes } from "@/lib/context/LikesContext";
+import { useAuth } from "@/lib/context/AuthContext";
 import type { Route, RouteType } from "@/types";
 
 const ROUTE_TYPE_LABELS: Record<RouteType, string> = {
@@ -30,11 +32,14 @@ interface RouteCardProps {
 
 export function RouteCard({ route, compact = false }: RouteCardProps) {
   const { isLiked, toggleLike } = useLikes();
+  const { user } = useAuth();
+  const router = useRouter();
   const [likeCount, setLikeCount] = useState(route.likes);
   const liked = isLiked(route.id);
 
   const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
+    if (!user) { router.push("/auth/login"); return; }
     const prev = likeCount;
     setLikeCount(liked ? prev - 1 : prev + 1);
     await toggleLike(route.id, prev);
@@ -94,17 +99,17 @@ export function RouteCard({ route, compact = false }: RouteCardProps) {
           </h3>
 
           {/* Stats */}
-          <div className="flex items-center gap-3 text-xs text-[#71717A] mb-3">
+          <div className="flex items-center gap-3 text-sm text-[#71717A] mb-3">
             <span className="flex items-center gap-1">
-              <Bike size={12} />
+              <Bike size={14} />
               {route.distance_km} км
             </span>
             <span className="flex items-center gap-1">
-              <Mountain size={12} />
+              <Mountain size={14} />
               {route.elevation_m} м
             </span>
             <span className="flex items-center gap-1">
-              <Clock size={12} />
+              <Clock size={14} />
               ~{Math.round(route.duration_min / 60)} ч
             </span>
           </div>
@@ -114,7 +119,7 @@ export function RouteCard({ route, compact = false }: RouteCardProps) {
             {route.route_types.map((type) => (
               <span
                 key={type}
-                className="text-[11px] font-semibold px-2 py-0.5 rounded-md"
+                className="text-xs font-semibold px-2 py-0.5 rounded-md"
                 style={{ backgroundColor: ROUTE_TYPE_COLORS[type].bg, color: ROUTE_TYPE_COLORS[type].text }}
               >
                 {ROUTE_TYPE_LABELS[type]}
@@ -143,14 +148,14 @@ export function RouteCard({ route, compact = false }: RouteCardProps) {
             <div className="flex items-center gap-2">
               <button
                 onClick={handleLike}
-                className="flex items-center gap-1 text-xs transition-colors"
+                className="flex items-center gap-1 text-sm min-w-[44px] min-h-[44px] justify-center transition-colors"
                 style={{ color: liked ? "#F4632A" : "#A1A1AA" }}
               >
-                <Heart size={13} fill={liked ? "#F4632A" : "none"} />
+                <Heart size={14} fill={liked ? "#F4632A" : "none"} />
                 {likeCount}
               </button>
               <span className="flex items-center gap-0.5 text-xs font-medium text-[#F4632A]">
-                Смотреть <ChevronRight size={13} />
+                Открыть <ChevronRight size={14} />
               </span>
             </div>
           </div>
