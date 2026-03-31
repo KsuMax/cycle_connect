@@ -5,6 +5,7 @@ import { LikesProvider } from "@/lib/context/LikesContext";
 import { EventLikesProvider } from "@/lib/context/EventLikesContext";
 import { AuthProvider } from "@/lib/context/AuthContext";
 import { RidesProvider } from "@/lib/context/RidesContext";
+import { FollowProvider } from "@/lib/context/FollowContext";
 import { BottomNav } from "@/components/layout/BottomNav";
 
 export const metadata: Metadata = {
@@ -20,7 +21,7 @@ export default function RootLayout({
   return (
     <html lang="ru" className="h-full">
       <body className="min-h-full flex flex-col">
-        <AuthProvider><LikesProvider><EventLikesProvider><FavoritesProvider><RidesProvider>{children}<BottomNav /></RidesProvider></FavoritesProvider></EventLikesProvider></LikesProvider></AuthProvider>
+        <AuthProvider><LikesProvider><EventLikesProvider><FavoritesProvider><RidesProvider><FollowProvider>{children}<BottomNav /></FollowProvider></RidesProvider></FavoritesProvider></EventLikesProvider></LikesProvider></AuthProvider>
       </body>
     </html>
   );

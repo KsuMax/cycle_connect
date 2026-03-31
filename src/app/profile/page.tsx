@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useFavorites } from "@/lib/context/FavoritesContext";
 import { useRides } from "@/lib/context/RidesContext";
 import { supabase } from "@/lib/supabase";
-import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera } from "lucide-react";
+import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink, Users } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
 import type { Route, RouteType } from "@/types";
@@ -83,6 +83,9 @@ export default function ProfilePage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/auth/login");
@@ -164,6 +167,21 @@ export default function ProfilePage() {
   useEffect(() => {
     setAvatarUrl(profile?.avatar_url ?? null);
   }, [profile]);
+
+  // Load followers/following counts
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("user_follows")
+      .select("follower_id", { count: "exact", head: true })
+      .eq("following_id", user.id)
+      .then(({ count }) => setFollowersCount(count ?? 0));
+    supabase
+      .from("user_follows")
+      .select("following_id", { count: "exact", head: true })
+      .eq("follower_id", user.id)
+      .then(({ count }) => setFollowingCount(count ?? 0));
+  }, [user]);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -263,21 +281,53 @@ export default function ProfilePage() {
                   {profile?.username && <p className="text-sm font-medium mt-0.5" style={{ color: "#F4632A" }}>@{profile.username}</p>}
                   <p className="text-sm text-[#71717A] mt-0.5">{user.email}</p>
                   {profile?.bio && <p className="text-sm text-[#71717A] mt-1">{profile.bio}</p>}
+                  {(profile?.website || profile?.strava_url) && (
+                    <div className="flex items-center gap-3 mt-2 flex-wrap">
+                      {profile.website && (
+                        <a href={profile.website} target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs text-[#7C5CFC] hover:underline">
+                          <Globe size={12} />
+                          {(() => { try { return new URL(profile.website!).hostname.replace("www.", ""); } catch { return profile.website; } })()}
+                          <ExternalLink size={10} />
+                        </a>
+                      )}
+                      {profile.strava_url && (
+                        <a href={profile.strava_url} target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs font-medium hover:underline"
+                          style={{ color: "#FC4C02" }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
+                          </svg>
+                          Strava
+                          <ExternalLink size={10} />
+                        </a>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <button className="flex items-center gap-1.5 text-sm text-[#71717A] hover:text-[#1C1C1E] transition-colors p-2 rounded-lg hover:bg-[#F5F4F1]">
+                <Link href="/profile/settings" className="flex items-center gap-1.5 text-sm text-[#71717A] hover:text-[#1C1C1E] transition-colors p-2 rounded-lg hover:bg-[#F5F4F1]">
                   <Settings size={16} /><span className="hidden sm:inline">Настройки</span>
-                </button>
+                </Link>
               </div>
-              <div className="flex gap-6 mt-4">
+              <div className="flex gap-6 mt-4 flex-wrap">
                 {[
-                  { value: Math.round(ridesKm).toLocaleString(), label: "км всего", color: "#F4632A" },
-                  { value: myRoutes.length,                       label: "маршрутов", color: "#7C5CFC" },
-                  { value: loadingRides ? "..." : ridesData.length, label: "поездок", color: "#0BBFB5" },
-                ].map(({ value, label, color }) => (
-                  <div key={label} className="text-center">
-                    <div className="text-xl font-bold" style={{ color }}>{value}</div>
-                    <div className="text-xs text-[#71717A]">{label}</div>
-                  </div>
+                  { value: Math.round(ridesKm).toLocaleString(), label: "км всего", color: "#F4632A", href: null },
+                  { value: myRoutes.length, label: "маршрутов", color: "#7C5CFC", href: null },
+                  { value: loadingRides ? "..." : ridesData.length, label: "поездок", color: "#0BBFB5", href: null },
+                  { value: followersCount, label: "подписчиков", color: "#A1A1AA", href: user ? `/users/${user.id}/followers` : null },
+                  { value: followingCount, label: "подписок",    color: "#A1A1AA", href: user ? `/users/${user.id}/following` : null },
+                ].map(({ value, label, color, href }) => (
+                  href ? (
+                    <Link key={label} href={href} className="text-center group">
+                      <div className="text-xl font-bold group-hover:underline" style={{ color }}>{value}</div>
+                      <div className="text-xs text-[#71717A]">{label}</div>
+                    </Link>
+                  ) : (
+                    <div key={label} className="text-center">
+                      <div className="text-xl font-bold" style={{ color }}>{value}</div>
+                      <div className="text-xs text-[#71717A]">{label}</div>
+                    </div>
+                  )
                 ))}
               </div>
             </div>

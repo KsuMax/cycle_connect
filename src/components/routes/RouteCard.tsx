@@ -94,6 +94,11 @@ export function RouteCard({ route, compact = false }: RouteCardProps) {
 
         {/* Content */}
         <div className="p-4">
+          <div className="flex items-center gap-1.5 mb-2">
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-md" style={{ backgroundColor: "#FFF0EB", color: "#F4632A" }}>
+              🗺 Маршрут
+            </span>
+          </div>
           <h3 className="font-semibold text-[#1C1C1E] text-base leading-tight mb-2 group-hover:text-[#F4632A] transition-colors">
             {route.title}
           </h3>

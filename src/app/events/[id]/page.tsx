@@ -2,6 +2,7 @@
 
 import { useState, use, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Avatar, AvatarGroup } from "@/components/ui/Avatar";
 import { DifficultyBadge, Badge } from "@/components/ui/Badge";
@@ -11,7 +12,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useEventLikes } from "@/lib/context/EventLikesContext";
 import {
   ChevronLeft, Calendar, Bike, Heart,
-  Share2, Users, MapPin, ExternalLink, Flag, ChevronRight, Pencil, Lock,
+  Share2, Users, MapPin, ExternalLink, Flag, ChevronRight, Pencil, Lock, Trash2,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { AuthTooltip } from "@/components/ui/AuthTooltip";
@@ -113,6 +114,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const { id } = use(params);
   const { user } = useAuth();
   const { isLiked, toggleLike } = useEventLikes();
+  const router = useRouter();
   const [event, setEvent] = useState<EventData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -120,6 +122,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [going, setGoing] = useState(false);
   const [activeDay, setActiveDay] = useState<number | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -173,6 +177,18 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     }
   };
 
+  const handleDelete = async () => {
+    if (!user || !event) return;
+    setDeleting(true);
+    await supabase.from("event_participants").delete().eq("event_id", event.id);
+    await supabase.from("event_days").delete().eq("event_id", event.id);
+    await supabase.from("event_likes").delete().eq("event_id", event.id);
+    await supabase.from("events").delete().eq("id", event.id);
+    const { data: profile } = await supabase.from("profiles").select("events_count").eq("id", user.id).single();
+    await supabase.from("profiles").update({ events_count: Math.max(0, (profile?.events_count ?? 1) - 1) }).eq("id", user.id);
+    router.push("/");
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F5F4F1]">
@@ -211,10 +227,17 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             <ChevronLeft size={16} /> Лента
           </Link>
           {isOrganizer && (
-            <Link href={`/events/${event.id}/edit`}
-              className="inline-flex items-center gap-1.5 text-sm text-[#71717A] hover:text-[#1C1C1E] border border-[#E4E4E7] px-3 py-1.5 rounded-lg hover:bg-[#F5F4F1] transition-colors">
-              <Pencil size={14} /> Редактировать
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link href={`/events/${event.id}/edit`}
+                className="inline-flex items-center gap-1.5 text-sm text-[#71717A] hover:text-[#1C1C1E] border border-[#E4E4E7] px-3 py-1.5 rounded-lg hover:bg-[#F5F4F1] transition-colors">
+                <Pencil size={14} /> Редактировать
+              </Link>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="inline-flex items-center gap-1.5 text-sm text-[#EF4444] hover:text-[#DC2626] border border-[#FECACA] px-3 py-1.5 rounded-lg hover:bg-[#FEF2F2] transition-colors">
+                <Trash2 size={14} /> Удалить
+              </button>
+            </div>
           )}
         </div>
 
@@ -336,10 +359,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               </h2>
               <div className="flex flex-wrap gap-3">
                 {event.participants.map((p) => (
-                  <div key={p.id} className="flex items-center gap-2">
+                  <Link key={p.id} href={`/users/${p.id}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
                     <Avatar user={p} size="sm" />
                     <span className="text-sm text-[#1C1C1E]">{p.name}</span>
-                  </div>
+                  </Link>
                 ))}
                 {event.participants.length === 0 && (
                   <p className="text-sm text-[#A1A1AA]">Пока никто не записался</p>
@@ -364,13 +387,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           <aside>
             <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7] sticky top-24"
               style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-              <div className="flex items-center gap-3 mb-4 pb-4 border-b border-[#F5F4F1]">
+              <Link href={`/users/${event.organizer.id}`} className="flex items-center gap-3 mb-4 pb-4 border-b border-[#F5F4F1] hover:opacity-80 transition-opacity">
                 <Avatar user={event.organizer} size="md" />
                 <div>
                   <div className="text-xs text-[#71717A]">Организатор</div>
                   <div className="font-medium text-[#1C1C1E]">{event.organizer.name}</div>
                 </div>
-              </div>
+              </Link>
 
               {event.is_private && (
                 <div className="flex items-center gap-1.5 text-xs text-[#71717A] bg-[#F5F4F1] rounded-lg px-3 py-2 mb-4">
@@ -462,6 +485,37 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           </aside>
         </div>
       </main>
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-[#FEF2F2] flex items-center justify-center">
+                <Trash2 size={18} className="text-[#EF4444]" />
+              </div>
+              <h2 className="font-bold text-[#1C1C1E] text-lg">Удалить мероприятие?</h2>
+            </div>
+            <p className="text-sm text-[#71717A] mb-5">
+              Это действие нельзя отменить. Мероприятие «{event.title}» и все данные будут удалены.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                className="flex-1 py-2.5 rounded-xl border border-[#E4E4E7] text-sm font-medium text-[#71717A] hover:bg-[#F5F4F1] transition-colors disabled:opacity-50">
+                Отмена
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50"
+                style={{ backgroundColor: deleting ? "#FCA5A5" : "#EF4444" }}>
+                {deleting ? "Удаление..." : "Удалить"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

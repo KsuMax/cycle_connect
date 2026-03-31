@@ -86,8 +86,8 @@ export function EventCard({ event }: EventCardProps) {
 
           <div className="relative">
             <div className="flex items-center gap-2 mb-1">
-              <Badge className="bg-white/20 text-white border-0 text-xs">
-                {isMultiDay ? `${event.days.length} дня · поход` : "Однодневная поездка"}
+              <Badge className="bg-white/30 text-white border-0 text-xs font-semibold backdrop-blur-sm">
+                📅 {isMultiDay ? `${event.days.length} дня · поход` : "Поездка"}
               </Badge>
             </div>
             <h3 className="text-white font-bold text-lg leading-tight group-hover:opacity-90 transition-opacity">
