@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { ArrowLeft, Eye, EyeOff, Check, X } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Check, X, LogOut } from "lucide-react";
 import Link from "next/link";
 
 function getPasswordStrength(password: string): { score: number; label: string; color: string } {
@@ -34,7 +34,7 @@ const PASSWORD_REQUIREMENTS = [
 const INPUT_CLS = "w-full px-3 py-2.5 rounded-xl border border-[#E4E4E7] bg-white text-sm text-[#1C1C1E] placeholder-[#A1A1AA] outline-none focus:border-[#F4632A] transition-colors";
 
 export default function SettingsPage() {
-  const { user, profile, loading: authLoading, refreshProfile } = useAuth();
+  const { user, profile, loading: authLoading, refreshProfile, signOut } = useAuth();
   const router = useRouter();
 
   const [name, setName] = useState("");
@@ -48,6 +48,7 @@ export default function SettingsPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  const [signingOut, setSigningOut] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -65,6 +66,13 @@ export default function SettingsPage() {
     }
     if (user) setEmail(user.email ?? "");
   }, [profile, user]);
+
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    await signOut();
+    router.push("/");
+    router.refresh();
+  };
 
   const strength = getPasswordStrength(password);
 
@@ -325,6 +333,20 @@ export default function SettingsPage() {
             {saving ? "Сохранение…" : "Сохранить изменения"}
           </button>
         </form>
+
+        {/* Sign out */}
+        <div className="mt-5 bg-white rounded-2xl p-5 border border-[#E4E4E7]"
+          style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+          <h2 className="text-sm font-semibold text-[#1C1C1E] mb-4">Аккаунт</h2>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            disabled={signingOut}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-red-200 bg-red-50 text-red-600 text-sm font-semibold hover:bg-red-100 transition-colors disabled:opacity-60">
+            <LogOut size={16} />
+            {signingOut ? "Выход…" : "Выйти из аккаунта"}
+          </button>
+        </div>
       </main>
 
     </div>
