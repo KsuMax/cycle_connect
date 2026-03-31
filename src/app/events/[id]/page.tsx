@@ -27,6 +27,7 @@ interface EventData {
   max_participants: number | null;
   likes_count: number;
   is_private: boolean;
+  cover_url: string | null;
   organizer_id: string;
   organizer: User;
   route: Route | null;
@@ -102,6 +103,7 @@ function dbToEvent(data: any): EventData {
     max_participants: data.max_participants,
     likes_count: data.likes_count ?? 0,
     is_private: data.is_private ?? false,
+    cover_url: data.cover_url ?? null,
     organizer_id: data.organizer_id,
     organizer: data.organizer ? dbToUser(data.organizer) : { id: data.organizer_id, name: "Организатор", initials: "О", color: "#7C5CFC", km_total: 0, routes_count: 0, events_count: 0 },
     route,
@@ -245,14 +247,21 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           {/* Left */}
           <div className="space-y-5">
             {/* Hero */}
-            <div className="rounded-2xl p-8 text-white relative overflow-hidden"
-              style={{ background: "linear-gradient(135deg, #0BBFB5 0%, #7C5CFC 100%)" }}>
-              <div className="absolute inset-0 opacity-10">
-                <svg viewBox="0 0 800 250" className="w-full h-full" preserveAspectRatio="none">
-                  <path d="M0,125 Q100,60 200,110 Q300,160 400,80 Q500,20 600,90 Q700,140 800,60 L800,250 L0,250 Z" fill="white" />
-                </svg>
-              </div>
-              <div className="relative">
+            <div className="rounded-2xl text-white relative overflow-hidden"
+              style={{ background: event.cover_url ? undefined : "linear-gradient(135deg, #0BBFB5 0%, #7C5CFC 100%)" }}>
+              {event.cover_url ? (
+                <>
+                  <img src={event.cover_url} alt={event.title} className="absolute inset-0 w-full h-full object-cover" />
+                  <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.15) 60%, transparent 100%)" }} />
+                </>
+              ) : (
+                <div className="absolute inset-0 opacity-10">
+                  <svg viewBox="0 0 800 250" className="w-full h-full" preserveAspectRatio="none">
+                    <path d="M0,125 Q100,60 200,110 Q300,160 400,80 Q500,20 600,90 Q700,140 800,60 L800,250 L0,250 Z" fill="white" />
+                  </svg>
+                </div>
+              )}
+              <div className="relative p-8">
                 <div className="flex flex-wrap items-center gap-2 mb-3">
                   {isMultiDay && <Badge className="bg-white/20 text-white border-0">🏕️ {event.days.length}-дневный велопоход</Badge>}
                   {event.route?.region && <Badge className="bg-white/20 text-white border-0">📍 {event.route.region}</Badge>}

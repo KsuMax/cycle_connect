@@ -57,6 +57,7 @@ export interface DbEvent {
   max_participants: number | null;
   likes_count: number;
   is_private: boolean;
+  cover_url: string | null;
   created_at: string;
   // joined
   organizer?: DbProfile;

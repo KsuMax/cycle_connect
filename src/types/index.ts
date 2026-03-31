@@ -62,6 +62,7 @@ export interface CycleEvent {
   likes: number;
   max_participants?: number;
   is_private?: boolean;
+  cover_url?: string | null;
   created_at: string;
 }
 

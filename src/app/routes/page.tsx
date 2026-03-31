@@ -107,6 +107,7 @@ function dbToEvent(e: DbEvent): CycleEvent {
     }) ?? [],
     max_participants: e.max_participants ?? undefined,
     is_private: e.is_private ?? false,
+    cover_url: e.cover_url ?? null,
     likes: e.likes_count,
     created_at: e.created_at,
   };

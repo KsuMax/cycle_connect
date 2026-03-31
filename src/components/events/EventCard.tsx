@@ -12,6 +12,21 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useEventLikes } from "@/lib/context/EventLikesContext";
 import type { CycleEvent } from "@/types";
 
+// Deterministic gradient palette — pick by hashing event id
+const GRADIENTS = [
+  "linear-gradient(135deg, #0BBFB5 0%, #7C5CFC 100%)",
+  "linear-gradient(135deg, #F4632A 0%, #E91E8C 100%)",
+  "linear-gradient(135deg, #2563EB 0%, #0BBFB5 100%)",
+  "linear-gradient(135deg, #7C5CFC 0%, #2563EB 100%)",
+  "linear-gradient(135deg, #E91E8C 0%, #7C5CFC 100%)",
+  "linear-gradient(135deg, #F4632A 0%, #7C5CFC 100%)",
+];
+
+function pickGradient(id: string): string {
+  const hash = id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  return GRADIENTS[hash % GRADIENTS.length];
+}
+
 interface EventCardProps {
   event: CycleEvent;
   compact?: boolean;
@@ -23,17 +38,14 @@ export function EventCard({ event }: EventCardProps) {
   const router = useRouter();
 
   const liked = isLiked(event.id);
-  // likeCount tracks the displayed count, initialized from DB and updated optimistically
   const [likeCount, setLikeCount] = useState(event.likes);
   const [going, setGoing] = useState(false);
   const [goingBusy, setGoingBusy] = useState(false);
 
-  // Keep likeCount in sync when event.likes changes (e.g. parent re-fetches)
   useEffect(() => {
     setLikeCount(event.likes);
   }, [event.likes]);
 
-  // Sync going state whenever user or participants change
   useEffect(() => {
     setGoing(user ? event.participants.some((p) => p.id === user.id) : false);
   }, [user?.id, event.id, event.participants]);
@@ -63,6 +75,7 @@ export function EventCard({ event }: EventCardProps) {
 
   const isMultiDay = event.days.length > 1;
   const totalKm = event.days.reduce((sum, d) => sum + d.distance_km, 0);
+  const hasCover = !!event.cover_url;
 
   return (
     <Link href={`/events/${event.id}`} className="group flex h-full">
@@ -72,25 +85,44 @@ export function EventCard({ event }: EventCardProps) {
       >
         {/* Hero banner */}
         <div
-          className="relative p-5 flex flex-col justify-end"
+          className="relative flex flex-col justify-end overflow-hidden"
           style={{
-            height: 140,
-            background: "linear-gradient(135deg, #0BBFB5 0%, #7C5CFC 100%)",
+            height: 160,
+            background: hasCover ? undefined : pickGradient(event.id),
           }}
         >
-          <div className="absolute inset-0 opacity-10">
-            <svg viewBox="0 0 400 140" className="w-full h-full" preserveAspectRatio="none">
-              <path d="M0,70 Q50,30 100,60 Q150,90 200,40 Q250,0 300,50 Q350,80 400,30 L400,140 L0,140 Z" fill="white"/>
-            </svg>
-          </div>
+          {/* Cover photo */}
+          {hasCover && (
+            <>
+              <img
+                src={event.cover_url!}
+                alt={event.title}
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+              {/* Gradient overlay for text readability */}
+              <div
+                className="absolute inset-0"
+                style={{ background: "linear-gradient(to top, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.1) 60%, transparent 100%)" }}
+              />
+            </>
+          )}
 
-          <div className="relative">
+          {/* Wave decoration (gradient-only) */}
+          {!hasCover && (
+            <div className="absolute inset-0 opacity-10">
+              <svg viewBox="0 0 400 160" className="w-full h-full" preserveAspectRatio="none">
+                <path d="M0,80 Q50,35 100,65 Q150,95 200,45 Q250,5 300,55 Q350,85 400,35 L400,160 L0,160 Z" fill="white"/>
+              </svg>
+            </div>
+          )}
+
+          <div className="relative p-5">
             <div className="flex items-center gap-2 mb-1">
               <Badge className="bg-white/30 text-white border-0 text-xs font-semibold backdrop-blur-sm">
                 📅 {isMultiDay ? `${event.days.length} дня · поход` : "Поездка"}
               </Badge>
             </div>
-            <h3 className="text-white font-bold text-lg leading-tight group-hover:opacity-90 transition-opacity">
+            <h3 className="text-white font-bold text-lg leading-tight group-hover:opacity-90 transition-opacity drop-shadow-sm">
               {event.title}
             </h3>
           </div>

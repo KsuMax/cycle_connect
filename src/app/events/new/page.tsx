@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { MOCK_ROUTES } from "@/lib/data/mock";
+import { CoverUpload } from "@/components/routes/CoverUpload";
 import { Plus, Trash2, ChevronLeft, Calendar, Bike, AlertCircle } from "lucide-react";
 import Link from "next/link";
 
@@ -48,6 +49,8 @@ function CreateEventForm() {
   const [maxParticipants, setMaxParticipants] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
   const [days, setDays] = useState<DayForm[]>([newDay(0)]);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [routes, setRoutes] = useState<RouteOption[]>([]);
@@ -107,7 +110,21 @@ function CreateEventForm() {
       return;
     }
 
-    // 2. Insert days
+    // 2. Upload cover if provided
+    if (coverFile) {
+      const ext = coverFile.name.split(".").pop() ?? "jpg";
+      const { data: uploadData } = await supabase.storage
+        .from("route-images")
+        .upload(`events/${eventData.id}/cover.${ext}`, coverFile, { upsert: true });
+      if (uploadData) {
+        const { data: urlData } = supabase.storage
+          .from("route-images")
+          .getPublicUrl(uploadData.path);
+        await supabase.from("events").update({ cover_url: urlData.publicUrl }).eq("id", eventData.id);
+      }
+    }
+
+    // 3. Insert days
     const dayRows = days.map((d, i) => ({
       event_id: eventData.id,
       day_number: i + 1,
@@ -168,6 +185,16 @@ function CreateEventForm() {
           {error && (
             <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">{error}</div>
           )}
+
+          {/* Cover photo */}
+          <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+            <h2 className="font-semibold text-[#1C1C1E] mb-1">Обложка</h2>
+            <p className="text-xs text-[#71717A] mb-3">Горизонтальное фото — показывается в карточке мероприятия</p>
+            <CoverUpload
+              value={coverPreview}
+              onChange={(preview, file) => { setCoverPreview(preview); setCoverFile(file); }}
+            />
+          </div>
 
           {/* Basic info */}
           <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
