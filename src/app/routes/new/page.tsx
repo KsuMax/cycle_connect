@@ -265,7 +265,7 @@ export default function NewRoutePage() {
           {/* Cover */}
           <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
             <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">Обложка</label>
-            <p className="text-xs text-[#71717A] mb-3">Горизонтальное фото — отображается в карточке маршрута</p>
+            <p className="text-xs text-[#71717A] mb-3">Фото обложки — отображается в карточке маршрута</p>
             <CoverUpload value={coverPreview} onChange={(preview, file) => { setCoverPreview(preview); setCoverFile(file); }} />
           </div>
 

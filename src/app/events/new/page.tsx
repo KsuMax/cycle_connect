@@ -189,10 +189,11 @@ function CreateEventForm() {
           {/* Cover photo */}
           <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
             <h2 className="font-semibold text-[#1C1C1E] mb-1">Обложка</h2>
-            <p className="text-xs text-[#71717A] mb-3">Горизонтальное фото — показывается в карточке мероприятия</p>
+            <p className="text-xs text-[#71717A] mb-3">Фото обложки — показывается в карточке мероприятия</p>
             <CoverUpload
               value={coverPreview}
               onChange={(preview, file) => { setCoverPreview(preview); setCoverFile(file); }}
+              label="мероприятия"
             />
           </div>
 
