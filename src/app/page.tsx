@@ -5,7 +5,7 @@ import { Header } from "@/components/layout/Header";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { EventCard } from "@/components/events/EventCard";
 import { Avatar } from "@/components/ui/Avatar";
-import { Bike, TrendingUp, Calendar } from "lucide-react";
+import { Bike, TrendingUp, Calendar, MapPin } from "lucide-react";
 import Link from "next/link";
 import { supabase, type DbRoute, type DbEvent } from "@/lib/supabase";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -132,14 +132,21 @@ export default function FeedPage() {
                 <Bike size={120} strokeWidth={1} />
               </div>
               <div className="relative">
-                <h1 className="text-2xl font-bold mb-1">Привет, велосипедист 👋</h1>
-                <p className="text-white/80 text-sm mb-4">Куда едем сегодня? В ленте — новые маршруты и поездки</p>
-                <Link href="/routes"
-                  className="inline-flex items-center gap-2 bg-white font-semibold text-sm px-4 py-2 rounded-xl hover:bg-white/90 transition-colors"
-                  style={{ color: "#F4632A" }}>
-                  <Bike size={16} />
-                  Найти маршрут
-                </Link>
+                <h1 className="text-2xl font-bold mb-1">Маршруты и поездки для велосипедистов</h1>
+                <p className="text-white/95 text-sm mb-4">Находи маршруты рядом, записывайся на групповые поездки, добавляй свои треки</p>
+                <div className="flex flex-wrap gap-2">
+                  <Link href="/routes"
+                    className="inline-flex items-center gap-2 bg-white font-semibold text-sm px-4 py-2.5 rounded-xl hover:bg-white/90 transition-colors"
+                    style={{ color: "#F4632A" }}>
+                    <Bike size={16} />
+                    Найти маршрут
+                  </Link>
+                  <Link href="/routes?tab=events"
+                    className="inline-flex items-center gap-2 bg-white/20 font-semibold text-sm px-4 py-2.5 rounded-xl hover:bg-white/30 transition-colors text-white">
+                    <Calendar size={16} />
+                    Ближайшие поездки
+                  </Link>
+                </div>
               </div>
             </div>
 
@@ -163,6 +170,20 @@ export default function FeedPage() {
                 </section>
               ) : null;
             })()}
+
+            {/* Inline create CTA — visible on all screen sizes */}
+            <div className="rounded-2xl p-5 flex items-center justify-between gap-4"
+              style={{ background: "linear-gradient(135deg, #0BBFB5 0%, #7C5CFC 100%)" }}>
+              <div>
+                <p className="text-white font-semibold text-sm mb-0.5">Планируешь поездку?</p>
+                <p className="text-white/80 text-xs">Создай мероприятие, опиши маршрут по дням и позови друзей</p>
+              </div>
+              <Link href="/events/new"
+                className="shrink-0 bg-white font-semibold text-xs px-4 py-2.5 rounded-xl hover:bg-white/90 transition-colors whitespace-nowrap"
+                style={{ color: "#7C5CFC" }}>
+                Создать
+              </Link>
+            </div>
 
             {/* Popular routes */}
             {routes.length > 0 && (

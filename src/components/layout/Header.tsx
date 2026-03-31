@@ -3,13 +3,12 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Map, Newspaper, LogOut, Globe } from "lucide-react";
+import { Map, Newspaper, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/context/AuthContext";
 
 const NAV_ITEMS = [
   { href: "/", label: "Лента", icon: Newspaper },
   { href: "/routes", label: "Маршруты", icon: Map },
-  { href: "/online", label: "Онлайн", icon: Globe },
 ];
 
 export function Header() {
@@ -44,23 +43,23 @@ export function Header() {
             return (
               <Link key={href} href={href}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                  "flex items-center gap-1.5 px-3 min-h-[44px] rounded-lg text-sm font-medium transition-colors",
                   isActive ? "text-[#F4632A] bg-[#FFF0EB]" : "text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1]"
                 )}>
                 <Icon size={16} strokeWidth={isActive ? 2.5 : 2} />
-                <span className="hidden sm:inline">{label}</span>
+                <span>{label}</span>
               </Link>
             );
           })}
         </nav>
 
-        {/* Auth area */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Auth area — hidden on mobile (BottomNav handles it) */}
+        <div className="hidden sm:flex items-center gap-2 shrink-0">
           {user ? (
             <>
               <Link href="/profile"
                 className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+                  "flex items-center gap-2 px-3 min-h-[44px] rounded-lg text-sm font-medium transition-colors",
                   pathname === "/profile" ? "text-[#F4632A] bg-[#FFF0EB]" : "text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1]"
                 )}>
                 <div className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center text-xs font-bold text-white shrink-0"
@@ -70,10 +69,10 @@ export function Header() {
                     : initials
                   }
                 </div>
-                <span className="hidden sm:inline">{profile?.name ?? "Профиль"}</span>
+                <span>{profile?.name ?? "Профиль"}</span>
               </Link>
               <button onClick={handleSignOut}
-                className="p-2 rounded-lg text-[#A1A1AA] hover:text-[#71717A] hover:bg-[#F5F4F1] transition-colors"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-[#A1A1AA] hover:text-[#71717A] hover:bg-[#F5F4F1] transition-colors"
                 title="Выйти">
                 <LogOut size={16} />
               </button>
@@ -81,12 +80,12 @@ export function Header() {
           ) : (
             <>
               <Link href="/auth/login"
-                className="text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+                className="text-sm font-medium px-4 min-h-[44px] flex items-center rounded-lg transition-colors"
                 style={{ color: "#71717A" }}>
                 Войти
               </Link>
               <Link href="/auth/register"
-                className="text-sm font-medium px-3 py-1.5 rounded-lg transition-colors text-white"
+                className="text-sm font-medium px-4 min-h-[44px] flex items-center rounded-lg transition-colors text-white"
                 style={{ backgroundColor: "#1C1C1E" }}>
                 Регистрация
               </Link>

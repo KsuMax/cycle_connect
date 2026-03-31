@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Calendar, Bike, Heart, ChevronRight } from "lucide-react";
 import { AvatarGroup } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
@@ -19,6 +20,7 @@ interface EventCardProps {
 export function EventCard({ event }: EventCardProps) {
   const { user } = useAuth();
   const { isLiked, toggleLike } = useEventLikes();
+  const router = useRouter();
 
   const liked = isLiked(event.id);
   // likeCount tracks the displayed count, initialized from DB and updated optimistically
@@ -38,7 +40,7 @@ export function EventCard({ event }: EventCardProps) {
 
   const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user) { router.push("/auth/login"); return; }
     const newCount = liked ? likeCount - 1 : likeCount + 1;
     setLikeCount(newCount);
     await toggleLike(event.id, likeCount);
@@ -46,7 +48,8 @@ export function EventCard({ event }: EventCardProps) {
 
   const handleGoing = async (e: React.MouseEvent) => {
     e.preventDefault();
-    if (!user || goingBusy) return;
+    if (!user) { router.push("/auth/login"); return; }
+    if (goingBusy) return;
     setGoingBusy(true);
     const wasGoing = going;
     setGoing(!wasGoing);
@@ -96,25 +99,18 @@ export function EventCard({ event }: EventCardProps) {
         {/* Content */}
         <div className="p-4 flex flex-col flex-1">
           {/* Meta */}
-          <div className="flex items-center gap-3 text-xs text-[#71717A] mb-3">
+          <div className="flex items-center gap-3 text-sm text-[#71717A] mb-3">
             <span className="flex items-center gap-1">
-              <Calendar size={12} />
+              <Calendar size={14} />
               {formatDate(event.start_date)}
             </span>
             <span className="flex items-center gap-1">
-              <Bike size={12} />
-              {totalKm} км всего
+              <Bike size={14} />
+              {totalKm} км
             </span>
-          </div>
-
-          {/* Days preview */}
-          <div className="flex gap-1.5 mb-3 flex-1 items-end">
-            {isMultiDay ? event.days.map((day) => (
-              <div key={day.day} className="flex-1 text-center">
-                <div className="text-xs font-semibold text-[#1C1C1E]">День {day.day}</div>
-                <div className="text-[10px] text-[#71717A]">{day.distance_km} км</div>
-              </div>
-            )) : <div className="h-8" />}
+            {isMultiDay && (
+              <span className="text-xs text-[#A1A1AA]">{event.days.length} дн.</span>
+            )}
           </div>
 
           {/* Footer */}
@@ -128,23 +124,23 @@ export function EventCard({ event }: EventCardProps) {
             <div className="flex items-center gap-2">
               <button
                 onClick={handleLike}
-                className="flex items-center gap-1 text-xs transition-colors"
+                className="flex items-center gap-1 text-sm min-w-[44px] min-h-[44px] justify-center transition-colors"
                 style={{ color: liked ? "#F4632A" : "#A1A1AA" }}
               >
-                <Heart size={13} fill={liked ? "#F4632A" : "none"} />
+                <Heart size={14} fill={liked ? "#F4632A" : "none"} />
                 {likeCount}
               </button>
 
               <button
                 onClick={handleGoing}
                 disabled={goingBusy}
-                className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-70"
+                className="flex items-center gap-1.5 text-sm font-medium px-4 min-h-[44px] rounded-xl transition-colors disabled:opacity-70"
                 style={going
                   ? { backgroundColor: "#0BBFB5", color: "white" }
                   : { backgroundColor: "#1C1C1E", color: "white" }
                 }
               >
-                {going ? "✓ Еду" : <>Я поеду <ChevronRight size={12} /></>}
+                {going ? "✓ Еду" : <>Я поеду <ChevronRight size={14} /></>}
               </button>
             </div>
           </div>
