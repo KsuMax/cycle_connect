@@ -55,19 +55,10 @@ export function RidesProvider({ children }: { children: ReactNode }) {
       try {
         if (alreadyRidden) {
           await supabase.from("route_rides").delete().match({ user_id: user.id, route_id: routeId });
-          if (distanceKm) {
-            const { data } = await supabase.from("profiles").select("km_total").eq("id", user.id).single();
-            const current = (data as { km_total: number } | null)?.km_total ?? 0;
-            await supabase.from("profiles").update({ km_total: Math.max(0, current - distanceKm) }).eq("id", user.id);
-          }
         } else {
           await supabase.from("route_rides").insert({ user_id: user.id, route_id: routeId });
-          if (distanceKm) {
-            const { data } = await supabase.from("profiles").select("km_total").eq("id", user.id).single();
-            const current = (data as { km_total: number } | null)?.km_total ?? 0;
-            await supabase.from("profiles").update({ km_total: current + distanceKm }).eq("id", user.id);
-          }
         }
+        // km_total обновляется автоматически триггером trg_sync_km_total на стороне БД
       } catch {
         // Supabase unavailable — persist locally only
       }
