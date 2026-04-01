@@ -13,7 +13,6 @@ import { useEventRides } from "@/lib/context/EventRidesContext";
 import { supabase } from "@/lib/supabase";
 import { DifficultyBadge, Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
-import { EventCard } from "@/components/events/EventCard";
 import { useRouter } from "next/navigation";
 import { useAuthModal } from "@/components/ui/AuthModal";
 import { useToast } from "@/lib/context/ToastContext";
@@ -26,6 +25,7 @@ interface RelatedEvent {
   id: string;
   title: string;
   start_date: string | null;
+  end_date: string | null;
   is_private: boolean;
   participants: { user_id: string }[];
 }
@@ -74,12 +74,18 @@ function dbToRoute(r: DbRoute): Route {
   };
 }
 
+/** Ride button state machine */
+type RideButtonState =
+  | { type: "not_ridden" }
+  | { type: "upcoming_event"; eventTitle: string; eventDate: string | null; eventId: string }
+  | { type: "ridden"; count: number };
+
 export default function RouteDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { isLiked, toggleLike } = useLikes();
-  const { hasRidden, toggleRide } = useRides();
+  const { hasRidden, rideCount, addRide } = useRides();
   const { requireAuth } = useAuthModal();
   const { showToast } = useToast();
   const { getRouteEventStatus } = useEventRides();
@@ -112,16 +118,13 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
     load();
   }, [id]);
 
-  // Load upcoming events for this route
+  // Load all events for this route (past + upcoming) for the sidebar list and tooltip details
   useEffect(() => {
-    const today = new Date().toISOString().split("T")[0];
     supabase
       .from("events")
-      .select("id, title, start_date, is_private, participants:event_participants(user_id)")
+      .select("id, title, start_date, end_date, is_private, participants:event_participants(user_id)")
       .eq("route_id", id)
-      .gte("start_date", today)
       .order("start_date", { ascending: true })
-      .limit(5)
       .then(({ data }) => {
         if (data) setRelatedEvents(data as RelatedEvent[]);
       });
@@ -153,6 +156,7 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   const isAuthor = user?.id === route.author.id;
+  const today = new Date().toISOString().split("T")[0];
 
   const handleDelete = async () => {
     if (!confirm("Удалить маршрут? Это действие нельзя отменить.")) return;
@@ -180,12 +184,97 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
     showToast(willFav ? "Добавлено в избранное" : "Убрано из избранного", "info");
   };
 
-  const handleRide = () => {
-    if (!requireAuth("отметить маршрут")) return;
-    const willRide = !hasRidden(route.id);
-    toggleRide(route.id, route.distance_km);
-    showToast(willRide ? "Маршрут отмечен как проеханный!" : "Отметка убрана", willRide ? "success" : "info");
-  };
+  // Visible events (public or user is participant)
+  const visibleEvents = relatedEvents.filter(
+    ev => !ev.is_private || (user && ev.participants.some(p => p.user_id === user.id))
+  );
+  const upcomingEvents = visibleEvents.filter(ev => ev.start_date && ev.start_date >= today);
+
+  // Derive ride button state.
+  // Primary detection: EventRidesContext (pre-loaded for all routes the user participates in).
+  // Tooltip details: relatedEvents (event title + date for the hover tooltip).
+  function getRideButtonState(): RideButtonState {
+    const eventStatus = getRouteEventStatus(route!.id);
+
+    if (eventStatus === "upcoming") {
+      const upcomingParticipating = upcomingEvents.find(ev =>
+        user && ev.participants.some(p => p.user_id === user.id)
+      );
+      return {
+        type: "upcoming_event",
+        eventTitle: upcomingParticipating?.title ?? "",
+        eventDate: upcomingParticipating?.start_date ?? null,
+        eventId: upcomingParticipating?.id ?? "",
+      };
+    }
+
+    if (hasRidden(route!.id)) {
+      return { type: "ridden", count: rideCount(route!.id) };
+    }
+
+    return { type: "not_ridden" };
+  }
+
+  const rideState = getRideButtonState();
+
+  function RideButton() {
+    if (rideState.type === "upcoming_event") {
+      return (
+        <div className="flex-1 relative group/ridebtn">
+          <div
+            className="w-full py-2.5 rounded-xl text-sm font-semibold text-center cursor-default select-none"
+            style={{ backgroundColor: "#EFF6FF", color: "#2563EB" }}
+          >
+            Скоро катну
+          </div>
+          {rideState.eventDate && (
+            <div
+              className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap opacity-0 group-hover/ridebtn:opacity-100 transition-opacity pointer-events-none z-10"
+              style={{ backgroundColor: "#1C1C1E", color: "white" }}
+            >
+              {rideState.eventTitle} · {formatDate(rideState.eventDate)}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (rideState.type === "ridden") {
+      return (
+        <div className="flex-1 flex flex-col gap-1">
+          <button
+            onClick={() => {
+              if (!requireAuth("отметить проезд")) return;
+              addRide(route!.id, route!.distance_km);
+              showToast("Проезд отмечен! +" + route!.distance_km + " км", "success");
+            }}
+            className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors"
+            style={{ backgroundColor: "#F4632A", color: "white" }}
+          >
+            Катнуть ещё
+          </button>
+          <div className="text-center text-xs text-[#A1A1AA]">
+            Проехал {rideState.count} {rideState.count === 1 ? "раз" : rideState.count < 5 ? "раза" : "раз"} · {rideState.count * route!.distance_km} км
+          </div>
+        </div>
+      );
+    }
+
+    // not_ridden
+    return (
+      <button
+        onClick={() => {
+          if (!requireAuth("отметить маршрут")) return;
+          addRide(route!.id, route!.distance_km);
+          showToast("Маршрут отмечен как проеханный!", "success");
+        }}
+        className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+        style={{ backgroundColor: "#1C1C1E", color: "white" }}
+      >
+        Катнуть
+      </button>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F5F4F1]">
@@ -252,29 +341,6 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               )}
 
-              {/* Event participation status */}
-              {(() => {
-                const status = getRouteEventStatus(route.id);
-                if (!status) return null;
-                return (
-                  <div className="mb-4 px-3 py-2 rounded-xl flex items-center gap-2"
-                    style={status === "upcoming"
-                      ? { backgroundColor: "#F0FDFA", border: "1px solid #99F6E4" }
-                      : { backgroundColor: "#FFF0EB", border: "1px solid #FDBA74" }}>
-                    <span className="text-lg">{status === "upcoming" ? "🚴" : "✅"}</span>
-                    <div>
-                      <div className="text-sm font-semibold"
-                        style={{ color: status === "upcoming" ? "#0D9488" : "#F4632A" }}>
-                        {status === "upcoming" ? "Скоро катну" : "Катанул"}
-                      </div>
-                      <div className="text-xs" style={{ color: status === "upcoming" ? "#5EEAD4" : "#FB923C" }}>
-                        {status === "upcoming" ? "Ты записан на мероприятие" : "Мероприятие завершено"}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-
               {/* Types */}
               <div className="flex flex-wrap gap-1.5 mb-4">
                 {route.route_types.map((type) => (
@@ -309,13 +375,7 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
 
               {/* Actions */}
               <div className="flex gap-2">
-                <button onClick={handleRide}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors"
-                  style={hasRidden(route.id)
-                    ? { backgroundColor: "#F4632A", color: "white" }
-                    : { backgroundColor: "#1C1C1E", color: "white" }}>
-                  {hasRidden(route.id) ? "Катанул ✓" : "Катнуть"}
-                </button>
+                <RideButton />
                 <button onClick={handleFavorite}
                   className="w-10 h-10 rounded-xl border flex items-center justify-center transition-colors"
                   style={isFavorite(route.id)
@@ -359,38 +419,34 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
             </div>
 
             {/* Upcoming events linked to this route */}
-            {relatedEvents.filter(ev =>
-              !ev.is_private || (user && ev.participants.some(p => p.user_id === user.id))
-            ).length > 0 && (
+            {upcomingEvents.length > 0 && (
               <div className="bg-white rounded-2xl p-4 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
                 <h3 className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-3 flex items-center gap-1.5">
                   <Calendar size={12} /> Ближайшие мероприятия
                 </h3>
                 <div className="space-y-1">
-                  {relatedEvents
-                    .filter(ev => !ev.is_private || (user && ev.participants.some(p => p.user_id === user.id)))
-                    .map(ev => (
-                      <Link key={ev.id} href={`/events/${ev.id}`}
-                        className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-[#F5F4F1] transition-colors group">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                          style={{ background: "linear-gradient(135deg, #0BBFB5 0%, #7C5CFC 100%)" }}>
-                          {ev.is_private
-                            ? <Lock size={12} className="text-white" />
-                            : <Calendar size={12} className="text-white" />}
+                  {upcomingEvents.map(ev => (
+                    <Link key={ev.id} href={`/events/${ev.id}`}
+                      className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-[#F5F4F1] transition-colors group">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                        style={{ background: "linear-gradient(135deg, #0BBFB5 0%, #7C5CFC 100%)" }}>
+                        {ev.is_private
+                          ? <Lock size={12} className="text-white" />
+                          : <Calendar size={12} className="text-white" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-[#1C1C1E] truncate group-hover:text-[#F4632A] transition-colors">
+                          {ev.title}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-[#1C1C1E] truncate group-hover:text-[#F4632A] transition-colors">
-                            {ev.title}
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-[#A1A1AA]">
-                            {ev.start_date && <span>{formatDate(ev.start_date)}</span>}
-                            <span className="flex items-center gap-0.5">
-                              <Users size={10} /> {ev.participants.length}
-                            </span>
-                          </div>
+                        <div className="flex items-center gap-2 text-xs text-[#A1A1AA]">
+                          {ev.start_date && <span>{formatDate(ev.start_date)}</span>}
+                          <span className="flex items-center gap-0.5">
+                            <Users size={10} /> {ev.participants.length}
+                          </span>
                         </div>
-                      </Link>
-                    ))}
+                      </div>
+                    </Link>
+                  ))}
                 </div>
               </div>
             )}
