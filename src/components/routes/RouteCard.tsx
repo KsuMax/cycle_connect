@@ -101,17 +101,15 @@ export function RouteCard({ route, compact = false }: RouteCardProps) {
               🗺 Маршрут
             </span>
           </div>
-          <h3 className="font-semibold text-[#1C1C1E] text-base leading-tight mb-1 group-hover:text-[#F4632A] transition-colors">
+          <h3 className="font-semibold text-[#1C1C1E] text-base leading-snug mb-2 line-clamp-2 group-hover:text-[#F4632A] transition-colors">
             {route.title}
-          </h3>
-          {getRouteEventStatus(route.id) === "upcoming" && (
-            <div className="mb-2">
-              <span className="inline-block text-[11px] font-semibold px-2 py-0.5 rounded-md"
+            {getRouteEventStatus(route.id) === "upcoming" && (
+              <span className="inline-block ml-1.5 align-middle -translate-y-px text-[11px] font-semibold px-2 py-0.5 rounded-md"
                 style={{ backgroundColor: "#EFF6FF", color: "#2563EB" }}>
                 Скоро катну
               </span>
-            </div>
-          )}
+            )}
+          </h3>
 
           {/* Stats */}
           <div className="flex items-center gap-3 text-sm text-[#71717A] mb-3">
