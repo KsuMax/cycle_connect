@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useFavorites } from "@/lib/context/FavoritesContext";
 import { useRides } from "@/lib/context/RidesContext";
 import { supabase } from "@/lib/supabase";
-import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink, Users } from "lucide-react";
+import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink, Users, Shield } from "lucide-react";
 import { AvatarLightbox } from "@/components/ui/AvatarLightbox";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
@@ -360,6 +360,34 @@ export default function ProfilePage() {
             </div>
           </div>
         )}
+
+        {/* Community section */}
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <Link href="/users"
+            className="flex items-center gap-3 bg-white rounded-2xl p-4 border border-[#E4E4E7] hover:border-[#7C5CFC]/40 transition-colors group"
+            style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "#F0ECFF" }}>
+              <Users size={18} style={{ color: "#7C5CFC" }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-[#1C1C1E] group-hover:text-[#7C5CFC] transition-colors">Участники</div>
+              <div className="text-[11px] text-[#A1A1AA]">Найти велосипедистов</div>
+            </div>
+            <ChevronRight size={14} className="text-[#A1A1AA] shrink-0" />
+          </Link>
+          <Link href="/clubs"
+            className="flex items-center gap-3 bg-white rounded-2xl p-4 border border-[#E4E4E7] hover:border-[#0BBFB5]/40 transition-colors group relative overflow-hidden"
+            style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "#E8FAF9" }}>
+              <Shield size={18} style={{ color: "#0BBFB5" }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-[#1C1C1E] group-hover:text-[#0BBFB5] transition-colors">Клубы</div>
+              <div className="text-[11px] text-[#A1A1AA]">Скоро</div>
+            </div>
+            <ChevronRight size={14} className="text-[#A1A1AA] shrink-0" />
+          </Link>
+        </div>
 
         {/* Tabs */}
         <div className="flex gap-1 bg-white rounded-2xl p-1.5 border border-[#E4E4E7] mb-6" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
