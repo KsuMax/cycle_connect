@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Bike, Mountain, Clock, Heart, ChevronRight } from "lucide-react";
 import { DifficultyBadge, Badge } from "@/components/ui/Badge";
 import { AvatarGroup } from "@/components/ui/Avatar";
 import { cn } from "@/lib/utils";
 import { useLikes } from "@/lib/context/LikesContext";
 import { useAuth } from "@/lib/context/AuthContext";
-import { useAuthModal } from "@/components/ui/AuthModal";
-import { useToast } from "@/lib/context/ToastContext";
 import { useEventRides } from "@/lib/context/EventRidesContext";
 import type { Route, RouteType } from "@/types";
 
@@ -35,20 +34,17 @@ interface RouteCardProps {
 export function RouteCard({ route, compact = false }: RouteCardProps) {
   const { isLiked, toggleLike } = useLikes();
   const { user } = useAuth();
-  const { requireAuth } = useAuthModal();
-  const { showToast } = useToast();
   const { getRouteEventStatus } = useEventRides();
+  const router = useRouter();
   const [likeCount, setLikeCount] = useState(route.likes);
   const liked = isLiked(route.id);
 
   const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
-    if (!requireAuth("поставить лайк")) return;
+    if (!user) { router.push("/auth/login"); return; }
     const prev = likeCount;
-    const willLike = !liked;
-    setLikeCount(willLike ? prev + 1 : prev - 1);
+    setLikeCount(liked ? prev - 1 : prev + 1);
     await toggleLike(route.id, prev);
-    showToast(willLike ? "Маршрут отмечен" : "Лайк убран", "info");
   };
 
   return (
@@ -105,9 +101,17 @@ export function RouteCard({ route, compact = false }: RouteCardProps) {
               🗺 Маршрут
             </span>
           </div>
-          <h3 className="font-semibold text-[#1C1C1E] text-base leading-tight mb-2 group-hover:text-[#F4632A] transition-colors">
+          <h3 className="font-semibold text-[#1C1C1E] text-base leading-tight mb-1 group-hover:text-[#F4632A] transition-colors">
             {route.title}
           </h3>
+          {getRouteEventStatus(route.id) === "upcoming" && (
+            <div className="mb-2">
+              <span className="inline-block text-[11px] font-semibold px-2 py-0.5 rounded-md"
+                style={{ backgroundColor: "#EFF6FF", color: "#2563EB" }}>
+                Скоро катну
+              </span>
+            </div>
+          )}
 
           {/* Stats */}
           <div className="flex items-center gap-3 text-sm text-[#71717A] mb-3">
@@ -137,24 +141,6 @@ export function RouteCard({ route, compact = false }: RouteCardProps) {
               </span>
             ))}
           </div>
-
-          {/* Event participation status */}
-          {(() => {
-            const status = getRouteEventStatus(route.id);
-            if (!status) return null;
-            return (
-              <div className="mb-2">
-                <span
-                  className="text-xs font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1"
-                  style={status === "upcoming"
-                    ? { backgroundColor: "#F0FDFA", color: "#0D9488" }
-                    : { backgroundColor: "#FFF0EB", color: "#F4632A" }}
-                >
-                  {status === "upcoming" ? "🚴 Скоро катну" : "✅ Катанул"}
-                </span>
-              </div>
-            );
-          })()}
 
           {/* Tags */}
           <div className="flex flex-wrap gap-1.5 mb-3">
