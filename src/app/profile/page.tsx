@@ -62,7 +62,7 @@ export default function ProfilePage() {
   const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
   const { favorites } = useFavorites();
-  const { rides, ridesLoaded } = useRides();
+  const { rideCounts, ridesLoaded } = useRides();
 
   const [activeTab, setActiveTab] = useState<Tab>("routes");
   const [eventsSubTab, setEventsSubTab] = useState<EventsSubTab>("rides");
@@ -105,10 +105,10 @@ export default function ProfilePage() {
       });
   }, [user]);
 
-  // Load ridden routes from context rides Set (which handles Supabase + localStorage fallback)
+  // Load ridden routes from context rideCounts Map (which handles Supabase + localStorage fallback)
   useEffect(() => {
     if (!user || !ridesLoaded) return;
-    const routeIds = Array.from(rides);
+    const routeIds = Array.from(rideCounts.keys());
     if (routeIds.length === 0) {
       setRidesData([]);
       setLoadingRides(false);
@@ -122,7 +122,7 @@ export default function ProfilePage() {
         if (data) setRidesData(data.map(dbToRoute));
         setLoadingRides(false);
       });
-  }, [rides, ridesLoaded, user]);
+  }, [rideCounts, ridesLoaded, user]);
 
   // Load favorite routes from Supabase (favorites Set contains real IDs, not mock)
   useEffect(() => {

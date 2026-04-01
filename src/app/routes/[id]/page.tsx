@@ -24,6 +24,7 @@ interface RelatedEvent {
   id: string;
   title: string;
   start_date: string | null;
+  end_date: string | null;
   is_private: boolean;
   participants: { user_id: string }[];
 }
@@ -72,12 +73,18 @@ function dbToRoute(r: DbRoute): Route {
   };
 }
 
+/** Derive ride button state from participation and ride history */
+type RideButtonState =
+  | { type: "not_ridden" }
+  | { type: "upcoming_event"; eventTitle: string; eventDate: string | null; eventId: string }
+  | { type: "ridden"; count: number };
+
 export default function RouteDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { isLiked, toggleLike } = useLikes();
-  const { hasRidden, toggleRide } = useRides();
+  const { hasRidden, rideCount, addRide } = useRides();
   const router = useRouter();
 
   const [route, setRoute] = useState<Route | null>(null);
@@ -107,16 +114,13 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
     load();
   }, [id]);
 
-  // Load upcoming events for this route
+  // Load all events for this route (past + upcoming) to detect participation
   useEffect(() => {
-    const today = new Date().toISOString().split("T")[0];
     supabase
       .from("events")
-      .select("id, title, start_date, is_private, participants:event_participants(user_id)")
+      .select("id, title, start_date, end_date, is_private, participants:event_participants(user_id)")
       .eq("route_id", id)
-      .gte("start_date", today)
       .order("start_date", { ascending: true })
-      .limit(5)
       .then(({ data }) => {
         if (data) setRelatedEvents(data as RelatedEvent[]);
       });
@@ -148,6 +152,7 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   const isAuthor = user?.id === route.author.id;
+  const today = new Date().toISOString().split("T")[0];
 
   const handleDelete = async () => {
     if (!confirm("Удалить маршрут? Это действие нельзя отменить.")) return;
@@ -163,6 +168,93 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
     setLikeCount(liked ? prev - 1 : prev + 1);
     await toggleLike(route.id, prev);
   };
+
+  // Visible events (public or user is participant)
+  const visibleEvents = relatedEvents.filter(
+    ev => !ev.is_private || (user && ev.participants.some(p => p.user_id === user.id))
+  );
+  const upcomingEvents = visibleEvents.filter(ev => ev.start_date && ev.start_date >= today);
+
+  // Determine ride button state
+  function getRideButtonState(): RideButtonState {
+    if (!user) return hasRidden(route!.id) ? { type: "ridden", count: rideCount(route!.id) } : { type: "not_ridden" };
+
+    // Check if user is registered for an upcoming event on this route
+    const upcomingParticipating = upcomingEvents.find(ev =>
+      ev.participants.some(p => p.user_id === user.id)
+    );
+    if (upcomingParticipating) {
+      return {
+        type: "upcoming_event",
+        eventTitle: upcomingParticipating.title,
+        eventDate: upcomingParticipating.start_date,
+        eventId: upcomingParticipating.id,
+      };
+    }
+
+    if (hasRidden(route!.id)) {
+      return { type: "ridden", count: rideCount(route!.id) };
+    }
+
+    return { type: "not_ridden" };
+  }
+
+  const rideState = getRideButtonState();
+
+  function RideButton() {
+    if (rideState.type === "upcoming_event") {
+      return (
+        <div className="flex-1 relative group/ridebtn">
+          <div
+            className="w-full py-2.5 rounded-xl text-sm font-semibold text-center cursor-default select-none"
+            style={{ backgroundColor: "#EFF6FF", color: "#2563EB" }}
+          >
+            Скоро катну
+          </div>
+          {rideState.eventDate && (
+            <div
+              className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap opacity-0 group-hover/ridebtn:opacity-100 transition-opacity pointer-events-none z-10"
+              style={{ backgroundColor: "#1C1C1E", color: "white" }}
+            >
+              {rideState.eventTitle} · {formatDate(rideState.eventDate)}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (rideState.type === "ridden") {
+      return (
+        <div className="flex-1 flex flex-col gap-1">
+          <AuthTooltip disabled={!user}>
+            <button
+              onClick={() => addRide(route!.id, route!.distance_km)}
+              className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors"
+              style={{ backgroundColor: "#F4632A", color: "white" }}
+            >
+              Катнуть ещё
+            </button>
+          </AuthTooltip>
+          <div className="text-center text-xs text-[#A1A1AA]">
+            Проехал {rideState.count} {rideState.count === 1 ? "раз" : rideState.count < 5 ? "раза" : "раз"} · {rideState.count * route!.distance_km} км
+          </div>
+        </div>
+      );
+    }
+
+    // not_ridden
+    return (
+      <AuthTooltip disabled={!user} className="flex-1">
+        <button
+          onClick={() => addRide(route!.id, route!.distance_km)}
+          className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors"
+          style={{ backgroundColor: "#1C1C1E", color: "white" }}
+        >
+          Катнуть
+        </button>
+      </AuthTooltip>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F5F4F1]">
@@ -263,15 +355,7 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
 
               {/* Actions */}
               <div className="flex gap-2">
-                <AuthTooltip disabled={!user} className="flex-1">
-                  <button onClick={() => toggleRide(route.id, route.distance_km)}
-                    className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors"
-                    style={hasRidden(route.id)
-                      ? { backgroundColor: "#F4632A", color: "white" }
-                      : { backgroundColor: "#1C1C1E", color: "white" }}>
-                    {hasRidden(route.id) ? "Катанул ✓" : "Катнуть"}
-                  </button>
-                </AuthTooltip>
+                <RideButton />
                 <AuthTooltip disabled={!user}>
                   <button onClick={() => toggleFavorite(route.id)}
                     className="w-10 h-10 rounded-xl border flex items-center justify-center transition-colors"
@@ -319,38 +403,34 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
             </div>
 
             {/* Upcoming events linked to this route */}
-            {relatedEvents.filter(ev =>
-              !ev.is_private || (user && ev.participants.some(p => p.user_id === user.id))
-            ).length > 0 && (
+            {upcomingEvents.length > 0 && (
               <div className="bg-white rounded-2xl p-4 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
                 <h3 className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-3 flex items-center gap-1.5">
                   <Calendar size={12} /> Ближайшие мероприятия
                 </h3>
                 <div className="space-y-1">
-                  {relatedEvents
-                    .filter(ev => !ev.is_private || (user && ev.participants.some(p => p.user_id === user.id)))
-                    .map(ev => (
-                      <Link key={ev.id} href={`/events/${ev.id}`}
-                        className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-[#F5F4F1] transition-colors group">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                          style={{ background: "linear-gradient(135deg, #0BBFB5 0%, #7C5CFC 100%)" }}>
-                          {ev.is_private
-                            ? <Lock size={12} className="text-white" />
-                            : <Calendar size={12} className="text-white" />}
+                  {upcomingEvents.map(ev => (
+                    <Link key={ev.id} href={`/events/${ev.id}`}
+                      className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-[#F5F4F1] transition-colors group">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                        style={{ background: "linear-gradient(135deg, #0BBFB5 0%, #7C5CFC 100%)" }}>
+                        {ev.is_private
+                          ? <Lock size={12} className="text-white" />
+                          : <Calendar size={12} className="text-white" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-[#1C1C1E] truncate group-hover:text-[#F4632A] transition-colors">
+                          {ev.title}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-[#1C1C1E] truncate group-hover:text-[#F4632A] transition-colors">
-                            {ev.title}
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-[#A1A1AA]">
-                            {ev.start_date && <span>{formatDate(ev.start_date)}</span>}
-                            <span className="flex items-center gap-0.5">
-                              <Users size={10} /> {ev.participants.length}
-                            </span>
-                          </div>
+                        <div className="flex items-center gap-2 text-xs text-[#A1A1AA]">
+                          {ev.start_date && <span>{formatDate(ev.start_date)}</span>}
+                          <span className="flex items-center gap-0.5">
+                            <Users size={10} /> {ev.participants.length}
+                          </span>
                         </div>
-                      </Link>
-                    ))}
+                      </div>
+                    </Link>
+                  ))}
                 </div>
               </div>
             )}

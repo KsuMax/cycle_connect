@@ -7,17 +7,20 @@ import { useAuth } from "./AuthContext";
 const STORAGE_KEY = "cc_rides";
 
 interface RidesContextValue {
-  rides: Set<string>;
+  /** routeId → number of times ridden */
+  rideCounts: Map<string, number>;
   ridesLoaded: boolean;
-  toggleRide: (routeId: string, distanceKm?: number) => Promise<void>;
+  /** Add one ride (manual or auto from event). Does NOT remove rides. */
+  addRide: (routeId: string, distanceKm?: number, eventId?: string) => Promise<void>;
   hasRidden: (routeId: string) => boolean;
+  rideCount: (routeId: string) => number;
 }
 
 const RidesContext = createContext<RidesContextValue | null>(null);
 
 export function RidesProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [rides, setRides] = useState<Set<string>>(new Set());
+  const [rideCounts, setRideCounts] = useState<Map<string, number>>(new Map());
   const [ridesLoaded, setRidesLoaded] = useState(false);
 
   useEffect(() => {
@@ -29,12 +32,26 @@ export function RidesProvider({ children }: { children: ReactNode }) {
         .eq("user_id", user.id)
         .then(({ data, error }) => {
           if (data && !error) {
-            setRides(new Set(data.map((r: { route_id: string }) => r.route_id)));
+            const counts = new Map<string, number>();
+            for (const r of data as { route_id: string }[]) {
+              counts.set(r.route_id, (counts.get(r.route_id) ?? 0) + 1);
+            }
+            setRideCounts(counts);
           } else {
-            // Table may not exist yet — fall back to localStorage
+            // Fallback to localStorage
             try {
               const stored = localStorage.getItem(STORAGE_KEY);
-              if (stored) setRides(new Set(JSON.parse(stored)));
+              if (stored) {
+                const parsed = JSON.parse(stored);
+                // Support old format (array of ids) and new format (object map)
+                if (Array.isArray(parsed)) {
+                  const counts = new Map<string, number>();
+                  for (const id of parsed as string[]) counts.set(id, 1);
+                  setRideCounts(counts);
+                } else {
+                  setRideCounts(new Map(Object.entries(parsed)));
+                }
+              }
             } catch {}
           }
           setRidesLoaded(true);
@@ -42,50 +59,50 @@ export function RidesProvider({ children }: { children: ReactNode }) {
     } else {
       try {
         const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) setRides(new Set(JSON.parse(stored)));
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            const counts = new Map<string, number>();
+            for (const id of parsed as string[]) counts.set(id, 1);
+            setRideCounts(counts);
+          } else {
+            setRideCounts(new Map(Object.entries(parsed)));
+          }
+        }
       } catch {}
       setRidesLoaded(true);
     }
   }, [user]);
 
-  const toggleRide = useCallback(async (routeId: string, distanceKm?: number) => {
-    const alreadyRidden = rides.has(routeId);
-
+  const addRide = useCallback(async (routeId: string, distanceKm?: number, eventId?: string) => {
     if (user) {
       try {
-        if (alreadyRidden) {
-          await supabase.from("route_rides").delete().match({ user_id: user.id, route_id: routeId });
-          if (distanceKm) {
-            const { data } = await supabase.from("profiles").select("km_total").eq("id", user.id).single();
-            const current = (data as { km_total: number } | null)?.km_total ?? 0;
-            await supabase.from("profiles").update({ km_total: Math.max(0, current - distanceKm) }).eq("id", user.id);
-          }
-        } else {
-          await supabase.from("route_rides").insert({ user_id: user.id, route_id: routeId });
-          if (distanceKm) {
-            const { data } = await supabase.from("profiles").select("km_total").eq("id", user.id).single();
-            const current = (data as { km_total: number } | null)?.km_total ?? 0;
-            await supabase.from("profiles").update({ km_total: current + distanceKm }).eq("id", user.id);
-          }
+        await supabase.from("route_rides").insert({
+          user_id: user.id,
+          route_id: routeId,
+          ...(eventId ? { event_id: eventId } : {}),
+        });
+        if (distanceKm) {
+          const { data } = await supabase.from("profiles").select("km_total").eq("id", user.id).single();
+          const current = (data as { km_total: number } | null)?.km_total ?? 0;
+          await supabase.from("profiles").update({ km_total: current + distanceKm }).eq("id", user.id);
         }
-      } catch {
-        // Supabase unavailable — persist locally only
-      }
+      } catch {}
     }
 
-    setRides((prev) => {
-      const next = new Set(prev);
-      if (alreadyRidden) next.delete(routeId);
-      else next.add(routeId);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(next)));
+    setRideCounts((prev) => {
+      const next = new Map(prev);
+      next.set(routeId, (next.get(routeId) ?? 0) + 1);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(next)));
       return next;
     });
-  }, [rides, user]);
+  }, [user]);
 
-  const hasRidden = useCallback((routeId: string) => rides.has(routeId), [rides]);
+  const hasRidden = useCallback((routeId: string) => (rideCounts.get(routeId) ?? 0) > 0, [rideCounts]);
+  const rideCount = useCallback((routeId: string) => rideCounts.get(routeId) ?? 0, [rideCounts]);
 
   return (
-    <RidesContext.Provider value={{ rides, ridesLoaded, toggleRide, hasRidden }}>
+    <RidesContext.Provider value={{ rideCounts, ridesLoaded, addRide, hasRidden, rideCount }}>
       {children}
     </RidesContext.Provider>
   );
