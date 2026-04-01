@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Calendar, Bike, Heart, ChevronRight } from "lucide-react";
 import { AvatarGroup } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
@@ -10,6 +9,8 @@ import { formatDate } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useEventLikes } from "@/lib/context/EventLikesContext";
+import { useAuthModal } from "@/components/ui/AuthModal";
+import { useToast } from "@/lib/context/ToastContext";
 import type { CycleEvent } from "@/types";
 
 // Deterministic gradient palette — pick by hashing event id
@@ -35,7 +36,8 @@ interface EventCardProps {
 export function EventCard({ event }: EventCardProps) {
   const { user } = useAuth();
   const { isLiked, toggleLike } = useEventLikes();
-  const router = useRouter();
+  const { requireAuth } = useAuthModal();
+  const { showToast } = useToast();
 
   const liked = isLiked(event.id);
   const [likeCount, setLikeCount] = useState(event.likes);
@@ -52,23 +54,27 @@ export function EventCard({ event }: EventCardProps) {
 
   const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
-    if (!user) { router.push("/auth/login"); return; }
-    const newCount = liked ? likeCount - 1 : likeCount + 1;
+    if (!requireAuth("поставить лайк")) return;
+    const willLike = !liked;
+    const newCount = willLike ? likeCount + 1 : likeCount - 1;
     setLikeCount(newCount);
     await toggleLike(event.id, likeCount);
+    showToast(willLike ? "Мероприятие отмечено" : "Лайк убран", "info");
   };
 
   const handleGoing = async (e: React.MouseEvent) => {
     e.preventDefault();
-    if (!user) { router.push("/auth/login"); return; }
+    if (!requireAuth("записаться на поездку")) return;
     if (goingBusy) return;
     setGoingBusy(true);
     const wasGoing = going;
     setGoing(!wasGoing);
     if (wasGoing) {
-      await supabase.from("event_participants").delete().eq("event_id", event.id).eq("user_id", user.id);
+      await supabase.from("event_participants").delete().eq("event_id", event.id).eq("user_id", user!.id);
+      showToast("Вы отменили участие", "info");
     } else {
-      await supabase.from("event_participants").insert({ event_id: event.id, user_id: user.id });
+      await supabase.from("event_participants").insert({ event_id: event.id, user_id: user!.id });
+      showToast("Вы записались на поездку!", "success");
     }
     setGoingBusy(false);
   };

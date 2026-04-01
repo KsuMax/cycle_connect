@@ -334,6 +334,29 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* Profile completion hint */}
+        {!profile?.bio && !avatarUrl && myRoutes.length === 0 && !loadingRoutes && (
+          <div className="bg-gradient-to-r from-[#FFF0EB] to-[#F5F3FF] rounded-2xl p-5 border border-[#E4E4E7] mb-6" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+            <h3 className="font-semibold text-[#1C1C1E] text-sm mb-1">Заполни профиль</h3>
+            <p className="text-xs text-[#71717A] mb-3">Добавь фото и расскажи о себе, чтобы другие велосипедисты тебя узнали</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              {!avatarUrl && (
+                <button
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-[#E4E4E7] text-[#71717A] hover:bg-white transition-colors"
+                >
+                  <Camera size={12} /> Добавить фото
+                </button>
+              )}
+              <Link href="/profile/settings"
+                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-[#E4E4E7] text-[#71717A] hover:bg-white transition-colors"
+              >
+                <Settings size={12} /> Настроить профиль
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="flex gap-1 bg-white rounded-2xl p-1.5 border border-[#E4E4E7] mb-6" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
           {TABS.map((tab) => (
@@ -365,9 +388,11 @@ export default function ProfilePage() {
                 {myRoutes.map((route) => <RouteCard key={route.id} route={route} />)}
               </div>
             ) : (
-              <EmptyState icon={<Map size={40} />} title="Нет маршрутов"
-                text="Добавь первый маршрут, нажав + в меню"
-                action={<Link href="/routes/new" className="mt-4 inline-block text-sm font-medium px-4 py-2 rounded-xl text-white" style={{ backgroundColor: "#F4632A" }}>Добавить маршрут</Link>}
+              <EmptyState icon={<Map size={28} />} title="Пока нет маршрутов"
+                text="Поделись своим любимым маршрутом — покажи его другим велосипедистам"
+                action={<Link href="/routes/new" className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl text-white" style={{ backgroundColor: "#F4632A" }}>
+                  <Map size={16} /> Добавить маршрут
+                </Link>}
               />
             )}
           </section>
@@ -384,8 +409,12 @@ export default function ProfilePage() {
                 {favoriteRoutes.map((route) => <RouteCard key={route.id} route={route} />)}
               </div>
             ) : (
-              <EmptyState icon={<Bookmark size={40} />} title="Нет избранных"
-                text='Нажми "Сохранить" на странице маршрута, чтобы добавить его сюда' />
+              <EmptyState icon={<Bookmark size={28} />} title="Нет избранных маршрутов"
+                text="Найди интересный маршрут и сохрани его, чтобы не потерять"
+                action={<Link href="/routes" className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl text-white" style={{ backgroundColor: "#F4632A" }}>
+                  <Map size={16} /> Найти маршрут
+                </Link>}
+              />
             )}
           </section>
         )}
@@ -425,9 +454,11 @@ export default function ProfilePage() {
                   {ridesData.map((route) => <RouteCard key={route.id} route={route} />)}
                 </div>
               ) : (
-                <EmptyState icon={<Bike size={40} />} title="Нет прокатанных маршрутов"
-                  text='Нажми "Катнуть" на странице маршрута, чтобы отметить его'
-                  action={<Link href="/routes" className="mt-4 inline-block text-sm font-medium px-4 py-2 rounded-xl text-white" style={{ backgroundColor: "#F4632A" }}>К маршрутам</Link>}
+                <EmptyState icon={<Bike size={28} />} title="Нет прокатанных маршрутов"
+                  text='Открой любой маршрут и нажми "Катнуть", чтобы добавить его в свои поездки'
+                  action={<Link href="/routes" className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl text-white" style={{ backgroundColor: "#F4632A" }}>
+                    <Bike size={16} /> Найти маршрут
+                  </Link>}
                 />
               )
             )}
@@ -459,9 +490,18 @@ export default function ProfilePage() {
                   ))}
                 </div>
               ) : (
-                <EmptyState icon={<Calendar size={40} />} title="Нет мероприятий"
-                  text="Присоединись к мероприятию или создай своё"
-                  action={<Link href="/events/new" className="mt-4 inline-block text-sm font-medium px-4 py-2 rounded-xl text-white" style={{ backgroundColor: "#F4632A" }}>Создать мероприятие</Link>}
+                <EmptyState icon={<Calendar size={28} />} title="Нет мероприятий"
+                  text="Запишись на групповую поездку или организуй свою"
+                  action={
+                    <div className="flex items-center gap-2 justify-center flex-wrap">
+                      <Link href="/routes?tab=events" className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl border border-[#E4E4E7] text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors">
+                        Найти поездку
+                      </Link>
+                      <Link href="/events/new" className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl text-white" style={{ backgroundColor: "#F4632A" }}>
+                        <Calendar size={16} /> Создать
+                      </Link>
+                    </div>
+                  }
                 />
               )
             )}
@@ -474,10 +514,12 @@ export default function ProfilePage() {
 
 function EmptyState({ icon, title, text, action }: { icon: React.ReactNode; title: string; text: string; action?: React.ReactNode }) {
   return (
-    <div className="text-center py-16 text-[#71717A]">
-      <div className="flex justify-center mb-3 opacity-20">{icon}</div>
-      <div className="font-medium mb-1 text-[#1C1C1E]">{title}</div>
-      <div className="text-sm max-w-xs mx-auto">{text}</div>
+    <div className="text-center py-12 px-4">
+      <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center mb-4" style={{ backgroundColor: "#FFF0EB" }}>
+        <div style={{ color: "#F4632A" }}>{icon}</div>
+      </div>
+      <div className="font-semibold mb-1 text-[#1C1C1E]">{title}</div>
+      <div className="text-sm text-[#71717A] max-w-xs mx-auto mb-4">{text}</div>
       {action}
     </div>
   );

@@ -8,6 +8,7 @@ import { ImageUpload } from "@/components/routes/ImageUpload";
 import { CoverUpload } from "@/components/routes/CoverUpload";
 import { DayEditor } from "@/components/events/DayEditor";
 import { useAuth } from "@/lib/context/AuthContext";
+import { useToast } from "@/lib/context/ToastContext";
 import { supabase } from "@/lib/supabase";
 import type { RouteType, Difficulty } from "@/types";
 import Link from "next/link";
@@ -28,6 +29,7 @@ const DIFFICULTIES: { value: Difficulty; label: string; emoji: string }[] = [
 export default function NewRoutePage() {
   const router = useRouter();
   const { user, profile } = useAuth();
+  const { showToast } = useToast();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -44,6 +46,7 @@ export default function NewRoutePage() {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [attempted, setAttempted] = useState(false);
 
   const toggleType = (type: RouteType) => {
     setRouteTypes((prev) =>
@@ -72,6 +75,8 @@ export default function NewRoutePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAttempted(true);
+    if (!canSubmit) return;
     if (!user) return;
     setSubmitting(true);
     setError("");
@@ -146,6 +151,7 @@ export default function NewRoutePage() {
       .update({ routes_count: (profile?.routes_count ?? 0) + 1 })
       .eq("id", user.id);
 
+    showToast("Маршрут опубликован!", "success");
     router.push(`/routes/${routeData.id}`);
   };
 
@@ -184,15 +190,18 @@ export default function NewRoutePage() {
           )}
 
           {/* Title */}
-          <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+          <div className={`bg-white rounded-2xl p-5 border ${attempted && !title.trim() ? "border-red-300" : "border-[#E4E4E7]"}`} style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
             <label className="block text-sm font-semibold text-[#1C1C1E] mb-2">Название маршрута *</label>
             <input type="text" placeholder="Например: Карельская тишина"
               value={title} onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors" />
+              className={`w-full px-4 py-2.5 rounded-xl border text-sm outline-none focus:border-[#F4632A] transition-colors ${attempted && !title.trim() ? "border-red-300" : "border-[#E4E4E7]"}`} />
+            {attempted && !title.trim() && (
+              <p className="text-xs text-red-500 mt-1.5">Введи название маршрута</p>
+            )}
           </div>
 
           {/* Route type */}
-          <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+          <div className={`bg-white rounded-2xl p-5 border ${attempted && routeTypes.length === 0 ? "border-red-300" : "border-[#E4E4E7]"}`} style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
             <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">Тип маршрута *</label>
             <p className="text-xs text-[#71717A] mb-3">Можно выбрать несколько</p>
             <div className="flex flex-wrap gap-2">
@@ -206,6 +215,9 @@ export default function NewRoutePage() {
                 </button>
               ))}
             </div>
+            {attempted && routeTypes.length === 0 && (
+              <p className="text-xs text-red-500 mt-2">Выбери хотя бы один тип маршрута</p>
+            )}
           </div>
 
           {/* Difficulty */}
@@ -285,13 +297,24 @@ export default function NewRoutePage() {
             />
           </div>
 
-          <button type="submit" disabled={!canSubmit}
-            className="w-full py-3.5 rounded-2xl text-sm font-semibold flex items-center justify-center gap-2 transition-opacity"
-            style={canSubmit
-              ? { backgroundColor: "#1C1C1E", color: "white" }
-              : { backgroundColor: "#E4E4E7", color: "#A1A1AA" }}>
-            {submitting ? "Публикую..." : "Опубликовать маршрут"} {!submitting && <ChevronRight size={16} />}
-          </button>
+          <div>
+            <button type="submit"
+              className="w-full py-3.5 rounded-2xl text-sm font-semibold flex items-center justify-center gap-2 transition-opacity"
+              style={canSubmit
+                ? { backgroundColor: "#1C1C1E", color: "white" }
+                : { backgroundColor: "#E4E4E7", color: "#A1A1AA" }}>
+              {submitting ? "Публикую..." : "Опубликовать маршрут"} {!submitting && <ChevronRight size={16} />}
+            </button>
+            {attempted && !canSubmit && (
+              <p className="text-xs text-[#71717A] text-center mt-2">
+                {!title.trim() && !routeTypes.length
+                  ? "Заполни название и выбери тип маршрута"
+                  : !title.trim()
+                  ? "Заполни название маршрута"
+                  : "Выбери тип маршрута"}
+              </p>
+            )}
+          </div>
         </form>
       </main>
     </div>

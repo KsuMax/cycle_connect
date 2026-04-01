@@ -6,6 +6,7 @@ import { Header } from "@/components/layout/Header";
 import { DayEditor } from "@/components/events/DayEditor";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/context/AuthContext";
+import { useToast } from "@/lib/context/ToastContext";
 import { supabase } from "@/lib/supabase";
 import { MOCK_ROUTES } from "@/lib/data/mock";
 import { CoverUpload } from "@/components/routes/CoverUpload";
@@ -40,6 +41,7 @@ function CreateEventForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user, profile } = useAuth();
+  const { showToast } = useToast();
   const preselectedRouteId = searchParams.get("route") ?? "";
 
   const [title, setTitle] = useState("");
@@ -53,6 +55,7 @@ function CreateEventForm() {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [attempted, setAttempted] = useState(false);
   const [routes, setRoutes] = useState<RouteOption[]>([]);
 
   // Load available routes (Supabase first, fallback to mock)
@@ -83,6 +86,8 @@ function CreateEventForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAttempted(true);
+    if (!title.trim()) return;
     if (!user) return;
     setSubmitting(true);
     setError("");
@@ -147,6 +152,7 @@ function CreateEventForm() {
       .update({ events_count: (profile?.events_count ?? 0) + 1 })
       .eq("id", user.id);
 
+    showToast("Мероприятие опубликовано!", "success");
     router.push(`/events/${eventData.id}`);
   };
 
@@ -203,8 +209,11 @@ function CreateEventForm() {
             <div className="space-y-4">
               <div>
                 <label className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-1.5 block">Название *</label>
-                <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Велопоход по Карелии" className="w-full px-4 py-2.5 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors" />
+                <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Велопоход по Карелии" className={`w-full px-4 py-2.5 rounded-xl border text-sm outline-none focus:border-[#F4632A] transition-colors ${attempted && !title.trim() ? "border-red-300" : "border-[#E4E4E7]"}`} />
+                {attempted && !title.trim() && (
+                  <p className="text-xs text-red-500 mt-1.5">Введи название мероприятия</p>
+                )}
               </div>
               <div>
                 <label className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-1.5 block">Описание</label>

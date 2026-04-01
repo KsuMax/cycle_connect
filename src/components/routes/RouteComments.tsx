@@ -6,6 +6,8 @@ import { Heart, Send } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/context/AuthContext";
+import { useAuthModal } from "@/components/ui/AuthModal";
+import { useToast } from "@/lib/context/ToastContext";
 import type { User } from "@/types";
 
 interface CommentData {
@@ -66,6 +68,8 @@ function dbToComment(row: DbCommentRow): CommentData {
 
 export function RouteComments({ routeId }: RouteCommentsProps) {
   const { user, profile } = useAuth();
+  const { requireAuth } = useAuthModal();
+  const { showToast } = useToast();
   const [comments, setComments] = useState<CommentData[]>([]);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState("");
@@ -101,6 +105,9 @@ export function RouteComments({ routeId }: RouteCommentsProps) {
     if (!error && data) {
       setComments((prev) => [...prev, dbToComment(data as unknown as DbCommentRow)]);
       setText("");
+      showToast("Комментарий добавлен", "success");
+    } else {
+      showToast("Не удалось отправить комментарий", "error");
     }
     setSubmitting(false);
   };
@@ -208,9 +215,14 @@ export function RouteComments({ routeId }: RouteCommentsProps) {
             <p className="text-xs text-[#A1A1AA] mt-2 ml-10">Enter — отправить, Shift+Enter — перенос строки</p>
           </>
         ) : (
-          <p className="text-sm text-center text-[#A1A1AA]">
-            <a href="/auth/login" className="text-[#F4632A] hover:underline">Войди</a>, чтобы оставить комментарий
-          </p>
+          <div className="text-center">
+            <button
+              onClick={() => requireAuth("оставить комментарий")}
+              className="text-sm text-[#F4632A] hover:underline font-medium"
+            >
+              Войди, чтобы оставить комментарий
+            </button>
+          </div>
         )}
       </div>
     </div>

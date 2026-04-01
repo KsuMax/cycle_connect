@@ -6,7 +6,9 @@ import { EventLikesProvider } from "@/lib/context/EventLikesContext";
 import { AuthProvider } from "@/lib/context/AuthContext";
 import { RidesProvider } from "@/lib/context/RidesContext";
 import { FollowProvider } from "@/lib/context/FollowContext";
+import { ToastProvider } from "@/lib/context/ToastContext";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { AuthModalWrapper } from "@/components/ui/AuthModalWrapper";
 
 export const metadata: Metadata = {
   title: "CycleConnect — велосипедное сообщество",
@@ -21,7 +23,13 @@ export default function RootLayout({
   return (
     <html lang="ru" className="h-full">
       <body className="min-h-full flex flex-col">
-        <AuthProvider><LikesProvider><EventLikesProvider><FavoritesProvider><RidesProvider><FollowProvider>{children}<BottomNav /></FollowProvider></RidesProvider></FavoritesProvider></EventLikesProvider></LikesProvider></AuthProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <AuthModalWrapper>
+              <LikesProvider><EventLikesProvider><FavoritesProvider><RidesProvider><FollowProvider>{children}<BottomNav /></FollowProvider></RidesProvider></FavoritesProvider></EventLikesProvider></LikesProvider>
+            </AuthModalWrapper>
+          </ToastProvider>
+        </AuthProvider>
       </body>
     </html>
   );

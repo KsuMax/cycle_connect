@@ -15,7 +15,8 @@ import {
   Share2, Users, MapPin, ExternalLink, Flag, ChevronRight, Pencil, Lock, Trash2,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
-import { AuthTooltip } from "@/components/ui/AuthTooltip";
+import { useAuthModal } from "@/components/ui/AuthModal";
+import { useToast } from "@/lib/context/ToastContext";
 import type { User, Route, EventDay, RouteType } from "@/types";
 
 interface EventData {
@@ -116,6 +117,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const { id } = use(params);
   const { user } = useAuth();
   const { isLiked, toggleLike } = useEventLikes();
+  const { requireAuth } = useAuthModal();
+  const { showToast } = useToast();
   const router = useRouter();
   const [event, setEvent] = useState<EventData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -168,14 +171,17 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   };
 
   const handleGoingToggle = async () => {
-    if (!user || !event) return;
+    if (!requireAuth("записаться на поездку")) return;
+    if (!event) return;
     const wasGoing = going;
     setGoing(!wasGoing);
     if (wasGoing) {
-      await supabase.from("event_participants").delete().eq("event_id", event.id).eq("user_id", user.id);
-      setEvent((prev) => prev ? { ...prev, participants: prev.participants.filter((p) => p.id !== user.id) } : prev);
+      await supabase.from("event_participants").delete().eq("event_id", event.id).eq("user_id", user!.id);
+      setEvent((prev) => prev ? { ...prev, participants: prev.participants.filter((p) => p.id !== user!.id) } : prev);
+      showToast("Вы отменили участие", "info");
     } else {
-      await supabase.from("event_participants").insert({ event_id: event.id, user_id: user.id });
+      await supabase.from("event_participants").insert({ event_id: event.id, user_id: user!.id });
+      showToast("Вы записались на поездку!", "success");
     }
   };
 
@@ -188,6 +194,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     await supabase.from("events").delete().eq("id", event.id);
     const { data: profile } = await supabase.from("profiles").select("events_count").eq("id", user.id).single();
     await supabase.from("profiles").update({ events_count: Math.max(0, (profile?.events_count ?? 1) - 1) }).eq("id", user.id);
+    showToast("Мероприятие удалено", "info");
     router.push("/");
   };
 
@@ -452,11 +459,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               )}
 
               <div className="mb-3">
-                <AuthTooltip disabled={!user} className="w-full">
-                  <Button variant={going ? "outline" : "secondary"} size="lg" className="w-full" onClick={handleGoingToggle}>
-                    {going ? "✓ Ты едешь!" : "Я поеду →"}
-                  </Button>
-                </AuthTooltip>
+                <Button variant={going ? "outline" : "secondary"} size="lg" className="w-full" onClick={handleGoingToggle}>
+                  {going ? "✓ Ты едешь!" : "Я поеду →"}
+                </Button>
               </div>
 
               {event.route && (
@@ -468,19 +473,18 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
               <div className="flex gap-2">
                 <div className="flex-1">
-                  <AuthTooltip disabled={!user} className="w-full">
-                    <button
-                      onClick={async () => {
-                        if (!user) return;
-                        const wasLiked = isLiked(event.id);
-                        setLikeCount((c) => wasLiked ? c - 1 : c + 1);
-                        await toggleLike(event.id, likeCount);
-                      }}
-                      className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-[#E4E4E7] text-sm transition-colors hover:bg-[#F5F4F1]"
-                      style={{ color: isLiked(event.id) ? "#F4632A" : "#71717A" }}>
-                      <Heart size={14} fill={isLiked(event.id) ? "#F4632A" : "none"} /> {likeCount}
-                    </button>
-                  </AuthTooltip>
+                  <button
+                    onClick={async () => {
+                      if (!requireAuth("поставить лайк")) return;
+                      const wasLiked = isLiked(event.id);
+                      setLikeCount((c) => wasLiked ? c - 1 : c + 1);
+                      await toggleLike(event.id, likeCount);
+                      showToast(wasLiked ? "Лайк убран" : "Мероприятие отмечено", "info");
+                    }}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-[#E4E4E7] text-sm transition-colors hover:bg-[#F5F4F1]"
+                    style={{ color: isLiked(event.id) ? "#F4632A" : "#71717A" }}>
+                    <Heart size={14} fill={isLiked(event.id) ? "#F4632A" : "none"} /> {likeCount}
+                  </button>
                 </div>
                 <div className="flex-1">
                   <button

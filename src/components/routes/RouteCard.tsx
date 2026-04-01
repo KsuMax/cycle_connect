@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Bike, Mountain, Clock, Heart, ChevronRight } from "lucide-react";
 import { DifficultyBadge, Badge } from "@/components/ui/Badge";
 import { AvatarGroup } from "@/components/ui/Avatar";
 import { cn } from "@/lib/utils";
 import { useLikes } from "@/lib/context/LikesContext";
 import { useAuth } from "@/lib/context/AuthContext";
+import { useAuthModal } from "@/components/ui/AuthModal";
+import { useToast } from "@/lib/context/ToastContext";
 import type { Route, RouteType } from "@/types";
 
 const ROUTE_TYPE_LABELS: Record<RouteType, string> = {
@@ -33,16 +34,19 @@ interface RouteCardProps {
 export function RouteCard({ route, compact = false }: RouteCardProps) {
   const { isLiked, toggleLike } = useLikes();
   const { user } = useAuth();
-  const router = useRouter();
+  const { requireAuth } = useAuthModal();
+  const { showToast } = useToast();
   const [likeCount, setLikeCount] = useState(route.likes);
   const liked = isLiked(route.id);
 
   const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
-    if (!user) { router.push("/auth/login"); return; }
+    if (!requireAuth("поставить лайк")) return;
     const prev = likeCount;
-    setLikeCount(liked ? prev - 1 : prev + 1);
+    const willLike = !liked;
+    setLikeCount(willLike ? prev + 1 : prev - 1);
     await toggleLike(route.id, prev);
+    showToast(willLike ? "Маршрут отмечен" : "Лайк убран", "info");
   };
 
   return (

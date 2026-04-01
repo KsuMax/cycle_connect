@@ -14,7 +14,8 @@ import { DifficultyBadge, Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { EventCard } from "@/components/events/EventCard";
 import { useRouter } from "next/navigation";
-import { AuthTooltip } from "@/components/ui/AuthTooltip";
+import { useAuthModal } from "@/components/ui/AuthModal";
+import { useToast } from "@/lib/context/ToastContext";
 import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import type { Route, RouteType } from "@/types";
@@ -78,6 +79,8 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
   const { isFavorite, toggleFavorite } = useFavorites();
   const { isLiked, toggleLike } = useLikes();
   const { hasRidden, toggleRide } = useRides();
+  const { requireAuth } = useAuthModal();
+  const { showToast } = useToast();
   const router = useRouter();
 
   const [route, setRoute] = useState<Route | null>(null);
@@ -153,15 +156,33 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
     if (!confirm("Удалить маршрут? Это действие нельзя отменить.")) return;
     setDeleting(true);
     await supabase.from("routes").delete().eq("id", route.id);
+    showToast("Маршрут удалён", "info");
     router.push("/routes");
   };
 
   const liked = isLiked(route.id);
 
   const handleLike = async () => {
+    if (!requireAuth("поставить лайк")) return;
     const prev = likeCount;
-    setLikeCount(liked ? prev - 1 : prev + 1);
+    const willLike = !liked;
+    setLikeCount(willLike ? prev + 1 : prev - 1);
     await toggleLike(route.id, prev);
+    showToast(willLike ? "Маршрут отмечен" : "Лайк убран", "info");
+  };
+
+  const handleFavorite = () => {
+    if (!requireAuth("добавить в избранное")) return;
+    const willFav = !isFavorite(route.id);
+    toggleFavorite(route.id);
+    showToast(willFav ? "Добавлено в избранное" : "Убрано из избранного", "info");
+  };
+
+  const handleRide = () => {
+    if (!requireAuth("отметить маршрут")) return;
+    const willRide = !hasRidden(route.id);
+    toggleRide(route.id, route.distance_km);
+    showToast(willRide ? "Маршрут отмечен как проеханный!" : "Отметка убрана", willRide ? "success" : "info");
   };
 
   return (
@@ -263,33 +284,27 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
 
               {/* Actions */}
               <div className="flex gap-2">
-                <AuthTooltip disabled={!user} className="flex-1">
-                  <button onClick={() => toggleRide(route.id, route.distance_km)}
-                    className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors"
-                    style={hasRidden(route.id)
-                      ? { backgroundColor: "#F4632A", color: "white" }
-                      : { backgroundColor: "#1C1C1E", color: "white" }}>
-                    {hasRidden(route.id) ? "Катанул ✓" : "Катнуть"}
-                  </button>
-                </AuthTooltip>
-                <AuthTooltip disabled={!user}>
-                  <button onClick={() => toggleFavorite(route.id)}
-                    className="w-10 h-10 rounded-xl border flex items-center justify-center transition-colors"
-                    style={isFavorite(route.id)
-                      ? { backgroundColor: "#FFF0EB", borderColor: "#F4632A", color: "#F4632A" }
-                      : { backgroundColor: "white", borderColor: "#E4E4E7", color: "#A1A1AA" }}>
-                    <Bookmark size={16} fill={isFavorite(route.id) ? "#F4632A" : "none"} />
-                  </button>
-                </AuthTooltip>
-                <AuthTooltip disabled={!user}>
-                  <button onClick={handleLike}
-                    className="w-10 h-10 rounded-xl border flex items-center justify-center transition-colors gap-1 text-xs font-medium"
-                    style={liked
-                      ? { backgroundColor: "#FFF0EB", borderColor: "#F4632A", color: "#F4632A" }
-                      : { backgroundColor: "white", borderColor: "#E4E4E7", color: "#A1A1AA" }}>
-                    <Heart size={14} fill={liked ? "#F4632A" : "none"} />
-                  </button>
-                </AuthTooltip>
+                <button onClick={handleRide}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+                  style={hasRidden(route.id)
+                    ? { backgroundColor: "#F4632A", color: "white" }
+                    : { backgroundColor: "#1C1C1E", color: "white" }}>
+                  {hasRidden(route.id) ? "Катанул ✓" : "Катнуть"}
+                </button>
+                <button onClick={handleFavorite}
+                  className="w-10 h-10 rounded-xl border flex items-center justify-center transition-colors"
+                  style={isFavorite(route.id)
+                    ? { backgroundColor: "#FFF0EB", borderColor: "#F4632A", color: "#F4632A" }
+                    : { backgroundColor: "white", borderColor: "#E4E4E7", color: "#A1A1AA" }}>
+                  <Bookmark size={16} fill={isFavorite(route.id) ? "#F4632A" : "none"} />
+                </button>
+                <button onClick={handleLike}
+                  className="w-10 h-10 rounded-xl border flex items-center justify-center transition-colors gap-1 text-xs font-medium"
+                  style={liked
+                    ? { backgroundColor: "#FFF0EB", borderColor: "#F4632A", color: "#F4632A" }
+                    : { backgroundColor: "white", borderColor: "#E4E4E7", color: "#A1A1AA" }}>
+                  <Heart size={14} fill={liked ? "#F4632A" : "none"} />
+                </button>
               </div>
 
               {isAuthor && (
