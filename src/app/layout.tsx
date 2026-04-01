@@ -7,6 +7,7 @@ import { AuthProvider } from "@/lib/context/AuthContext";
 import { RidesProvider } from "@/lib/context/RidesContext";
 import { FollowProvider } from "@/lib/context/FollowContext";
 import { ToastProvider } from "@/lib/context/ToastContext";
+import { EventRidesProvider } from "@/lib/context/EventRidesContext";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { AuthModalWrapper } from "@/components/ui/AuthModalWrapper";
 
@@ -26,7 +27,7 @@ export default function RootLayout({
         <AuthProvider>
           <ToastProvider>
             <AuthModalWrapper>
-              <LikesProvider><EventLikesProvider><FavoritesProvider><RidesProvider><FollowProvider>{children}<BottomNav /></FollowProvider></RidesProvider></FavoritesProvider></EventLikesProvider></LikesProvider>
+              <LikesProvider><EventLikesProvider><FavoritesProvider><RidesProvider><FollowProvider><EventRidesProvider>{children}<BottomNav /></EventRidesProvider></FollowProvider></RidesProvider></FavoritesProvider></EventLikesProvider></LikesProvider>
             </AuthModalWrapper>
           </ToastProvider>
         </AuthProvider>

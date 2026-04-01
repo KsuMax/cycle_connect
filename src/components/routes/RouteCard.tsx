@@ -10,6 +10,7 @@ import { useLikes } from "@/lib/context/LikesContext";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useAuthModal } from "@/components/ui/AuthModal";
 import { useToast } from "@/lib/context/ToastContext";
+import { useEventRides } from "@/lib/context/EventRidesContext";
 import type { Route, RouteType } from "@/types";
 
 const ROUTE_TYPE_LABELS: Record<RouteType, string> = {
@@ -36,6 +37,7 @@ export function RouteCard({ route, compact = false }: RouteCardProps) {
   const { user } = useAuth();
   const { requireAuth } = useAuthModal();
   const { showToast } = useToast();
+  const { getRouteEventStatus } = useEventRides();
   const [likeCount, setLikeCount] = useState(route.likes);
   const liked = isLiked(route.id);
 
@@ -135,6 +137,24 @@ export function RouteCard({ route, compact = false }: RouteCardProps) {
               </span>
             ))}
           </div>
+
+          {/* Event participation status */}
+          {(() => {
+            const status = getRouteEventStatus(route.id);
+            if (!status) return null;
+            return (
+              <div className="mb-2">
+                <span
+                  className="text-xs font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1"
+                  style={status === "upcoming"
+                    ? { backgroundColor: "#F0FDFA", color: "#0D9488" }
+                    : { backgroundColor: "#FFF0EB", color: "#F4632A" }}
+                >
+                  {status === "upcoming" ? "🚴 Скоро катну" : "✅ Катанул"}
+                </span>
+              </div>
+            );
+          })()}
 
           {/* Tags */}
           <div className="flex flex-wrap gap-1.5 mb-3">

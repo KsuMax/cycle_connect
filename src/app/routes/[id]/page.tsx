@@ -9,6 +9,7 @@ import { useFavorites } from "@/lib/context/FavoritesContext";
 import { useLikes } from "@/lib/context/LikesContext";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useRides } from "@/lib/context/RidesContext";
+import { useEventRides } from "@/lib/context/EventRidesContext";
 import { supabase } from "@/lib/supabase";
 import { DifficultyBadge, Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
@@ -81,6 +82,7 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
   const { hasRidden, toggleRide } = useRides();
   const { requireAuth } = useAuthModal();
   const { showToast } = useToast();
+  const { getRouteEventStatus } = useEventRides();
   const router = useRouter();
 
   const [route, setRoute] = useState<Route | null>(null);
@@ -249,6 +251,29 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
                   <MapPin size={14} /> {route.region}
                 </div>
               )}
+
+              {/* Event participation status */}
+              {(() => {
+                const status = getRouteEventStatus(route.id);
+                if (!status) return null;
+                return (
+                  <div className="mb-4 px-3 py-2 rounded-xl flex items-center gap-2"
+                    style={status === "upcoming"
+                      ? { backgroundColor: "#F0FDFA", border: "1px solid #99F6E4" }
+                      : { backgroundColor: "#FFF0EB", border: "1px solid #FDBA74" }}>
+                    <span className="text-lg">{status === "upcoming" ? "🚴" : "✅"}</span>
+                    <div>
+                      <div className="text-sm font-semibold"
+                        style={{ color: status === "upcoming" ? "#0D9488" : "#F4632A" }}>
+                        {status === "upcoming" ? "Скоро катну" : "Катанул"}
+                      </div>
+                      <div className="text-xs" style={{ color: status === "upcoming" ? "#5EEAD4" : "#FB923C" }}>
+                        {status === "upcoming" ? "Ты записан на мероприятие" : "Мероприятие завершено"}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Types */}
               <div className="flex flex-wrap gap-1.5 mb-4">
