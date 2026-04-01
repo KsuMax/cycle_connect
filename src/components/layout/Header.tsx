@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Map, Newspaper, LogOut } from "lucide-react";
+import { Map, Newspaper, LogOut, Users } from "lucide-react";
 import { useAuth } from "@/lib/context/AuthContext";
 
 const NAV_ITEMS = [
   { href: "/", label: "Лента", icon: Newspaper },
   { href: "/routes", label: "Маршруты", icon: Map },
+  { href: "/users", label: "Участники", icon: Users },
 ];
 
 export function Header() {

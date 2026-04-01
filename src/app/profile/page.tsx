@@ -9,6 +9,7 @@ import { useFavorites } from "@/lib/context/FavoritesContext";
 import { useRides } from "@/lib/context/RidesContext";
 import { supabase } from "@/lib/supabase";
 import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink, Users } from "lucide-react";
+import { AvatarLightbox } from "@/components/ui/AvatarLightbox";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
 import type { Route, RouteType } from "@/types";
@@ -86,6 +87,7 @@ export default function ProfilePage() {
 
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
+  const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/auth/login");
@@ -244,8 +246,10 @@ export default function ProfilePage() {
         <div className="bg-white rounded-2xl p-6 border border-[#E4E4E7] mb-6" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
           <div className="flex items-start gap-5">
             <div className="relative shrink-0 group">
-              <div className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center text-xl font-bold text-white"
-                style={{ backgroundColor: "#7C5CFC" }}>
+              <div
+                className={`w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center text-xl font-bold text-white${avatarUrl ? " cursor-pointer" : ""}`}
+                style={{ backgroundColor: "#7C5CFC" }}
+                onClick={() => avatarUrl && setShowAvatarLightbox(true)}>
                 {avatarUrl
                   ? <img src={avatarUrl} alt="Аватар" className="w-full h-full object-cover" />
                   : initials
@@ -508,6 +512,14 @@ export default function ProfilePage() {
           </section>
         )}
       </main>
+
+      {showAvatarLightbox && avatarUrl && (
+        <AvatarLightbox
+          src={avatarUrl}
+          alt={profile?.name || "Аватар"}
+          onClose={() => setShowAvatarLightbox(false)}
+        />
+      )}
     </div>
   );
 }

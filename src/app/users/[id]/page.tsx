@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useFollow } from "@/lib/context/FollowContext";
 import { Map, Calendar, Globe, ExternalLink, UserPlus, UserCheck, ChevronRight } from "lucide-react";
+import { AvatarLightbox } from "@/components/ui/AvatarLightbox";
 import { formatDate } from "@/lib/utils";
 import type { Route, RouteType } from "@/types";
 import type { DbRoute, DbProfile } from "@/lib/supabase";
@@ -74,6 +75,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
   const [loadingRoutes, setLoadingRoutes] = useState(true);
   const [events, setEvents] = useState<ProfileEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
+  const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
 
   // Load profile
   useEffect(() => {
@@ -199,7 +201,12 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
         {/* Profile header */}
         <div className="bg-white rounded-2xl p-6 border border-[#E4E4E7] mb-6" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
           <div className="flex items-start gap-5">
-            <Avatar user={userObj} size="lg" className="rounded-2xl w-16 h-16 shrink-0" />
+            <div
+              className={profile.avatar_url ? "cursor-pointer" : ""}
+              onClick={() => profile.avatar_url && setShowAvatarLightbox(true)}
+            >
+              <Avatar user={userObj} size="lg" className="rounded-2xl w-16 h-16 shrink-0" />
+            </div>
             <div className="flex-1">
               <div className="flex items-start justify-between">
                 <div>
@@ -358,6 +365,14 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
           </section>
         )}
       </main>
+
+      {showAvatarLightbox && profile.avatar_url && (
+        <AvatarLightbox
+          src={profile.avatar_url}
+          alt={profile.name}
+          onClose={() => setShowAvatarLightbox(false)}
+        />
+      )}
     </div>
   );
 }
