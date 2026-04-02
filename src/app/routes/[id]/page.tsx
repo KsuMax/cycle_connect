@@ -16,6 +16,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { useRouter } from "next/navigation";
 import { useAuthModal } from "@/components/ui/AuthModal";
 import { useToast } from "@/lib/context/ToastContext";
+import { useAchievements } from "@/lib/context/AchievementsContext";
 import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import type { Route, RouteType } from "@/types";
@@ -88,6 +89,7 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
   const { hasRidden, rideCount, addRide } = useRides();
   const { requireAuth } = useAuthModal();
   const { showToast } = useToast();
+  const { checkAndAward } = useAchievements();
   const { getRouteEventStatus } = useEventRides();
   const router = useRouter();
 
@@ -247,6 +249,7 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
               if (!requireAuth("отметить проезд")) return;
               addRide(route!.id, route!.distance_km);
               showToast("Проезд отмечен! +" + route!.distance_km + " км", "success");
+              checkAndAward("ride_added", { routeId: route!.id, authorId: route!.author.id, distanceKm: route!.distance_km });
             }}
             className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors"
             style={{ backgroundColor: "#F4632A", color: "white" }}
@@ -267,6 +270,7 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
           if (!requireAuth("отметить маршрут")) return;
           addRide(route!.id, route!.distance_km);
           showToast("Маршрут отмечен как проеханный!", "success");
+          checkAndAward("ride_added", { routeId: route!.id, authorId: route!.author.id, distanceKm: route!.distance_km });
         }}
         className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors"
         style={{ backgroundColor: "#1C1C1E", color: "white" }}

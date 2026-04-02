@@ -8,7 +8,8 @@ import { Avatar } from "@/components/ui/Avatar";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useFollow } from "@/lib/context/FollowContext";
-import { Map, Calendar, Globe, ExternalLink, UserPlus, UserCheck, ChevronRight } from "lucide-react";
+import { Map, Calendar, Globe, ExternalLink, UserPlus, UserCheck, ChevronRight, Trophy, Lock } from "lucide-react";
+import { useAchievements } from "@/lib/context/AchievementsContext";
 import { AvatarLightbox } from "@/components/ui/AvatarLightbox";
 import { formatDate } from "@/lib/utils";
 import type { Route, RouteType } from "@/types";
@@ -55,12 +56,13 @@ function dbToRoute(r: DbRoute): Route {
   };
 }
 
-type Tab = "routes" | "events";
+type Tab = "routes" | "events" | "achievements";
 
 export default function UserProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { user } = useAuth();
   const { isFollowing, follow, unfollow, loaded: followLoaded } = useFollow();
+  const { achievements, fetchUserAchievements, checkAndAward } = useAchievements();
 
   const [profile, setProfile] = useState<DbProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -76,6 +78,8 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
   const [events, setEvents] = useState<ProfileEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
+  const [userAchievementIds, setUserAchievementIds] = useState<Set<string>>(new Set());
+  const [loadingAchievements, setLoadingAchievements] = useState(true);
 
   // Load profile
   useEffect(() => {
@@ -119,6 +123,14 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
       });
   }, [id]);
 
+  // Load user's achievements
+  useEffect(() => {
+    fetchUserAchievements(id).then((ids) => {
+      setUserAchievementIds(ids);
+      setLoadingAchievements(false);
+    });
+  }, [id, fetchUserAchievements]);
+
   // Load events user participates in
   useEffect(() => {
     supabase
@@ -151,6 +163,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
     } else {
       await follow(id);
       setFollowersCount((c) => c + 1);
+      checkAndAward("user_followed", {});
     }
     setFollowBusy(false);
   };
@@ -290,6 +303,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
           {([
             { id: "routes" as const, label: "Маршруты", icon: <Map size={15} />, count: routes.length },
             { id: "events" as const, label: "Мероприятия", icon: <Calendar size={15} />, count: events.length },
+            { id: "achievements" as const, label: "Достижения", icon: <Trophy size={15} />, count: userAchievementIds.size },
           ]).map((tab) => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-medium transition-all"
@@ -361,6 +375,68 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                 <div className="font-medium text-[#1C1C1E]">Нет мероприятий</div>
                 <div className="text-sm mt-1">Пользователь ещё не участвовал в мероприятиях</div>
               </div>
+            )}
+          </section>
+        )}
+
+        {activeTab === "achievements" && (
+          <section>
+            {loadingAchievements ? (
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-4">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="h-32 bg-white rounded-2xl animate-pulse border border-[#E4E4E7]" />
+                ))}
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="flex-1">
+                    <div className="flex justify-between text-xs text-[#71717A] mb-1">
+                      <span>Открыто {userAchievementIds.size} из {achievements.length}</span>
+                      <span>{Math.round((userAchievementIds.size / Math.max(achievements.length, 1)) * 100)}%</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-[#E4E4E7] overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${(userAchievementIds.size / Math.max(achievements.length, 1)) * 100}%`,
+                          background: "linear-gradient(90deg, #F4632A, #7C5CFC)",
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+                  {achievements.map((ach) => {
+                    const earned = userAchievementIds.has(ach.id);
+                    // Hide hidden achievements that user hasn't earned
+                    if (ach.is_hidden && !earned) return null;
+                    return (
+                      <div
+                        key={ach.id}
+                        className="bg-white rounded-2xl p-3 border text-center transition-all"
+                        style={{
+                          borderColor: earned ? "#F4632A" : "#E4E4E7",
+                          boxShadow: earned
+                            ? "0 0 0 1px #F4632A, 0 1px 3px 0 rgb(0 0 0 / 0.07)"
+                            : "0 1px 3px 0 rgb(0 0 0 / 0.07)",
+                          opacity: earned ? 1 : 0.45,
+                        }}
+                      >
+                        <div className="text-3xl mb-2">
+                          {earned ? ach.icon : <Lock size={28} className="mx-auto text-[#A1A1AA]" />}
+                        </div>
+                        <div className="text-xs font-semibold text-[#1C1C1E] leading-tight mb-0.5">
+                          {earned ? ach.title : ach.title}
+                        </div>
+                        <div className="text-[10px] text-[#A1A1AA] leading-tight">
+                          {earned ? ach.description : "Ещё не получено"}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </section>
         )}

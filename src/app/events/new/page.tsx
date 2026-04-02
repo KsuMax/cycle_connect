@@ -7,6 +7,7 @@ import { DayEditor } from "@/components/events/DayEditor";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useToast } from "@/lib/context/ToastContext";
+import { useAchievements } from "@/lib/context/AchievementsContext";
 import { supabase } from "@/lib/supabase";
 import { MOCK_ROUTES } from "@/lib/data/mock";
 import { CoverUpload } from "@/components/routes/CoverUpload";
@@ -42,6 +43,7 @@ function CreateEventForm() {
   const router = useRouter();
   const { user, profile } = useAuth();
   const { showToast } = useToast();
+  const { checkAndAward } = useAchievements();
   const preselectedRouteId = searchParams.get("route") ?? "";
 
   const [title, setTitle] = useState("");
@@ -153,6 +155,7 @@ function CreateEventForm() {
       .eq("id", user.id);
 
     showToast("Мероприятие опубликовано!", "success");
+    checkAndAward("event_created", {});
     router.push(`/events/${eventData.id}`);
   };
 

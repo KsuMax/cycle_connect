@@ -8,8 +8,10 @@ import { RidesProvider } from "@/lib/context/RidesContext";
 import { FollowProvider } from "@/lib/context/FollowContext";
 import { ToastProvider } from "@/lib/context/ToastContext";
 import { EventRidesProvider } from "@/lib/context/EventRidesContext";
+import { AchievementsProvider } from "@/lib/context/AchievementsContext";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { AuthModalWrapper } from "@/components/ui/AuthModalWrapper";
+import { AchievementModal } from "@/components/ui/AchievementModal";
 
 export const metadata: Metadata = {
   title: "CycleConnect — велосипедное сообщество",
@@ -27,7 +29,9 @@ export default function RootLayout({
         <AuthProvider>
           <ToastProvider>
             <AuthModalWrapper>
-              <LikesProvider><EventLikesProvider><FavoritesProvider><RidesProvider><FollowProvider><EventRidesProvider>{children}<BottomNav /></EventRidesProvider></FollowProvider></RidesProvider></FavoritesProvider></EventLikesProvider></LikesProvider>
+              <AchievementsProvider>
+                <LikesProvider><EventLikesProvider><FavoritesProvider><RidesProvider><FollowProvider><EventRidesProvider>{children}<BottomNav /><AchievementModal /></EventRidesProvider></FollowProvider></RidesProvider></FavoritesProvider></EventLikesProvider></LikesProvider>
+              </AchievementsProvider>
             </AuthModalWrapper>
           </ToastProvider>
         </AuthProvider>

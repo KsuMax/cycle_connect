@@ -9,6 +9,7 @@ import { CoverUpload } from "@/components/routes/CoverUpload";
 import { DayEditor } from "@/components/events/DayEditor";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useToast } from "@/lib/context/ToastContext";
+import { useAchievements } from "@/lib/context/AchievementsContext";
 import { supabase } from "@/lib/supabase";
 import type { RouteType, Difficulty } from "@/types";
 import Link from "next/link";
@@ -30,6 +31,7 @@ export default function NewRoutePage() {
   const router = useRouter();
   const { user, profile } = useAuth();
   const { showToast } = useToast();
+  const { checkAndAward } = useAchievements();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -152,6 +154,7 @@ export default function NewRoutePage() {
       .eq("id", user.id);
 
     showToast("Маршрут опубликован!", "success");
+    checkAndAward("route_created", { routesCount: (profile?.routes_count ?? 0) + 1 });
     router.push(`/routes/${routeData.id}`);
   };
 

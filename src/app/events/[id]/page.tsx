@@ -17,6 +17,7 @@ import {
 import { formatDate } from "@/lib/utils";
 import { useAuthModal } from "@/components/ui/AuthModal";
 import { useToast } from "@/lib/context/ToastContext";
+import { useAchievements } from "@/lib/context/AchievementsContext";
 import type { User, Route, EventDay, RouteType } from "@/types";
 
 interface EventData {
@@ -119,6 +120,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const { isLiked, toggleLike } = useEventLikes();
   const { requireAuth } = useAuthModal();
   const { showToast } = useToast();
+  const { checkAndAward } = useAchievements();
   const router = useRouter();
   const [event, setEvent] = useState<EventData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -182,6 +184,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     } else {
       await supabase.from("event_participants").insert({ event_id: event.id, user_id: user!.id });
       showToast("Вы записались на поездку!", "success");
+      checkAndAward("event_joined", {});
     }
   };
 

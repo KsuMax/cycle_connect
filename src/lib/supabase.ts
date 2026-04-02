@@ -78,3 +78,19 @@ export interface DbEventDay {
   description: string | null;
   surface_note: string | null;
 }
+
+export interface DbAchievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  is_hidden: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface DbUserAchievement {
+  user_id: string;
+  achievement_id: string;
+  earned_at: string;
+}

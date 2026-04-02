@@ -8,14 +8,15 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useFavorites } from "@/lib/context/FavoritesContext";
 import { useRides } from "@/lib/context/RidesContext";
 import { supabase } from "@/lib/supabase";
-import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink, Users, Shield } from "lucide-react";
+import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink, Users, Shield, Trophy, Lock } from "lucide-react";
+import { useAchievements } from "@/lib/context/AchievementsContext";
 import { AvatarLightbox } from "@/components/ui/AvatarLightbox";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
 import type { Route, RouteType } from "@/types";
 import type { DbRoute } from "@/lib/supabase";
 
-type Tab = "routes" | "favorites" | "events";
+type Tab = "routes" | "favorites" | "events" | "achievements";
 type EventsSubTab = "rides" | "events_list";
 
 interface ProfileEvent {
@@ -64,6 +65,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const { favorites } = useFavorites();
   const { rideCounts, ridesLoaded } = useRides();
+  const { achievements, earnedIds, earnedMap, loaded: achievementsLoaded } = useAchievements();
 
   const [activeTab, setActiveTab] = useState<Tab>("routes");
   const [eventsSubTab, setEventsSubTab] = useState<EventsSubTab>("rides");
@@ -220,9 +222,10 @@ export default function ProfilePage() {
     : user?.email?.[0].toUpperCase() ?? "?";
 
   const TABS: { id: Tab; label: string; icon: React.ReactNode; count: number }[] = [
-    { id: "routes",    label: "Мои маршруты", icon: <Map size={15} />,      count: myRoutes.length },
-    { id: "favorites", label: "Избранное",    icon: <Bookmark size={15} />, count: favoriteRoutes.length },
-    { id: "events",    label: "Поездки",      icon: <Calendar size={15} />, count: tripsCount },
+    { id: "routes",       label: "Мои маршруты", icon: <Map size={15} />,      count: myRoutes.length },
+    { id: "favorites",    label: "Избранное",    icon: <Bookmark size={15} />, count: favoriteRoutes.length },
+    { id: "events",       label: "Поездки",      icon: <Calendar size={15} />, count: tripsCount },
+    { id: "achievements", label: "Достижения",   icon: <Trophy size={15} />,   count: earnedIds.size },
   ];
 
   if (authLoading) {
@@ -536,6 +539,71 @@ export default function ProfilePage() {
                   }
                 />
               )
+            )}
+          </section>
+        )}
+
+        {activeTab === "achievements" && (
+          <section>
+            {!achievementsLoaded ? (
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-4">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="h-32 bg-white rounded-2xl animate-pulse border border-[#E4E4E7]" />
+                ))}
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="flex-1">
+                    <div className="flex justify-between text-xs text-[#71717A] mb-1">
+                      <span>Открыто {earnedIds.size} из {achievements.length}</span>
+                      <span>{Math.round((earnedIds.size / Math.max(achievements.length, 1)) * 100)}%</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-[#E4E4E7] overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${(earnedIds.size / Math.max(achievements.length, 1)) * 100}%`,
+                          background: "linear-gradient(90deg, #F4632A, #7C5CFC)",
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+                  {achievements.map((ach) => {
+                    const earned = earnedIds.has(ach.id);
+                    const showHidden = ach.is_hidden && !earned;
+                    return (
+                      <div
+                        key={ach.id}
+                        className="bg-white rounded-2xl p-3 border text-center transition-all"
+                        style={{
+                          borderColor: earned ? "#F4632A" : "#E4E4E7",
+                          boxShadow: earned
+                            ? "0 0 0 1px #F4632A, 0 1px 3px 0 rgb(0 0 0 / 0.07)"
+                            : "0 1px 3px 0 rgb(0 0 0 / 0.07)",
+                          opacity: earned ? 1 : 0.45,
+                        }}
+                      >
+                        <div className="text-3xl mb-2">
+                          {showHidden ? <Lock size={28} className="mx-auto text-[#A1A1AA]" /> : ach.icon}
+                        </div>
+                        <div className="text-xs font-semibold text-[#1C1C1E] leading-tight mb-0.5">
+                          {showHidden ? "???" : ach.title}
+                        </div>
+                        <div className="text-[10px] text-[#A1A1AA] leading-tight">
+                          {earned
+                            ? new Date(earnedMap.get(ach.id)!).toLocaleDateString("ru")
+                            : showHidden
+                              ? "Скрытое достижение"
+                              : ach.description}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </section>
         )}
