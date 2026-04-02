@@ -19,6 +19,7 @@ export interface DbProfile {
   created_at: string;
   website?: string | null;
   strava_url?: string | null;
+  showcase_achievements?: string[] | null;
 }
 
 export interface DbRoute {
@@ -86,6 +87,8 @@ export interface DbAchievement {
   icon: string;
   is_hidden: boolean;
   sort_order: number;
+  max_level: number;
+  level_thresholds: Record<string, number> | null;
   created_at: string;
 }
 
@@ -93,4 +96,17 @@ export interface DbUserAchievement {
   user_id: string;
   achievement_id: string;
   earned_at: string;
+  level: number;
+  level_updated_at: string | null;
+}
+
+export interface DbNotification {
+  id: string;
+  user_id: string;
+  type: string;
+  actor_id: string | null;
+  data: Record<string, unknown> | null;
+  read: boolean;
+  created_at: string;
+  actor?: DbProfile;
 }

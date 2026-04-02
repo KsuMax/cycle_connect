@@ -11,6 +11,8 @@ import { supabase } from "@/lib/supabase";
 import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink, Users, Shield, Trophy } from "lucide-react";
 import { useAchievements } from "@/lib/context/AchievementsContext";
 import { AchievementBadge } from "@/components/ui/AchievementBadge";
+import { ProfileShowcase } from "@/components/ui/ProfileShowcase";
+import { ShowcasePicker } from "@/components/ui/ShowcasePicker";
 import { AvatarLightbox } from "@/components/ui/AvatarLightbox";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
@@ -66,7 +68,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const { favorites } = useFavorites();
   const { rideCounts, ridesLoaded } = useRides();
-  const { achievements, earnedIds, earnedMap, loaded: achievementsLoaded } = useAchievements();
+  const { achievements, earnedIds, earnedMap, loaded: achievementsLoaded, showcaseIds, setShowcaseIds } = useAchievements();
 
   const [activeTab, setActiveTab] = useState<Tab>("routes");
   const [eventsSubTab, setEventsSubTab] = useState<EventsSubTab>("rides");
@@ -91,6 +93,7 @@ export default function ProfilePage() {
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
+  const [showShowcasePicker, setShowShowcasePicker] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/auth/login");
@@ -342,6 +345,18 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* Showcase */}
+        {achievementsLoaded && (
+          <div className="mb-6">
+            <ProfileShowcase
+              showcaseIds={showcaseIds}
+              achievements={achievements}
+              earnedLevels={new Map(Array.from(earnedMap.entries()).map(([id, info]) => [id, info.level]))}
+              onEdit={() => setShowShowcasePicker(true)}
+            />
+          </div>
+        )}
+
         {/* Profile completion hint */}
         {!profile?.bio && !avatarUrl && myRoutes.length === 0 && !loadingRoutes && (
           <div className="bg-gradient-to-r from-[#FFF0EB] to-[#F5F3FF] rounded-2xl p-5 border border-[#E4E4E7] mb-6" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
@@ -572,20 +587,34 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-                  {achievements.map((ach) => (
-                    <AchievementBadge
-                      key={ach.id}
-                      achievement={ach}
-                      earned={earnedIds.has(ach.id)}
-                      earnedDate={earnedMap.get(ach.id)}
-                    />
-                  ))}
+                  {achievements.map((ach) => {
+                    const info = earnedMap.get(ach.id);
+                    return (
+                      <AchievementBadge
+                        key={ach.id}
+                        achievement={ach}
+                        earned={earnedIds.has(ach.id)}
+                        earnedDate={info?.earned_at}
+                        level={info?.level}
+                      />
+                    );
+                  })}
                 </div>
               </>
             )}
           </section>
         )}
       </main>
+
+      {showShowcasePicker && (
+        <ShowcasePicker
+          achievements={achievements}
+          earnedLevels={new Map(Array.from(earnedMap.entries()).map(([id, info]) => [id, info.level]))}
+          selected={showcaseIds}
+          onSave={(ids) => { setShowcaseIds(ids); setShowShowcasePicker(false); }}
+          onClose={() => setShowShowcasePicker(false)}
+        />
+      )}
 
       {showAvatarLightbox && avatarUrl && (
         <AvatarLightbox

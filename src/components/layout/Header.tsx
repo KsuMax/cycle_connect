@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Map, Newspaper, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/context/AuthContext";
+import { NotificationBell } from "@/components/ui/NotificationBell";
 
 const NAV_ITEMS = [
   { href: "/", label: "Лента", icon: Newspaper },
@@ -57,6 +58,7 @@ export function Header() {
         <div className="hidden sm:flex items-center gap-2 shrink-0">
           {user ? (
             <>
+              <NotificationBell />
               <Link href="/profile"
                 className={cn(
                   "flex items-center gap-2 px-3 min-h-[44px] rounded-lg text-sm font-medium transition-colors",
