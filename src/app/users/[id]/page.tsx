@@ -8,8 +8,9 @@ import { Avatar } from "@/components/ui/Avatar";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useFollow } from "@/lib/context/FollowContext";
-import { Map, Calendar, Globe, ExternalLink, UserPlus, UserCheck, ChevronRight, Trophy, Lock } from "lucide-react";
+import { Map, Calendar, Globe, ExternalLink, UserPlus, UserCheck, ChevronRight, Trophy } from "lucide-react";
 import { useAchievements } from "@/lib/context/AchievementsContext";
+import { AchievementBadge } from "@/components/ui/AchievementBadge";
 import { AvatarLightbox } from "@/components/ui/AvatarLightbox";
 import { formatDate } from "@/lib/utils";
 import type { Route, RouteType } from "@/types";
@@ -407,34 +408,14 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                   </div>
                 </div>
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-                  {achievements.map((ach) => {
-                    const earned = userAchievementIds.has(ach.id);
-                    // Hide hidden achievements that user hasn't earned
-                    if (ach.is_hidden && !earned) return null;
-                    return (
-                      <div
-                        key={ach.id}
-                        className="bg-white rounded-2xl p-3 border text-center transition-all"
-                        style={{
-                          borderColor: earned ? "#F4632A" : "#E4E4E7",
-                          boxShadow: earned
-                            ? "0 0 0 1px #F4632A, 0 1px 3px 0 rgb(0 0 0 / 0.07)"
-                            : "0 1px 3px 0 rgb(0 0 0 / 0.07)",
-                          opacity: earned ? 1 : 0.45,
-                        }}
-                      >
-                        <div className="text-3xl mb-2">
-                          {earned ? ach.icon : <Lock size={28} className="mx-auto text-[#A1A1AA]" />}
-                        </div>
-                        <div className="text-xs font-semibold text-[#1C1C1E] leading-tight mb-0.5">
-                          {earned ? ach.title : ach.title}
-                        </div>
-                        <div className="text-[10px] text-[#A1A1AA] leading-tight">
-                          {earned ? ach.description : "Ещё не получено"}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {achievements.map((ach) => (
+                    <AchievementBadge
+                      key={ach.id}
+                      achievement={ach}
+                      earned={userAchievementIds.has(ach.id)}
+                      hideIfHiddenAndNotEarned
+                    />
+                  ))}
                 </div>
               </>
             )}

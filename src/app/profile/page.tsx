@@ -8,8 +8,9 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useFavorites } from "@/lib/context/FavoritesContext";
 import { useRides } from "@/lib/context/RidesContext";
 import { supabase } from "@/lib/supabase";
-import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink, Users, Shield, Trophy, Lock } from "lucide-react";
+import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink, Users, Shield, Trophy } from "lucide-react";
 import { useAchievements } from "@/lib/context/AchievementsContext";
+import { AchievementBadge } from "@/components/ui/AchievementBadge";
 import { AvatarLightbox } from "@/components/ui/AvatarLightbox";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
@@ -571,37 +572,14 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-                  {achievements.map((ach) => {
-                    const earned = earnedIds.has(ach.id);
-                    const showHidden = ach.is_hidden && !earned;
-                    return (
-                      <div
-                        key={ach.id}
-                        className="bg-white rounded-2xl p-3 border text-center transition-all"
-                        style={{
-                          borderColor: earned ? "#F4632A" : "#E4E4E7",
-                          boxShadow: earned
-                            ? "0 0 0 1px #F4632A, 0 1px 3px 0 rgb(0 0 0 / 0.07)"
-                            : "0 1px 3px 0 rgb(0 0 0 / 0.07)",
-                          opacity: earned ? 1 : 0.45,
-                        }}
-                      >
-                        <div className="text-3xl mb-2">
-                          {showHidden ? <Lock size={28} className="mx-auto text-[#A1A1AA]" /> : ach.icon}
-                        </div>
-                        <div className="text-xs font-semibold text-[#1C1C1E] leading-tight mb-0.5">
-                          {showHidden ? "???" : ach.title}
-                        </div>
-                        <div className="text-[10px] text-[#A1A1AA] leading-tight">
-                          {earned
-                            ? new Date(earnedMap.get(ach.id)!).toLocaleDateString("ru")
-                            : showHidden
-                              ? "Скрытое достижение"
-                              : ach.description}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {achievements.map((ach) => (
+                    <AchievementBadge
+                      key={ach.id}
+                      achievement={ach}
+                      earned={earnedIds.has(ach.id)}
+                      earnedDate={earnedMap.get(ach.id)}
+                    />
+                  ))}
                 </div>
               </>
             )}
