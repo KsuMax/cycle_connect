@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ImagePlus, X } from "lucide-react";
+import { ImagePlus, X, AlertTriangle } from "lucide-react";
 import { CoverCropModal } from "./CoverCropModal";
+import { validateImageFile } from "@/lib/upload";
 
 interface CoverUploadProps {
   value: string | null;
@@ -13,9 +14,15 @@ interface CoverUploadProps {
 export function CoverUpload({ value, onChange, label = "маршрута" }: CoverUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const handleFile = (file: File) => {
-    if (!file.type.startsWith("image/")) return;
+    const result = validateImageFile(file);
+    if (!result.valid) {
+      setUploadError(result.error!);
+      return;
+    }
+    setUploadError(null);
     setPendingFile(file);
   };
 
@@ -63,7 +70,7 @@ export function CoverUpload({ value, onChange, label = "маршрута" }: Cov
         <input
           ref={inputRef}
           type="file"
-          accept="image/*"
+          accept="image/jpeg,image/png,image/webp,image/gif"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -71,6 +78,12 @@ export function CoverUpload({ value, onChange, label = "маршрута" }: Cov
             e.target.value = "";
           }}
         />
+        {uploadError && (
+          <div className="mt-2 flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200">
+            <AlertTriangle size={14} className="text-red-500 shrink-0 mt-0.5" />
+            <div className="text-xs text-red-600">{uploadError}</div>
+          </div>
+        )}
       </div>
 
       {pendingFile && (

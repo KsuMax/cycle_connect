@@ -18,6 +18,7 @@ import { formatDate } from "@/lib/utils";
 import { useAuthModal } from "@/components/ui/AuthModal";
 import { useToast } from "@/lib/context/ToastContext";
 import { useAchievements } from "@/lib/context/AchievementsContext";
+import { sanitizeHtml } from "@/lib/sanitize";
 import type { User, Route, EventDay, RouteType } from "@/types";
 
 interface EventData {
@@ -319,7 +320,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               <div className="bg-white rounded-2xl p-6 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
                 <h2 className="font-semibold text-[#1C1C1E] mb-3">О поездке</h2>
                 <div className="prose prose-sm max-w-none text-[#71717A] leading-relaxed"
-                  dangerouslySetInnerHTML={{ __html: event.description }} />
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(event.description) }} />
               </div>
             )}
 
@@ -361,7 +362,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                       {isOpen && day.description && (
                         <div className="px-5 pb-5 border-t border-[#F5F4F1]">
                           <div className="pt-4 prose prose-sm max-w-none text-[#71717A] leading-relaxed"
-                            dangerouslySetInnerHTML={{ __html: day.description }} />
+                            dangerouslySetInnerHTML={{ __html: sanitizeHtml(day.description) }} />
                         </div>
                       )}
                     </div>
