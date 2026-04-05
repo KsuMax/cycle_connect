@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Upload, X, ImagePlus } from "lucide-react";
+import { Upload, X, ImagePlus, AlertTriangle } from "lucide-react";
+import { filterValidImageFiles } from "@/lib/upload";
 
 interface ImageUploadProps {
   images: string[]; // preview URLs
@@ -12,10 +13,13 @@ export function ImageUpload({ images, onChange }: ImageUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
 
   const handleFiles = (incoming: FileList | null) => {
     if (!incoming) return;
-    const newFiles = Array.from(incoming).filter((f) => f.type.startsWith("image/"));
+    const { valid: newFiles, errors } = filterValidImageFiles(Array.from(incoming));
+    setUploadErrors(errors);
+    if (newFiles.length === 0) return;
     const newPreviews = newFiles.map((f) => URL.createObjectURL(f));
     const merged = { files: [...files, ...newFiles], previews: [...images, ...newPreviews] };
     setFiles(merged.files);
@@ -47,9 +51,18 @@ export function ImageUpload({ images, onChange }: ImageUploadProps) {
           </p>
           <p className="text-xs text-[#A1A1AA] mt-0.5">Перетащи файлы или нажми. PNG, JPG до 10 МБ</p>
         </div>
-        <input ref={inputRef} type="file" accept="image/*" multiple className="hidden"
+        <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple className="hidden"
           onChange={(e) => handleFiles(e.target.files)} />
       </div>
+
+      {uploadErrors.length > 0 && (
+        <div className="mt-2 flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200">
+          <AlertTriangle size={14} className="text-red-500 shrink-0 mt-0.5" />
+          <div className="text-xs text-red-600">
+            {uploadErrors.map((err, i) => <div key={i}>{err}</div>)}
+          </div>
+        </div>
+      )}
 
       {images.length > 0 && (
         <div className="mt-3 grid grid-cols-3 sm:grid-cols-4 gap-2">

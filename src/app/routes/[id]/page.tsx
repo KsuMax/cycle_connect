@@ -19,6 +19,7 @@ import { useToast } from "@/lib/context/ToastContext";
 import { useAchievements } from "@/lib/context/AchievementsContext";
 import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import { sanitizeHtml } from "@/lib/sanitize";
 import type { Route, RouteType } from "@/types";
 import type { DbRoute } from "@/lib/supabase";
 
@@ -322,7 +323,7 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
               <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
                 <h2 className="font-semibold text-[#1C1C1E] mb-3">О маршруте</h2>
                 <div className="prose prose-sm max-w-none text-[#3F3F46] leading-relaxed"
-                  dangerouslySetInnerHTML={{ __html: route.description }} />
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(route.description) }} />
               </div>
             )}
 
