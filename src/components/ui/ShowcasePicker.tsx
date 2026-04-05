@@ -7,7 +7,7 @@ import type { DbAchievement } from "@/lib/supabase";
 
 interface ShowcasePickerProps {
   achievements: DbAchievement[];
-  earnedLevels: Map<string, number>;
+  earnedLevels: Record<string, number>;
   selected: string[];
   onSave: (ids: string[]) => void;
   onClose: () => void;
@@ -16,7 +16,7 @@ interface ShowcasePickerProps {
 export function ShowcasePicker({ achievements, earnedLevels, selected, onSave, onClose }: ShowcasePickerProps) {
   const [picked, setPicked] = useState<string[]>(selected);
 
-  const earnedAchievements = achievements.filter((a) => earnedLevels.has(a.id));
+  const earnedAchievements = achievements.filter((a) => a.id in earnedLevels);
 
   const toggle = (id: string) => {
     setPicked((prev) => {
@@ -51,7 +51,7 @@ export function ShowcasePicker({ achievements, earnedLevels, selected, onSave, o
           ) : (
             earnedAchievements.map((ach) => {
               const isSelected = picked.includes(ach.id);
-              const level = earnedLevels.get(ach.id) ?? 1;
+              const level = earnedLevels[ach.id] ?? 1;
               const levelMeta = ach.max_level > 1 ? getLevelMeta(level) : null;
               const disabled = !isSelected && picked.length >= 3;
 

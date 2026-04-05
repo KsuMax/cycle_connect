@@ -53,7 +53,7 @@ interface AchievementsContextValue {
   checkAndAward: <T extends keyof TriggerMap>(trigger: T, payload: TriggerMap[T]) => Promise<void>;
   newlyEarned: NewlyEarnedItem[];
   dismissNewlyEarned: () => void;
-  fetchUserAchievements: (userId: string) => Promise<Map<string, number>>;
+  fetchUserAchievements: (userId: string) => Promise<Record<string, number>>;
   /** Showcase: current user's pinned achievement IDs */
   showcaseIds: string[];
   setShowcaseIds: (ids: string[]) => Promise<void>;
@@ -408,12 +408,14 @@ export function AchievementsProvider({ children }: { children: ReactNode }) {
 
   // ─── Fetch another user's achievements (with levels) ──────────────────────
 
-  const fetchUserAchievements = useCallback(async (userId: string): Promise<Map<string, number>> => {
+  const fetchUserAchievements = useCallback(async (userId: string): Promise<Record<string, number>> => {
     const { data } = await supabase
       .from("user_achievements")
       .select("achievement_id, level")
       .eq("user_id", userId);
-    return new Map(data?.map((d) => [d.achievement_id, d.level ?? 1]) ?? []);
+    const result: Record<string, number> = {};
+    (data ?? []).forEach((d) => { result[d.achievement_id] = d.level ?? 1; });
+    return result;
   }, []);
 
   // ─── Showcase ──────────────────────────────────────────────────────────────

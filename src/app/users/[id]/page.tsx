@@ -80,7 +80,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
   const [events, setEvents] = useState<ProfileEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
-  const [userAchievementLevels, setUserAchievementLevels] = useState<Map<string, number>>(new Map());
+  const [userAchievementLevels, setUserAchievementLevels] = useState<Record<string, number>>({});
   const [loadingAchievements, setLoadingAchievements] = useState(true);
 
   // Load profile
@@ -316,7 +316,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
           {([
             { id: "routes" as const, label: "Маршруты", icon: <Map size={15} />, count: routes.length },
             { id: "events" as const, label: "Мероприятия", icon: <Calendar size={15} />, count: events.length },
-            { id: "achievements" as const, label: "Достижения", icon: <Trophy size={15} />, count: userAchievementLevels.size },
+            { id: "achievements" as const, label: "Достижения", icon: <Trophy size={15} />, count: Object.keys(userAchievementLevels).length },
           ]).map((tab) => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-medium transition-all"
@@ -405,14 +405,14 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                 <div className="flex items-center gap-3 mb-5">
                   <div className="flex-1">
                     <div className="flex justify-between text-xs text-[#71717A] mb-1">
-                      <span>Открыто {userAchievementLevels.size} из {achievements.length}</span>
-                      <span>{Math.round((userAchievementLevels.size / Math.max(achievements.length, 1)) * 100)}%</span>
+                      <span>Открыто {Object.keys(userAchievementLevels).length} из {achievements.length}</span>
+                      <span>{Math.round((Object.keys(userAchievementLevels).length / Math.max(achievements.length, 1)) * 100)}%</span>
                     </div>
                     <div className="h-2 rounded-full bg-[#E4E4E7] overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-500"
                         style={{
-                          width: `${(userAchievementLevels.size / Math.max(achievements.length, 1)) * 100}%`,
+                          width: `${(Object.keys(userAchievementLevels).length / Math.max(achievements.length, 1)) * 100}%`,
                           background: "linear-gradient(90deg, #F4632A, #7C5CFC)",
                         }}
                       />
@@ -424,8 +424,8 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                     <AchievementBadge
                       key={ach.id}
                       achievement={ach}
-                      earned={userAchievementLevels.has(ach.id)}
-                      level={userAchievementLevels.get(ach.id)}
+                      earned={ach.id in userAchievementLevels}
+                      level={userAchievementLevels[ach.id]}
                       hideIfHiddenAndNotEarned
                     />
                   ))}

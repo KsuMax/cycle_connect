@@ -70,10 +70,10 @@ export default function ProfilePage() {
   const { rideCounts, ridesLoaded } = useRides();
   const { achievements, earnedIds, earnedMap, loaded: achievementsLoaded, showcaseIds, setShowcaseIds } = useAchievements();
 
-  const earnedLevels: Map<string, number> = useMemo(() => {
-    const m = new Map<string, number>();
-    earnedMap.forEach((info, id) => m.set(id, info.level));
-    return m;
+  const earnedLevels: Record<string, number> = useMemo(() => {
+    const result: Record<string, number> = {};
+    earnedMap.forEach((info, id) => { result[id] = info.level; });
+    return result;
   }, [earnedMap]);
 
   const [activeTab, setActiveTab] = useState<Tab>("routes");

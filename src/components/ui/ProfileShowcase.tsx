@@ -9,7 +9,7 @@ interface ProfileShowcaseProps {
   /** Full achievements catalog */
   achievements: DbAchievement[];
   /** User's earned levels map */
-  earnedLevels: Map<string, number>;
+  earnedLevels: Record<string, number>;
   /** Show edit button (own profile only) */
   onEdit?: () => void;
 }
@@ -41,7 +41,7 @@ export function ProfileShowcase({ showcaseIds, achievements, earnedLevels, onEdi
             <AchievementBadge
               achievement={ach}
               earned
-              level={earnedLevels.get(ach.id) ?? 1}
+              level={earnedLevels[ach.id] ?? 1}
               compact
             />
           </div>
