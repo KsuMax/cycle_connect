@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { RouteCard } from "@/components/routes/RouteCard";
@@ -69,6 +69,12 @@ export default function ProfilePage() {
   const { favorites } = useFavorites();
   const { rideCounts, ridesLoaded } = useRides();
   const { achievements, earnedIds, earnedMap, loaded: achievementsLoaded, showcaseIds, setShowcaseIds } = useAchievements();
+
+  const earnedLevels: Map<string, number> = useMemo(() => {
+    const m = new Map<string, number>();
+    earnedMap.forEach((info, id) => m.set(id, info.level));
+    return m;
+  }, [earnedMap]);
 
   const [activeTab, setActiveTab] = useState<Tab>("routes");
   const [eventsSubTab, setEventsSubTab] = useState<EventsSubTab>("rides");
@@ -351,7 +357,7 @@ export default function ProfilePage() {
             <ProfileShowcase
               showcaseIds={showcaseIds}
               achievements={achievements}
-              earnedLevels={new Map<string, number>(Array.from(earnedMap.entries()).map(([id, info]) => [id, info.level]))}
+              earnedLevels={earnedLevels}
               onEdit={() => setShowShowcasePicker(true)}
             />
           </div>
@@ -609,7 +615,7 @@ export default function ProfilePage() {
       {showShowcasePicker && (
         <ShowcasePicker
           achievements={achievements}
-          earnedLevels={new Map<string, number>(Array.from(earnedMap.entries()).map(([id, info]) => [id, info.level]))}
+          earnedLevels={earnedLevels}
           selected={showcaseIds}
           onSave={(ids) => { setShowcaseIds(ids); setShowShowcasePicker(false); }}
           onClose={() => setShowShowcasePicker(false)}
