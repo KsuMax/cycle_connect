@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Map, Newspaper, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/context/AuthContext";
+import { proxyImageUrl } from "@/lib/supabase";
 import { NotificationBell } from "@/components/ui/NotificationBell";
 
 const NAV_ITEMS = [
@@ -67,7 +68,7 @@ export function Header() {
                 <div className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center text-xs font-bold text-white shrink-0"
                   style={{ backgroundColor: "#7C5CFC" }}>
                   {profile?.avatar_url
-                    ? <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                    ? <img src={proxyImageUrl(profile.avatar_url) ?? profile.avatar_url} alt="" className="w-full h-full object-cover" />
                     : initials
                   }
                 </div>

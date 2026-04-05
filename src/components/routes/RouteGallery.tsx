@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { X, ChevronLeft, ChevronRight, Images } from "lucide-react";
+import { proxyImageUrl } from "@/lib/supabase";
 
 interface RouteGalleryProps {
   images: string[];
 }
 
-export function RouteGallery({ images }: RouteGalleryProps) {
+export function RouteGallery({ images: rawImages }: RouteGalleryProps) {
+  const images = useMemo(() => rawImages.map((url) => proxyImageUrl(url) ?? url), [rawImages]);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   if (images.length === 0) return null;

@@ -7,7 +7,7 @@ import { Header } from "@/components/layout/Header";
 import { Avatar, AvatarGroup } from "@/components/ui/Avatar";
 import { DifficultyBadge, Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { supabase } from "@/lib/supabase";
+import { supabase, proxyImageUrl } from "@/lib/supabase";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useEventLikes } from "@/lib/context/EventLikesContext";
 import {
@@ -262,7 +262,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               style={{ background: event.cover_url ? undefined : "linear-gradient(135deg, #0BBFB5 0%, #7C5CFC 100%)" }}>
               {event.cover_url ? (
                 <>
-                  <img src={event.cover_url} alt={event.title} className="absolute inset-0 w-full h-full object-cover" />
+                  <img src={proxyImageUrl(event.cover_url) ?? event.cover_url} alt={event.title} className="absolute inset-0 w-full h-full object-cover" />
                   <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.15) 60%, transparent 100%)" }} />
                 </>
               ) : (

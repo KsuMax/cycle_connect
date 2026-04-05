@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { proxyImageUrl } from "@/lib/supabase";
 import type { User } from "@/types";
 
 interface AvatarProps {
@@ -25,7 +26,7 @@ export function Avatar({ user, size = "md", className }: AvatarProps) {
       title={user.name}
     >
       {user.avatar_url
-        ? <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+        ? <img src={proxyImageUrl(user.avatar_url) ?? user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
         : user.initials
       }
     </div>

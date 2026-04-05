@@ -8,7 +8,7 @@ import { ImageUpload } from "@/components/routes/ImageUpload";
 import { CoverUpload } from "@/components/routes/CoverUpload";
 import { DayEditor } from "@/components/events/DayEditor";
 import { useAuth } from "@/lib/context/AuthContext";
-import { supabase } from "@/lib/supabase";
+import { supabase, proxyImageUrl } from "@/lib/supabase";
 import type { RouteType, Difficulty } from "@/types";
 import Link from "next/link";
 
@@ -329,7 +329,7 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
               <label className="block text-sm font-semibold text-[#1C1C1E] mb-3">Текущие фотографии</label>
               <div className="flex flex-wrap gap-2">
                 {existingImages.map((img) => (
-                  <img key={img.url} src={img.url} alt="" className="w-24 h-24 object-cover rounded-xl border border-[#E4E4E7]" />
+                  <img key={img.url} src={proxyImageUrl(img.url) ?? img.url} alt="" className="w-24 h-24 object-cover rounded-xl border border-[#E4E4E7]" />
                 ))}
               </div>
             </div>

@@ -3,7 +3,29 @@ import { createClient } from "@supabase/supabase-js";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// In the browser, route through our Vercel proxy to bypass Russian ISP blocks on *.supabase.co
+const isBrowser = typeof window !== "undefined";
+const clientUrl = isBrowser ? "/api/supabase" : supabaseUrl;
+
+export const supabase = createClient(clientUrl, supabaseAnonKey);
+
+/**
+ * Rewrite a Supabase storage URL to go through our proxy when in the browser.
+ * DB stores absolute URLs like "https://xxx.supabase.co/storage/v1/object/public/..."
+ * In Russia these are blocked, so we rewrite them to "/api/supabase/storage/..."
+ */
+export function proxyImageUrl(url: string | null | undefined): string | null | undefined {
+  if (!url || !isBrowser) return url;
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.endsWith(".supabase.co") || parsed.hostname.endsWith(".supabase.in")) {
+      return `/api/supabase${parsed.pathname}${parsed.search}`;
+    }
+  } catch {
+    // not a valid URL, return as-is
+  }
+  return url;
+}
 
 // ─── Types matching DB schema ─────────────────────────────────────────────────
 

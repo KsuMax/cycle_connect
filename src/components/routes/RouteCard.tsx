@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { useLikes } from "@/lib/context/LikesContext";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useEventRides } from "@/lib/context/EventRidesContext";
+import { proxyImageUrl } from "@/lib/supabase";
 import type { Route, RouteType } from "@/types";
 
 const ROUTE_TYPE_LABELS: Record<RouteType, string> = {
@@ -59,7 +60,7 @@ export function RouteCard({ route, compact = false }: RouteCardProps) {
         {/* Cover or placeholder */}
         <div className="relative overflow-hidden" style={{ height: compact ? 140 : 180 }}>
           {route.cover_url ? (
-            <img src={route.cover_url} alt={route.title} className="w-full h-full object-cover" />
+            <img src={proxyImageUrl(route.cover_url) ?? route.cover_url} alt={route.title} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-[#E6FAF9] to-[#D1FAF7]">
               <svg className="absolute inset-0 w-full h-full" viewBox="0 0 400 180" preserveAspectRatio="none">

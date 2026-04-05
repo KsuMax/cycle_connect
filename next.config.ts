@@ -23,12 +23,38 @@ const securityHeaders = [
   },
 ];
 
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+
 const nextConfig: NextConfig = {
   async headers() {
     return [
       {
         source: "/(.*)",
         headers: securityHeaders,
+      },
+    ];
+  },
+  async rewrites() {
+    return [
+      // Proxy Supabase REST API through our domain to bypass Russian ISP blocks
+      {
+        source: "/api/supabase/rest/:path*",
+        destination: `${supabaseUrl}/rest/:path*`,
+      },
+      // Proxy Supabase Auth
+      {
+        source: "/api/supabase/auth/:path*",
+        destination: `${supabaseUrl}/auth/:path*`,
+      },
+      // Proxy Supabase Storage
+      {
+        source: "/api/supabase/storage/:path*",
+        destination: `${supabaseUrl}/storage/:path*`,
+      },
+      // Proxy Supabase Realtime
+      {
+        source: "/api/supabase/realtime/:path*",
+        destination: `${supabaseUrl}/realtime/:path*`,
       },
     ];
   },

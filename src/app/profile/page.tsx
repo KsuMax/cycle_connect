@@ -7,7 +7,7 @@ import { RouteCard } from "@/components/routes/RouteCard";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useFavorites } from "@/lib/context/FavoritesContext";
 import { useRides } from "@/lib/context/RidesContext";
-import { supabase } from "@/lib/supabase";
+import { supabase, proxyImageUrl } from "@/lib/supabase";
 import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink, Users, Shield, Trophy } from "lucide-react";
 import { useAchievements } from "@/lib/context/AchievementsContext";
 import { AchievementBadge } from "@/components/ui/AchievementBadge";
@@ -258,7 +258,7 @@ export default function ProfilePage() {
                 style={{ backgroundColor: "#7C5CFC" }}
                 onClick={() => avatarUrl && setShowAvatarLightbox(true)}>
                 {avatarUrl
-                  ? <img src={avatarUrl} alt="Аватар" className="w-full h-full object-cover" />
+                  ? <img src={proxyImageUrl(avatarUrl) ?? avatarUrl} alt="Аватар" className="w-full h-full object-cover" />
                   : initials
                 }
               </div>
@@ -351,7 +351,7 @@ export default function ProfilePage() {
             <ProfileShowcase
               showcaseIds={showcaseIds}
               achievements={achievements}
-              earnedLevels={new Map(Array.from(earnedMap.entries()).map(([id, info]) => [id, info.level]))}
+              earnedLevels={new Map<string, number>(Array.from(earnedMap.entries()).map(([id, info]) => [id, info.level]))}
               onEdit={() => setShowShowcasePicker(true)}
             />
           </div>
@@ -609,7 +609,7 @@ export default function ProfilePage() {
       {showShowcasePicker && (
         <ShowcasePicker
           achievements={achievements}
-          earnedLevels={new Map(Array.from(earnedMap.entries()).map(([id, info]) => [id, info.level]))}
+          earnedLevels={new Map<string, number>(Array.from(earnedMap.entries()).map(([id, info]) => [id, info.level]))}
           selected={showcaseIds}
           onSave={(ids) => { setShowcaseIds(ids); setShowShowcasePicker(false); }}
           onClose={() => setShowShowcasePicker(false)}
@@ -618,7 +618,7 @@ export default function ProfilePage() {
 
       {showAvatarLightbox && avatarUrl && (
         <AvatarLightbox
-          src={avatarUrl}
+          src={proxyImageUrl(avatarUrl) ?? avatarUrl}
           alt={profile?.name || "Аватар"}
           onClose={() => setShowAvatarLightbox(false)}
         />
