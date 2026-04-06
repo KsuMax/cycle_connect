@@ -3,12 +3,26 @@ import { createBrowserClient } from "@supabase/ssr";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-// In the browser, route through our Vercel proxy to bypass Russian ISP blocks on *.supabase.co
 const isBrowser = typeof window !== "undefined";
-const clientUrl = isBrowser ? `${window.location.origin}/api/supabase` : supabaseUrl;
 
-// createBrowserClient stores the session in cookies so Next.js middleware can read it
-export const supabase = createBrowserClient(clientUrl, supabaseAnonKey);
+// Cookie keys are derived from supabaseUrl, so we must always pass the real URL to
+// createBrowserClient — otherwise the middleware (which also uses supabaseUrl) won't
+// find the session cookie and will redirect authenticated users to /auth/login.
+// Requests are still routed through the Vercel proxy via a custom fetch.
+export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey, {
+  global: {
+    fetch: (input, init) => {
+      if (isBrowser) {
+        const url = input instanceof Request ? input.url : String(input);
+        const proxied = url.replace(supabaseUrl, `${window.location.origin}/api/supabase`);
+        if (proxied !== url) {
+          return fetch(new Request(proxied, input instanceof Request ? input : undefined), init);
+        }
+      }
+      return fetch(input, init);
+    },
+  },
+});
 
 /**
  * Rewrite a Supabase storage URL to go through our proxy when in the browser.
