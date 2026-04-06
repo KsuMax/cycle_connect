@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -7,7 +7,8 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const isBrowser = typeof window !== "undefined";
 const clientUrl = isBrowser ? `${window.location.origin}/api/supabase` : supabaseUrl;
 
-export const supabase = createClient(clientUrl, supabaseAnonKey);
+// createBrowserClient stores the session in cookies so Next.js middleware can read it
+export const supabase = createBrowserClient(clientUrl, supabaseAnonKey);
 
 /**
  * Rewrite a Supabase storage URL to go through our proxy when in the browser.
