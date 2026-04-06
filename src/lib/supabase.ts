@@ -42,6 +42,7 @@ export interface DbProfile {
   website?: string | null;
   strava_url?: string | null;
   showcase_achievements?: string[] | null;
+  is_admin?: boolean;
 }
 
 export interface DbRoute {

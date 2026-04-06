@@ -1,11 +1,13 @@
 import { cn } from "@/lib/utils";
 import { proxyImageUrl } from "@/lib/supabase";
 import type { User } from "@/types";
+import type { UserSticker } from "@/lib/stickers";
 
 interface AvatarProps {
   user: User;
   size?: "sm" | "md" | "lg";
   className?: string;
+  sticker?: UserSticker | null;
 }
 
 const SIZE_CLASSES = {
@@ -14,8 +16,15 @@ const SIZE_CLASSES = {
   lg: "w-12 h-12 text-base",
 };
 
-export function Avatar({ user, size = "md", className }: AvatarProps) {
-  return (
+// Sticker badge size scales with avatar size
+const STICKER_SIZES = {
+  sm: "w-4 h-4 text-[8px] -bottom-0.5 -right-0.5 border",
+  md: "w-5 h-5 text-[9px] -bottom-1 -right-1 border-2",
+  lg: "w-6 h-6 text-[11px] -bottom-1 -right-1 border-2",
+};
+
+export function Avatar({ user, size = "md", className, sticker }: AvatarProps) {
+  const inner = (
     <div
       className={cn(
         "rounded-full overflow-hidden flex items-center justify-center font-semibold text-white shrink-0",
@@ -29,6 +38,24 @@ export function Avatar({ user, size = "md", className }: AvatarProps) {
         ? <img src={proxyImageUrl(user.avatar_url) ?? user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
         : user.initials
       }
+    </div>
+  );
+
+  if (!sticker) return inner;
+
+  return (
+    <div className="relative inline-block shrink-0">
+      {inner}
+      <div
+        className={cn(
+          "absolute rounded-full flex items-center justify-center leading-none border-white cursor-help select-none",
+          STICKER_SIZES[size]
+        )}
+        style={{ background: sticker.bg }}
+        title={sticker.tooltip}
+      >
+        {sticker.emoji}
+      </div>
     </div>
   );
 }

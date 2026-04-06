@@ -16,6 +16,7 @@ import { AvatarLightbox } from "@/components/ui/AvatarLightbox";
 import { formatDate } from "@/lib/utils";
 import type { Route, RouteType } from "@/types";
 import type { DbRoute, DbProfile } from "@/lib/supabase";
+import { getUserSticker } from "@/lib/stickers";
 
 interface ProfileEvent {
   id: string;
@@ -220,7 +221,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
               className={profile.avatar_url ? "cursor-pointer" : ""}
               onClick={() => profile.avatar_url && setShowAvatarLightbox(true)}
             >
-              <Avatar user={userObj} size="lg" className="rounded-2xl w-16 h-16 shrink-0" />
+              <Avatar user={userObj} size="lg" className="rounded-2xl w-16 h-16 shrink-0" sticker={getUserSticker(profile)} />
             </div>
             <div className="flex-1">
               <div className="flex items-start justify-between">

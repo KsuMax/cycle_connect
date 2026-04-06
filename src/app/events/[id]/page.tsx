@@ -12,7 +12,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useEventLikes } from "@/lib/context/EventLikesContext";
 import {
   ChevronLeft, Calendar, Bike, Heart,
-  Share2, Users, MapPin, ExternalLink, Flag, ChevronRight, Pencil, Lock, Trash2,
+  Share2, Users, MapPin, ExternalLink, Flag, ChevronRight, Pencil, Lock, Trash2, UserPlus, Search, X,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { useAuthModal } from "@/components/ui/AuthModal";
@@ -117,7 +117,7 @@ function dbToEvent(data: any): EventData {
 
 export default function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { isLiked, toggleLike } = useEventLikes();
   const { requireAuth } = useAuthModal();
   const { showToast } = useToast();
@@ -132,6 +132,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [shareCopied, setShareCopied] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Admin: force-add participant
+  const [showAddParticipant, setShowAddParticipant] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Array<{ id: string; name: string; username: string | null; avatar_url: string | null }>>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [addingUserId, setAddingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -200,6 +207,35 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     await supabase.from("profiles").update({ events_count: Math.max(0, (profile?.events_count ?? 1) - 1) }).eq("id", user.id);
     showToast("Мероприятие удалено", "info");
     router.push("/");
+  };
+
+  const handleSearchUsers = async (q: string) => {
+    setSearchQuery(q);
+    if (q.trim().length < 2) { setSearchResults([]); return; }
+    setSearchLoading(true);
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, name, username, avatar_url")
+      .or(`name.ilike.%${q}%,username.ilike.%${q}%`)
+      .limit(8);
+    setSearchResults(data ?? []);
+    setSearchLoading(false);
+  };
+
+  const handleAdminAddParticipant = async (targetUserId: string, targetName: string) => {
+    if (!event) return;
+    const alreadyIn = event.participants.some((p) => p.id === targetUserId);
+    if (alreadyIn) { showToast(`${targetName} уже участвует`, "info"); return; }
+    setAddingUserId(targetUserId);
+    const { error } = await supabase.from("event_participants").insert({ event_id: event.id, user_id: targetUserId });
+    if (error) {
+      showToast("Ошибка при добавлении", "error");
+    } else {
+      const newParticipant = dbToUser({ id: targetUserId, name: targetName, avatar_url: searchResults.find(r => r.id === targetUserId)?.avatar_url ?? null }, "#0BBFB5");
+      setEvent((prev) => prev ? { ...prev, participants: [...prev.participants, newParticipant] } : prev);
+      showToast(`${targetName} добавлен в мероприятие`, "success");
+    }
+    setAddingUserId(null);
   };
 
   if (loading) {
@@ -373,10 +409,20 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
             {/* Participants */}
             <div className="bg-white rounded-2xl p-6 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-              <h2 className="font-semibold text-[#1C1C1E] mb-4 flex items-center gap-2">
-                <Users size={18} style={{ color: "#0BBFB5" }} />
-                Участники ({event.participants.length}{event.max_participants ? `/${event.max_participants}` : ""})
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-semibold text-[#1C1C1E] flex items-center gap-2">
+                  <Users size={18} style={{ color: "#0BBFB5" }} />
+                  Участники ({event.participants.length}{event.max_participants ? `/${event.max_participants}` : ""})
+                </h2>
+                {isAdmin && (
+                  <button
+                    onClick={() => { setShowAddParticipant(true); setSearchQuery(""); setSearchResults([]); }}
+                    className="flex items-center gap-1.5 text-xs text-[#7C5CFC] hover:text-[#6347E0] border border-[#E4E4E7] px-2.5 py-1.5 rounded-lg hover:bg-[#F5F4F1] transition-colors"
+                    title="Добавить участника (Админ)">
+                    <UserPlus size={13} /> Добавить
+                  </button>
+                )}
+              </div>
               <div className="flex flex-wrap gap-3">
                 {event.participants.map((p) => (
                   <Link key={p.id} href={`/users/${p.id}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
@@ -502,6 +548,78 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           </aside>
         </div>
       </main>
+
+      {/* Admin: add participant modal */}
+      {showAddParticipant && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-[#EDE9FE] flex items-center justify-center">
+                  <UserPlus size={15} style={{ color: "#7C5CFC" }} />
+                </div>
+                <h2 className="font-bold text-[#1C1C1E]">Добавить участника</h2>
+              </div>
+              <button
+                onClick={() => setShowAddParticipant(false)}
+                className="text-[#A1A1AA] hover:text-[#1C1C1E] transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="relative mb-3">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A1A1AA]" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => handleSearchUsers(e.target.value)}
+                placeholder="Имя или @username..."
+                autoFocus
+                className="w-full pl-9 pr-3 py-2.5 text-sm border border-[#E4E4E7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7C5CFC]/30 focus:border-[#7C5CFC] transition-all"
+              />
+            </div>
+            <div className="space-y-1 max-h-60 overflow-y-auto">
+              {searchLoading && (
+                <div className="text-center py-4 text-sm text-[#A1A1AA]">Поиск...</div>
+              )}
+              {!searchLoading && searchQuery.length >= 2 && searchResults.length === 0 && (
+                <div className="text-center py-4 text-sm text-[#A1A1AA]">Никого не нашли</div>
+              )}
+              {searchResults.map((r) => {
+                const isAlready = event.participants.some((p) => p.id === r.id);
+                return (
+                  <button
+                    key={r.id}
+                    disabled={isAlready || addingUserId === r.id}
+                    onClick={() => handleAdminAddParticipant(r.id, r.name)}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#F5F4F1] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left">
+                    <div
+                      className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center text-xs font-bold text-white shrink-0"
+                      style={{ backgroundColor: "#7C5CFC" }}>
+                      {r.avatar_url
+                        ? <img src={r.avatar_url} alt={r.name} className="w-full h-full object-cover" />
+                        : r.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
+                      }
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-[#1C1C1E] truncate">{r.name}</div>
+                      {r.username && <div className="text-xs text-[#A1A1AA]">@{r.username}</div>}
+                    </div>
+                    {isAlready
+                      ? <span className="text-xs text-[#A1A1AA] shrink-0">уже едет</span>
+                      : addingUserId === r.id
+                        ? <div className="w-4 h-4 border-2 border-[#7C5CFC] border-t-transparent rounded-full animate-spin shrink-0" />
+                        : <UserPlus size={14} className="text-[#7C5CFC] shrink-0" />
+                    }
+                  </button>
+                );
+              })}
+            </div>
+            {searchQuery.length < 2 && (
+              <p className="text-xs text-[#A1A1AA] text-center mt-2">Введите минимум 2 символа для поиска</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

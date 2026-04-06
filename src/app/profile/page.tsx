@@ -9,6 +9,7 @@ import { useFavorites } from "@/lib/context/FavoritesContext";
 import { useRides } from "@/lib/context/RidesContext";
 import { supabase, proxyImageUrl } from "@/lib/supabase";
 import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink, Users, Shield, Trophy } from "lucide-react";
+import { getUserSticker } from "@/lib/stickers";
 import { useAchievements } from "@/lib/context/AchievementsContext";
 import { AchievementBadge } from "@/components/ui/AchievementBadge";
 import { ProfileShowcase } from "@/components/ui/ProfileShowcase";
@@ -285,6 +286,18 @@ export default function ProfilePage() {
                 className="hidden"
                 onChange={handleAvatarUpload}
               />
+              {(() => {
+                const sticker = profile ? getUserSticker(profile) : null;
+                return sticker ? (
+                  <div
+                    className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full flex items-center justify-center text-sm leading-none border-2 border-white cursor-help select-none z-10"
+                    style={{ background: sticker.bg }}
+                    title={sticker.tooltip}
+                  >
+                    {sticker.emoji}
+                  </div>
+                ) : null;
+              })()}
               {avatarError && (
                 <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-red-500 font-medium">
                   {avatarError}
