@@ -5,7 +5,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 // In the browser, route through our Vercel proxy to bypass Russian ISP blocks on *.supabase.co
 const isBrowser = typeof window !== "undefined";
-const clientUrl = isBrowser ? "/api/supabase" : supabaseUrl;
+const clientUrl = isBrowser ? `${window.location.origin}/api/supabase` : supabaseUrl;
 
 export const supabase = createClient(clientUrl, supabaseAnonKey);
 
