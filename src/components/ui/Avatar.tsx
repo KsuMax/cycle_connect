@@ -51,7 +51,7 @@ export function Avatar({ user, size = "md", className, sticker }: AvatarProps) {
           "absolute rounded-full flex items-center justify-center leading-none border-white cursor-help select-none overflow-hidden",
           STICKER_SIZES[size]
         )}
-        style={{ background: sticker.iconUrl ? "transparent" : sticker.bg, borderColor: "white" }}
+        style={{ background: sticker.bg, borderColor: "white" }}
         title={sticker.tooltip}
       >
         {sticker.iconUrl

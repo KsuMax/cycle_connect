@@ -33,7 +33,7 @@ export function getUserSticker(profile: ProfileStats): UserSticker | null {
       emoji: "⚡",
       label: "Админ",
       tooltip: "Администратор сообщества",
-      bg: "transparent",
+      bg: "linear-gradient(135deg, #7C5CFC, #A855F7)",
       iconUrl: "/admin-badge.png",
     };
   }
