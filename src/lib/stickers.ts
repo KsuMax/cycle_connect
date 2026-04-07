@@ -16,6 +16,8 @@ export interface UserSticker {
   tooltip: string;
   /** CSS gradient or solid color for the badge background */
   bg: string;
+  /** Optional custom image URL — when set, renders an image instead of the emoji */
+  iconUrl?: string;
 }
 
 interface ProfileStats {
@@ -28,10 +30,11 @@ interface ProfileStats {
 export function getUserSticker(profile: ProfileStats): UserSticker | null {
   if (profile.is_admin) {
     return {
-      emoji: "👑",
+      emoji: "⚡",
       label: "Админ",
       tooltip: "Администратор сообщества",
-      bg: "linear-gradient(135deg, #7C5CFC, #F4632A)",
+      bg: "transparent",
+      iconUrl: "/admin-badge.png",
     };
   }
   if (profile.km_total >= 3000 && profile.routes_count >= 10) {

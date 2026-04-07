@@ -48,13 +48,16 @@ export function Avatar({ user, size = "md", className, sticker }: AvatarProps) {
       {inner}
       <div
         className={cn(
-          "absolute rounded-full flex items-center justify-center leading-none border-white cursor-help select-none",
+          "absolute rounded-full flex items-center justify-center leading-none border-white cursor-help select-none overflow-hidden",
           STICKER_SIZES[size]
         )}
-        style={{ background: sticker.bg }}
+        style={{ background: sticker.iconUrl ? "transparent" : sticker.bg, borderColor: "white" }}
         title={sticker.tooltip}
       >
-        {sticker.emoji}
+        {sticker.iconUrl
+          ? <img src={sticker.iconUrl} alt={sticker.label} className="w-full h-full object-contain" draggable={false} />
+          : sticker.emoji
+        }
       </div>
     </div>
   );
