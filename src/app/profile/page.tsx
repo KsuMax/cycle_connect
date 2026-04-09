@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useToast } from "@/lib/context/ToastContext";
 import { Header } from "@/components/layout/Header";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useFavorites } from "@/lib/context/FavoritesContext";
 import { useRides } from "@/lib/context/RidesContext";
 import { supabase, proxyImageUrl } from "@/lib/supabase";
-import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink, Users, Shield, Trophy } from "lucide-react";
+import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink, Users, Shield, Trophy, Activity } from "lucide-react";
+import { StravaTab } from "@/components/strava/StravaTab";
 import { getUserSticker } from "@/lib/stickers";
 import { useAchievements } from "@/lib/context/AchievementsContext";
 import { AchievementBadge } from "@/components/ui/AchievementBadge";
@@ -20,7 +22,7 @@ import Link from "next/link";
 import type { Route, RouteType } from "@/types";
 import type { DbRoute } from "@/lib/supabase";
 
-type Tab = "routes" | "favorites" | "events" | "achievements";
+type Tab = "routes" | "favorites" | "events" | "strava" | "achievements";
 type EventsSubTab = "rides" | "events_list";
 
 interface ProfileEvent {
@@ -77,8 +79,41 @@ export default function ProfilePage() {
     return result;
   }, [earnedMap]);
 
+  const searchParams = useSearchParams();
+  const { showToast } = useToast();
+
   const [activeTab, setActiveTab] = useState<Tab>("routes");
   const [eventsSubTab, setEventsSubTab] = useState<EventsSubTab>("rides");
+
+  // OAuth callback toasts + auto-tab. Strips the query string after
+  // handling so a refresh doesn't re-fire the toast.
+  useEffect(() => {
+    const success = searchParams?.get("strava");
+    const error = searchParams?.get("strava_error");
+    const tabParam = searchParams?.get("tab");
+
+    if (tabParam === "strava") setActiveTab("strava");
+
+    if (success === "connected") {
+      showToast("Strava подключён — заезды появятся через минуту", "success");
+      setActiveTab("strava");
+    } else if (error) {
+      showToast(stravaErrorMessage(error), "error");
+      setActiveTab("strava");
+    }
+
+    if (success || error || tabParam === "strava") {
+      // Drop the query params from the URL without triggering navigation.
+      const url = new URL(window.location.href);
+      url.searchParams.delete("strava");
+      url.searchParams.delete("strava_error");
+      url.searchParams.delete("tab");
+      window.history.replaceState({}, "", url.toString());
+    }
+  // We deliberately want this to run once on mount, not on every
+  // searchParams identity change (which would re-fire the toast).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [myRoutes, setMyRoutes] = useState<Route[]>([]);
   const [loadingRoutes, setLoadingRoutes] = useState(true);
@@ -236,6 +271,7 @@ export default function ProfilePage() {
     { id: "routes",       label: "Мои маршруты", icon: <Map size={15} />,      count: myRoutes.length },
     { id: "favorites",    label: "Избранное",    icon: <Bookmark size={15} />, count: favoriteRoutes.length },
     { id: "events",       label: "Поездки",      icon: <Calendar size={15} />, count: tripsCount },
+    { id: "strava",       label: "Strava",       icon: <Activity size={15} />, count: profile?.strava_synced_rides ?? 0 },
     { id: "achievements", label: "Достижения",   icon: <Trophy size={15} />,   count: earnedIds.size },
   ];
 
@@ -578,6 +614,12 @@ export default function ProfilePage() {
           </section>
         )}
 
+        {activeTab === "strava" && (
+          <section>
+            <StravaTab />
+          </section>
+        )}
+
         {activeTab === "achievements" && (
           <section>
             {!achievementsLoaded ? (
@@ -644,6 +686,22 @@ export default function ProfilePage() {
       )}
     </div>
   );
+}
+
+function stravaErrorMessage(code: string): string {
+  // Mirrors the error codes emitted by /api/strava/callback/route.ts.
+  switch (code) {
+    case "denied":             return "Ты отменил подключение Strava";
+    case "missing_params":     return "Strava вернула неполный ответ — попробуй ещё раз";
+    case "not_signed_in":      return "Войди в аккаунт перед подключением Strava";
+    case "state_mismatch":
+    case "state_user_mismatch":return "Ссылка устарела — попробуй подключить ещё раз";
+    case "token_exchange":     return "Strava отказала в обмене токенов — попробуй позже";
+    case "no_athlete":         return "Strava не вернула профиль — попробуй ещё раз";
+    case "storage":            return "Не удалось сохранить подключение — попробуй позже";
+    case "profile_update":     return "Не удалось обновить профиль";
+    default:                   return "Не получилось подключить Strava — попробуй ещё раз";
+  }
 }
 
 function EmptyState({ icon, title, text, action }: { icon: React.ReactNode; title: string; text: string; action?: React.ReactNode }) {

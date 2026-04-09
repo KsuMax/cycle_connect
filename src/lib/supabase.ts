@@ -58,6 +58,48 @@ export interface DbProfile {
   strava_url?: string | null;
   showcase_achievements?: string[] | null;
   is_admin?: boolean;
+  // Strava integration (added by migration 005). All optional so old rows
+  // and other code that selects subsets of profiles still type-check.
+  strava_connected?: boolean;
+  strava_athlete_id?: number | null;
+  strava_synced_km?: number;
+  strava_synced_rides?: number;
+  strava_last_activity_at?: string | null;
+  strava_show_activities?: boolean;
+  strava_sport_types?: string[];
+}
+
+/**
+ * Row shape for public.strava_activities. Mirrors the columns we
+ * read from the client; the `raw` jsonb column is not exposed here
+ * because we never need it on the frontend.
+ */
+export interface DbStravaActivity {
+  id: number;
+  user_id: string;
+  athlete_id: number;
+  type: string;
+  sport_type: string | null;
+  name: string | null;
+  distance_m: number;
+  moving_time_s: number;
+  elapsed_time_s: number;
+  total_elevation_gain_m: number | null;
+  average_speed_ms: number | null;
+  max_speed_ms: number | null;
+  average_heartrate: number | null;
+  max_heartrate: number | null;
+  kudos_count: number;
+  start_date: string;
+  timezone: string | null;
+  start_latlng: number[] | null;
+  end_latlng: number[] | null;
+  summary_polyline: string | null;
+  is_manual: boolean;
+  is_private: boolean;
+  is_commute: boolean;
+  is_trainer: boolean;
+  is_counted: boolean;
 }
 
 export interface DbRoute {
