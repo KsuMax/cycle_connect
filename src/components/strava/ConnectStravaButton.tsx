@@ -32,27 +32,27 @@ export function ConnectStravaButton({
   className = "",
 }: Props) {
   return (
-    <form action="/api/strava/connect" method="POST" className={className}>
-      <button
-        type="submit"
-        className="inline-flex items-center gap-2.5 px-5 py-3 rounded-xl text-white font-semibold text-sm transition-colors w-full justify-center sm:w-auto"
+    <div className={className}>
+      <a
+        href="/api/strava/connect"
+        className="inline-flex items-center gap-2.5 px-5 py-3 rounded-xl text-white font-semibold text-sm transition-colors w-full justify-center sm:w-auto no-underline"
         style={{ backgroundColor: "#FC4C02" }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = "#E34302";
+          (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "#E34302";
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = "#FC4C02";
+          (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "#FC4C02";
         }}
       >
         <StravaLogo size={18} />
         Connect with Strava
-      </button>
+      </a>
       {variant === "default" && (
         <p className="text-[11px] text-[#A1A1AA] mt-2 leading-relaxed">
           Подключи Strava — мы автоматически подсчитаем твои километры
           и покажем заезды в профиле. Ты ничего не вводишь руками.
         </p>
       )}
-    </form>
+    </div>
   );
 }
