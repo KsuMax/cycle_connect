@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/lib/context/ToastContext";
 import { Header } from "@/components/layout/Header";
@@ -67,6 +67,14 @@ function dbToRoute(r: DbRoute): Route {
 }
 
 export default function ProfilePage() {
+  return (
+    <Suspense>
+      <ProfilePageInner />
+    </Suspense>
+  );
+}
+
+function ProfilePageInner() {
   const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
   const { favorites } = useFavorites();
