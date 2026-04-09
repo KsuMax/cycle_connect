@@ -35,10 +35,6 @@ create index if not exists strava_connections_athlete_idx
 --    completely blocked. service_role bypasses RLS and retains full access.
 alter table public.strava_connections enable row level security;
 
--- 3. Migrate any existing rows from private schema (safe no-op if empty)
-insert into public.strava_connections
-  select * from private.strava_connections
-  on conflict (user_id) do nothing;
-
--- 4. Drop old private table (data already copied above)
-drop table if exists private.strava_connections;
+-- Note: private.strava_connections was never populated (the private schema
+-- approach was abandoned before any tokens were stored), so no data migration
+-- is needed. The private schema itself is kept for any future use.

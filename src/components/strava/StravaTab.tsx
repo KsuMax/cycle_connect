@@ -52,17 +52,26 @@ export function StravaTab() {
 
     (async () => {
       const [{ data: rows, error: rowsErr }, { data: monthRows, error: monthErr }] =
+        // Filter by the sport types the user has enabled (default: Ride + GravelRide).
+        // This hides HIIT sessions, walks, and other non-cycling activities.
+        const sportTypes: string[] =
+          profile?.strava_sport_types?.length
+            ? profile.strava_sport_types
+            : ["Ride", "GravelRide"];
+
         await Promise.all([
           supabase
             .from("strava_activities")
             .select("*")
             .eq("user_id", user.id)
+            .in("type", sportTypes)
             .order("start_date", { ascending: false })
             .limit(ACTIVITY_LIMIT),
           supabase
             .from("strava_activities")
             .select("distance_m")
             .eq("user_id", user.id)
+            .in("type", sportTypes)
             .eq("is_counted", true)
             .gte(
               "start_date",
