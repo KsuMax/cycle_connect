@@ -32,8 +32,13 @@ const STATE_COOKIE = "strava_oauth_state";
 const BACKFILL_DAYS = 30;
 
 function errorRedirect(code: string): NextResponse {
+  // Log the error code so it appears in Vercel runtime logs.
+  // Never log tokens or personally-identifying data here.
+  console.error(`[strava/callback] error: ${code}`);
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const url = new URL("/profile/settings", appUrl);
+  // Redirect to /profile (not /profile/settings) so the toast handler
+  // in profile/page.tsx can show a user-visible error message.
+  const url = new URL("/profile", appUrl);
   url.searchParams.set("strava_error", code);
   return NextResponse.redirect(url);
 }
