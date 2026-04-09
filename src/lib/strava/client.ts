@@ -54,7 +54,6 @@ export async function getConnectionByUserId(
   const admin = createAdminSupabase();
 
   const { data, error } = await admin
-    .schema("private")
     .from("strava_connections")
     .select(
       "user_id, athlete_id, access_token, refresh_token, expires_at, scope, backfill_status, disconnected_at",
@@ -81,7 +80,6 @@ export async function getConnectionByAthleteId(
   const admin = createAdminSupabase();
 
   const { data, error } = await admin
-    .schema("private")
     .from("strava_connections")
     .select(
       "user_id, athlete_id, access_token, refresh_token, expires_at, scope, backfill_status, disconnected_at",
@@ -120,7 +118,6 @@ export async function ensureFreshAccessToken(
   const admin = createAdminSupabase();
 
   const { error } = await admin
-    .schema("private")
     .from("strava_connections")
     .update({
       access_token: refreshed.access_token,

@@ -111,7 +111,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const expiresAtIso = new Date(tokens.expires_at * 1000).toISOString();
 
   const { error: upsertError } = await admin
-    .schema("private")
     .from("strava_connections")
     .upsert(
       {
@@ -130,6 +129,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     );
 
   if (upsertError) {
+    console.error("[strava/callback] upsertError", {
+      code: upsertError.code,
+      message: upsertError.message,
+      details: upsertError.details,
+      hint: upsertError.hint,
+    });
     return errorRedirect("storage");
   }
 

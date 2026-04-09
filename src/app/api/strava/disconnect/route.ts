@@ -50,7 +50,6 @@ export async function POST(): Promise<NextResponse> {
   //    but disconnected_at != null makes getConnectionByUserId return
   //    null so subsequent API calls will 401 cleanly.
   const { error: updateError } = await admin
-    .schema("private")
     .from("strava_connections")
     .update({
       disconnected_at: new Date().toISOString(),

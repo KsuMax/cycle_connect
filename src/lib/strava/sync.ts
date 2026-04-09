@@ -153,7 +153,6 @@ export async function backfillActivities(
 
   // Mark the connection as running so the UI can show a spinner.
   await admin
-    .schema("private")
     .from("strava_connections")
     .update({ backfill_status: "running", backfill_error: null })
     .eq("user_id", conn.user_id);
@@ -192,7 +191,6 @@ export async function backfillActivities(
     }
 
     await admin
-      .schema("private")
       .from("strava_connections")
       .update({
         backfill_status: "done",
@@ -207,7 +205,6 @@ export async function backfillActivities(
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown";
     await admin
-      .schema("private")
       .from("strava_connections")
       .update({
         backfill_status: "error",
@@ -244,7 +241,6 @@ export async function handleAthleteDeauth(athleteId: number): Promise<void> {
   const admin = createAdminSupabase();
 
   const { data: conn, error: selectError } = await admin
-    .schema("private")
     .from("strava_connections")
     .select("user_id")
     .eq("athlete_id", athleteId)
@@ -259,7 +255,6 @@ export async function handleAthleteDeauth(athleteId: number): Promise<void> {
   }
 
   await admin
-    .schema("private")
     .from("strava_connections")
     .update({ disconnected_at: new Date().toISOString() })
     .eq("athlete_id", athleteId);
