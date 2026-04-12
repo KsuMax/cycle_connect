@@ -5,10 +5,8 @@ import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { ArrowLeft, Eye, EyeOff, Check, X, LogOut, Activity } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Check, X, LogOut } from "lucide-react";
 import Link from "next/link";
-import { ConnectStravaButton } from "@/components/strava/ConnectStravaButton";
-import { StravaLogo } from "@/components/strava/StravaLogo";
 
 function getPasswordStrength(password: string): { score: number; label: string; color: string } {
   if (!password) return { score: 0, label: "", color: "" };
@@ -43,8 +41,6 @@ export default function SettingsPage() {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [website, setWebsite] = useState("");
-  const [stravaUrl, setStravaUrl] = useState("");
-
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -53,13 +49,6 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-
-  // Strava integration state — driven entirely from the profile row.
-  // Local optimistic mirror so the toggle reacts instantly.
-  const [stravaShowActivities, setStravaShowActivities] = useState(true);
-  const [savingStravaToggle, setSavingStravaToggle] = useState(false);
-  const [disconnectingStrava, setDisconnectingStrava] = useState(false);
-  const [stravaError, setStravaError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/auth/login");
@@ -70,50 +59,9 @@ export default function SettingsPage() {
       setName(profile.name ?? "");
       setUsername(profile.username ?? "");
       setWebsite(profile.website ?? "");
-      setStravaUrl(profile.strava_url ?? "");
-      setStravaShowActivities(profile.strava_show_activities ?? true);
     }
     if (user) setEmail(user.email ?? "");
   }, [profile, user]);
-
-  const handleStravaToggle = async (next: boolean) => {
-    if (!user) return;
-    setStravaError(null);
-    setStravaShowActivities(next);
-    setSavingStravaToggle(true);
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .update({ strava_show_activities: next })
-      .eq("id", user.id);
-    if (updateError) {
-      setStravaError(updateError.message);
-      setStravaShowActivities(!next); // revert
-    } else {
-      await refreshProfile();
-    }
-    setSavingStravaToggle(false);
-  };
-
-  const handleStravaDisconnect = async () => {
-    if (!user) return;
-    if (!window.confirm("Отключить Strava? История заездов сохранится — при повторном подключении не пропадёт.")) {
-      return;
-    }
-    setStravaError(null);
-    setDisconnectingStrava(true);
-    try {
-      const res = await fetch("/api/strava/disconnect", { method: "POST" });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(body?.error ?? `HTTP ${res.status}`);
-      }
-      await refreshProfile();
-    } catch (err) {
-      setStravaError(err instanceof Error ? err.message : "disconnect_failed");
-    } finally {
-      setDisconnectingStrava(false);
-    }
-  };
 
   const strength = getPasswordStrength(password);
 
@@ -139,7 +87,6 @@ export default function SettingsPage() {
       name: name.trim(),
       username: username.trim() || null,
       website: website.trim() || null,
-      strava_url: stravaUrl.trim() || null,
     };
     const { error: profileError } = await supabase
       .from("profiles")
@@ -341,84 +288,6 @@ export default function SettingsPage() {
                 className={INPUT_CLS}
               />
             </Field>
-            <Field label="Профиль Strava" htmlFor="strava">
-              <input
-                id="strava"
-                type="url"
-                value={stravaUrl}
-                onChange={(e) => setStravaUrl(e.target.value)}
-                placeholder="https://www.strava.com/athletes/..."
-                className={INPUT_CLS}
-              />
-            </Field>
-          </Section>
-
-          {/* Strava integration */}
-          <Section title="Интеграция Strava">
-            {profile?.strava_connected ? (
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: "#FFF0EB", color: "#FC4C02" }}
-                  >
-                    <StravaLogo size={20} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-[#1C1C1E]">
-                      Strava подключён
-                    </div>
-                    <div className="text-xs text-[#71717A] mt-0.5">
-                      {profile.strava_synced_rides ?? 0} заездов ·{" "}
-                      {Math.round(Number(profile.strava_synced_km ?? 0))} км
-                    </div>
-                  </div>
-                </div>
-
-                {/* Visibility toggle */}
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={stravaShowActivities}
-                    disabled={savingStravaToggle}
-                    onChange={(e) => handleStravaToggle(e.target.checked)}
-                    className="mt-1 w-4 h-4 rounded border-[#E4E4E7] accent-[#FC4C02]"
-                  />
-                  <div>
-                    <div className="text-sm font-medium text-[#1C1C1E]">
-                      Показывать заезды другим участникам
-                    </div>
-                    <div className="text-xs text-[#71717A] mt-0.5">
-                      Если выключить, твои заезды видишь только ты. Приватные
-                      заезды Strava никогда не показываются.
-                    </div>
-                  </div>
-                </label>
-
-                <button
-                  type="button"
-                  onClick={handleStravaDisconnect}
-                  disabled={disconnectingStrava}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-[#E4E4E7] bg-white text-sm font-medium text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors disabled:opacity-60"
-                >
-                  {disconnectingStrava ? "Отключение…" : "Отключить Strava"}
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-xs text-[#71717A]">
-                  <Activity size={14} />
-                  Подключи Strava — километры и заезды появятся в профиле автоматически
-                </div>
-                <ConnectStravaButton variant="compact" />
-              </div>
-            )}
-
-            {stravaError && (
-              <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-xs">
-                {stravaError}
-              </div>
-            )}
           </Section>
 
           {error && (

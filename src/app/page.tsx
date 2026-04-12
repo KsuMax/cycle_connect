@@ -9,7 +9,6 @@ import { Bike, TrendingUp, Calendar, MapPin } from "lucide-react";
 import Link from "next/link";
 import { supabase, type DbRoute, type DbEvent } from "@/lib/supabase";
 import { useAuth } from "@/lib/context/AuthContext";
-import { CommunityPulse } from "@/components/strava/CommunityPulse";
 import type { Route, CycleEvent, RouteType } from "@/types";
 
 function dbToRoute(r: DbRoute): Route {
@@ -189,9 +188,6 @@ export default function FeedPage() {
                 Создать
               </Link>
             </div>
-
-            {/* Pulse — recent Strava activities from the community */}
-            <CommunityPulse />
 
             {/* Popular routes */}
             {routes.length > 0 && (

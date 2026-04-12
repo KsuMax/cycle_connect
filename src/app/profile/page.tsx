@@ -1,16 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useToast } from "@/lib/context/ToastContext";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useFavorites } from "@/lib/context/FavoritesContext";
 import { useRides } from "@/lib/context/RidesContext";
 import { supabase, proxyImageUrl } from "@/lib/supabase";
-import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink, Users, Shield, Trophy, Activity } from "lucide-react";
-import { StravaTab } from "@/components/strava/StravaTab";
+import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink, Users, Shield, Trophy } from "lucide-react";
 import { getUserSticker } from "@/lib/stickers";
 import { useAchievements } from "@/lib/context/AchievementsContext";
 import { AchievementBadge } from "@/components/ui/AchievementBadge";
@@ -22,7 +20,7 @@ import Link from "next/link";
 import type { Route, RouteType } from "@/types";
 import type { DbRoute } from "@/lib/supabase";
 
-type Tab = "routes" | "favorites" | "events" | "strava" | "achievements";
+type Tab = "routes" | "favorites" | "events" | "achievements";
 type EventsSubTab = "rides" | "events_list";
 
 interface ProfileEvent {
@@ -67,14 +65,6 @@ function dbToRoute(r: DbRoute): Route {
 }
 
 export default function ProfilePage() {
-  return (
-    <Suspense>
-      <ProfilePageInner />
-    </Suspense>
-  );
-}
-
-function ProfilePageInner() {
   const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
   const { favorites } = useFavorites();
@@ -87,41 +77,10 @@ function ProfilePageInner() {
     return result;
   }, [earnedMap]);
 
-  const searchParams = useSearchParams();
-  const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState<Tab>("routes");
   const [eventsSubTab, setEventsSubTab] = useState<EventsSubTab>("rides");
 
-  // OAuth callback toasts + auto-tab. Strips the query string after
-  // handling so a refresh doesn't re-fire the toast.
-  useEffect(() => {
-    const success = searchParams?.get("strava");
-    const error = searchParams?.get("strava_error");
-    const tabParam = searchParams?.get("tab");
-
-    if (tabParam === "strava") setActiveTab("strava");
-
-    if (success === "connected") {
-      showToast("Strava подключён — заезды появятся через минуту", "success");
-      setActiveTab("strava");
-    } else if (error) {
-      showToast(stravaErrorMessage(error), "error");
-      setActiveTab("strava");
-    }
-
-    if (success || error || tabParam === "strava") {
-      // Drop the query params from the URL without triggering navigation.
-      const url = new URL(window.location.href);
-      url.searchParams.delete("strava");
-      url.searchParams.delete("strava_error");
-      url.searchParams.delete("tab");
-      window.history.replaceState({}, "", url.toString());
-    }
-  // We deliberately want this to run once on mount, not on every
-  // searchParams identity change (which would re-fire the toast).
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const [myRoutes, setMyRoutes] = useState<Route[]>([]);
   const [loadingRoutes, setLoadingRoutes] = useState(true);
@@ -279,7 +238,6 @@ function ProfilePageInner() {
     { id: "routes",       label: "Мои маршруты", icon: <Map size={15} />,      count: myRoutes.length },
     { id: "favorites",    label: "Избранное",    icon: <Bookmark size={15} />, count: favoriteRoutes.length },
     { id: "events",       label: "Поездки",      icon: <Calendar size={15} />, count: tripsCount },
-    { id: "strava",       label: "Strava",       icon: <Activity size={15} />, count: profile?.strava_synced_rides ?? 0 },
     { id: "achievements", label: "Достижения",   icon: <Trophy size={15} />,   count: earnedIds.size },
   ];
 
@@ -619,12 +577,6 @@ function ProfilePageInner() {
                 />
               )
             )}
-          </section>
-        )}
-
-        {activeTab === "strava" && (
-          <section>
-            <StravaTab />
           </section>
         )}
 
