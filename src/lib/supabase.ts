@@ -180,6 +180,18 @@ export interface DbUserAchievement {
   level_updated_at: string | null;
 }
 
+export interface DbRideIntent {
+  id: string;
+  route_id: string;
+  creator_id: string;
+  planned_date: string;
+  note: string | null;
+  created_at: string;
+  // joined
+  creator?: DbProfile;
+  participants?: { user_id: string; joined_at: string; profile?: DbProfile | null }[];
+}
+
 export interface DbNotification {
   id: string;
   user_id: string;

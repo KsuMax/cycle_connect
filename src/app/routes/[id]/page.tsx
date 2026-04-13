@@ -10,6 +10,7 @@ import { useLikes } from "@/lib/context/LikesContext";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useRides } from "@/lib/context/RidesContext";
 import { useEventRides } from "@/lib/context/EventRidesContext";
+import { useIntents } from "@/lib/context/IntentsContext";
 import { supabase } from "@/lib/supabase";
 import { DifficultyBadge, Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
@@ -17,11 +18,12 @@ import { useRouter } from "next/navigation";
 import { useAuthModal } from "@/components/ui/AuthModal";
 import { useToast } from "@/lib/context/ToastContext";
 import { useAchievements } from "@/lib/context/AchievementsContext";
+import { RideIntentsSection } from "@/components/routes/RideIntentsSection";
 import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { sanitizeHtml } from "@/lib/sanitize";
 import type { Route, RouteType } from "@/types";
-import type { DbRoute } from "@/lib/supabase";
+import type { DbRoute, DbRideIntent } from "@/lib/supabase";
 
 interface RelatedEvent {
   id: string;
@@ -80,6 +82,7 @@ function dbToRoute(r: DbRoute): Route {
 type RideButtonState =
   | { type: "not_ridden" }
   | { type: "upcoming_event"; eventTitle: string; eventDate: string | null; eventId: string }
+  | { type: "has_intent"; intentDate: string; intentId: string }
   | { type: "ridden"; count: number };
 
 export default function RouteDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -92,6 +95,7 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
   const { showToast } = useToast();
   const { checkAndAward } = useAchievements();
   const { getRouteEventStatus } = useEventRides();
+  const { getRouteIntentStatus } = useIntents();
   const router = useRouter();
 
   const [route, setRoute] = useState<Route | null>(null);
@@ -100,6 +104,8 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
   const [likeCount, setLikeCount] = useState(0);
   const [deleting, setDeleting] = useState(false);
   const [relatedEvents, setRelatedEvents] = useState<RelatedEvent[]>([]);
+  const [rideIntents, setRideIntents] = useState<DbRideIntent[]>([]);
+  const [intentsKey, setIntentsKey] = useState(0);
 
   useEffect(() => {
     async function load() {
@@ -132,6 +138,20 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
         if (data) setRelatedEvents(data as RelatedEvent[]);
       });
   }, [id]);
+
+  // Load ride intents for this route
+  useEffect(() => {
+    const today = new Date().toISOString().split("T")[0];
+    supabase
+      .from("ride_intents")
+      .select("*, creator:profiles!creator_id(id, name, avatar_url), participants:ride_intent_participants(user_id, joined_at, profile:profiles!user_id(id, name, avatar_url))")
+      .eq("route_id", id)
+      .gte("planned_date", today)
+      .order("planned_date", { ascending: true })
+      .then(({ data }) => {
+        if (data) setRideIntents(data as unknown as DbRideIntent[]);
+      });
+  }, [id, intentsKey]);
 
   if (loading) {
     return (
@@ -211,6 +231,15 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
       };
     }
 
+    const intentStatus = getRouteIntentStatus(route!.id);
+    if (intentStatus) {
+      return {
+        type: "has_intent",
+        intentDate: intentStatus.plannedDate,
+        intentId: intentStatus.intentId,
+      };
+    }
+
     if (hasRidden(route!.id)) {
       return { type: "ridden", count: rideCount(route!.id) };
     }
@@ -236,6 +265,27 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
               style={{ backgroundColor: "#1C1C1E", color: "white" }}
             >
               {rideState.eventTitle} · {formatDate(rideState.eventDate)}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (rideState.type === "has_intent") {
+      return (
+        <div className="flex-1 relative group/ridebtn">
+          <div
+            className="w-full py-2.5 rounded-xl text-sm font-semibold text-center cursor-default select-none"
+            style={{ backgroundColor: "#F0FDF4", color: "#16A34A" }}
+          >
+            Планирую
+          </div>
+          {rideState.intentDate && (
+            <div
+              className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap opacity-0 group-hover/ridebtn:opacity-100 transition-opacity pointer-events-none z-10"
+              style={{ backgroundColor: "#1C1C1E", color: "white" }}
+            >
+              {formatDate(rideState.intentDate)}
             </div>
           )}
         </div>
@@ -455,6 +505,14 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               </div>
             )}
+
+            {/* Ride intents */}
+            <RideIntentsSection
+              routeId={route.id}
+              routeTitle={route.title}
+              intents={rideIntents}
+              onIntentsChange={() => setIntentsKey(k => k + 1)}
+            />
 
             {/* Create event */}
             <Link href={`/events/new?route=${route.id}`}

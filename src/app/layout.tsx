@@ -8,6 +8,7 @@ import { RidesProvider } from "@/lib/context/RidesContext";
 import { FollowProvider } from "@/lib/context/FollowContext";
 import { ToastProvider } from "@/lib/context/ToastContext";
 import { EventRidesProvider } from "@/lib/context/EventRidesContext";
+import { IntentsProvider } from "@/lib/context/IntentsContext";
 import { AchievementsProvider } from "@/lib/context/AchievementsContext";
 import { NotificationsProvider } from "@/lib/context/NotificationsContext";
 import { BottomNav } from "@/components/layout/BottomNav";
@@ -32,7 +33,7 @@ export default function RootLayout({
             <AuthModalWrapper>
               <AchievementsProvider>
                 <NotificationsProvider>
-                  <LikesProvider><EventLikesProvider><FavoritesProvider><RidesProvider><FollowProvider><EventRidesProvider>{children}<BottomNav /><AchievementModal /></EventRidesProvider></FollowProvider></RidesProvider></FavoritesProvider></EventLikesProvider></LikesProvider>
+                  <LikesProvider><EventLikesProvider><FavoritesProvider><RidesProvider><FollowProvider><EventRidesProvider><IntentsProvider>{children}<BottomNav /><AchievementModal /></IntentsProvider></EventRidesProvider></FollowProvider></RidesProvider></FavoritesProvider></EventLikesProvider></LikesProvider>
                 </NotificationsProvider>
               </AchievementsProvider>
             </AuthModalWrapper>

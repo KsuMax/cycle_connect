@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { useLikes } from "@/lib/context/LikesContext";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useEventRides } from "@/lib/context/EventRidesContext";
+import { useIntents } from "@/lib/context/IntentsContext";
 import { proxyImageUrl } from "@/lib/supabase";
 import type { Route, RouteType } from "@/types";
 
@@ -36,6 +37,7 @@ export function RouteCard({ route, compact = false }: RouteCardProps) {
   const { isLiked, toggleLike } = useLikes();
   const { user } = useAuth();
   const { getRouteEventStatus } = useEventRides();
+  const { getRouteIntentStatus } = useIntents();
   const router = useRouter();
   const [likeCount, setLikeCount] = useState(route.likes);
   const liked = isLiked(route.id);
@@ -104,12 +106,17 @@ export function RouteCard({ route, compact = false }: RouteCardProps) {
           </div>
           <h3 className="font-semibold text-[#1C1C1E] text-base leading-snug mb-2 line-clamp-2 group-hover:text-[#F4632A] transition-colors">
             {route.title}
-            {getRouteEventStatus(route.id) === "upcoming" && (
+            {getRouteEventStatus(route.id) === "upcoming" ? (
               <span className="inline-block ml-1.5 align-middle -translate-y-px text-[11px] font-semibold px-2 py-0.5 rounded-md"
                 style={{ backgroundColor: "#EFF6FF", color: "#2563EB" }}>
                 Скоро катну
               </span>
-            )}
+            ) : getRouteIntentStatus(route.id) ? (
+              <span className="inline-block ml-1.5 align-middle -translate-y-px text-[11px] font-semibold px-2 py-0.5 rounded-md"
+                style={{ backgroundColor: "#F0FDF4", color: "#16A34A" }}>
+                Планирую
+              </span>
+            ) : null}
           </h3>
 
           {/* Stats */}
