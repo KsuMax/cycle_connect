@@ -20,6 +20,8 @@ import { useToast } from "@/lib/context/ToastContext";
 import { useAchievements } from "@/lib/context/AchievementsContext";
 import { sanitizeHtml } from "@/lib/sanitize";
 import type { User, Route, EventDay, RouteType } from "@/types";
+import type { DbEvent, DbEventDay, DbProfile, DbRoute } from "@/lib/supabase";
+import { dbToRoute, dbToUser } from "@/lib/transforms";
 
 interface EventData {
   id: string;
@@ -38,25 +40,10 @@ interface EventData {
   participants: User[];
 }
 
-function dbToUser(p: Record<string, unknown>, color = "#7C5CFC"): User {
-  const name = (p.name as string) ?? "Участник";
-  return {
-    id: p.id as string,
-    name,
-    initials: name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase(),
-    color,
-    avatar_url: (p.avatar_url as string | null) ?? null,
-    km_total: (p.km_total as number) ?? 0,
-    routes_count: (p.routes_count as number) ?? 0,
-    events_count: (p.events_count as number) ?? 0,
-  };
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function dbToEvent(data: any): EventData {
+function dbToEventData(data: DbEvent): EventData {
   const days: EventDay[] = (data.event_days ?? [])
-    .sort((a: any, b: any) => a.day_number - b.day_number)
-    .map((d: any) => ({
+    .sort((a: DbEventDay, b: DbEventDay) => a.day_number - b.day_number)
+    .map((d: DbEventDay) => ({
       day: d.day_number,
       date: d.date ?? "",
       title: d.title ?? `День ${d.day_number}`,
@@ -68,34 +55,10 @@ function dbToEvent(data: any): EventData {
     }));
 
   const participants: User[] = (data.event_participants ?? [])
-    .filter((p: any) => p.profile)
-    .map((p: any) => dbToUser(p.profile, "#0BBFB5"));
+    .filter((p: { profile?: DbProfile | null }) => p.profile)
+    .map((p: { profile?: DbProfile | null }) => dbToUser(p.profile!, "#0BBFB5"));
 
-  let route: Route | null = null;
-  if (data.route) {
-    const r = data.route;
-    route = {
-      id: r.id,
-      title: r.title,
-      description: r.description ?? "",
-      region: r.region ?? "",
-      distance_km: r.distance_km ?? 0,
-      elevation_m: r.elevation_m ?? 0,
-      duration_min: r.duration_min ?? 0,
-      difficulty: r.difficulty ?? "medium",
-      surface: r.surface ?? [],
-      bike_types: r.bike_types ?? [],
-      route_types: (r.route_types ?? []) as RouteType[],
-      tags: r.tags ?? [],
-      author: { id: r.author_id, name: "", initials: "", color: "#F4632A", km_total: 0, routes_count: 0, events_count: 0 },
-      riders_today: r.riders_today ?? 0,
-      likes: r.likes_count ?? 0,
-      mapmagic_url: r.mapmagic_url ?? undefined,
-      mapmagic_embed: r.mapmagic_embed ?? undefined,
-      cover_url: r.cover_url ?? undefined,
-      created_at: r.created_at,
-    };
-  }
+  const route: Route | null = data.route ? dbToRoute(data.route as DbRoute) : null;
 
   return {
     id: data.id,
@@ -155,7 +118,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         .single();
 
       if (!error && data) {
-        const ev = dbToEvent(data);
+        const ev = dbToEventData(data as unknown as DbEvent);
         setEvent(ev);
         setLikeCount(ev.likes_count);
         if (user) setGoing(ev.participants.some((p) => p.id === user.id));
@@ -231,7 +194,15 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     if (error) {
       showToast("Ошибка при добавлении", "error");
     } else {
-      const newParticipant = dbToUser({ id: targetUserId, name: targetName, avatar_url: searchResults.find(r => r.id === targetUserId)?.avatar_url ?? null }, "#0BBFB5");
+      const pName = targetName;
+      const newParticipant: User = {
+        id: targetUserId,
+        name: pName,
+        initials: pName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
+        color: "#0BBFB5",
+        avatar_url: searchResults.find((r) => r.id === targetUserId)?.avatar_url ?? null,
+        km_total: 0, routes_count: 0, events_count: 0,
+      };
       setEvent((prev) => prev ? { ...prev, participants: [...prev.participants, newParticipant] } : prev);
       showToast(`${targetName} добавлен в мероприятие`, "success");
     }

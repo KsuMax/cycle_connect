@@ -8,100 +8,15 @@ import { EventCard } from "@/components/events/EventCard";
 import { Search, SlidersHorizontal, X, Plus, Map, Calendar } from "lucide-react";
 import Link from "next/link";
 import type { Difficulty, RouteType, Route, CycleEvent } from "@/types";
-import { supabase, type DbRoute, type DbEvent } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/context/AuthContext";
 import { ROUTE_TYPES, DIFFICULTIES as BASE_DIFFICULTIES } from "@/constants/routes";
+import { dbToRoute, dbToEvent } from "@/lib/transforms";
 
 const DIFFICULTIES: { value: Difficulty | "all"; label: string }[] = [
   { value: "all", label: "Все" },
   ...BASE_DIFFICULTIES,
 ];
-
-function dbRouteToRoute(r: DbRoute): Route {
-  return {
-    id: r.id,
-    title: r.title,
-    description: r.description,
-    region: r.region,
-    distance_km: r.distance_km,
-    elevation_m: r.elevation_m,
-    duration_min: r.duration_min,
-    difficulty: r.difficulty,
-    surface: r.surface as Route["surface"],
-    bike_types: r.bike_types as Route["bike_types"],
-    route_types: r.route_types as RouteType[],
-    tags: r.tags,
-    author: {
-      id: r.author_id,
-      name: r.author?.name ?? "Участник",
-      initials: (r.author?.name ?? "?").split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
-      color: "#F4632A",
-      avatar_url: r.author?.avatar_url ?? null,
-      km_total: r.author?.km_total ?? 0,
-      routes_count: r.author?.routes_count ?? 0,
-      events_count: r.author?.events_count ?? 0,
-    },
-    riders_today: r.riders_today,
-    likes: r.likes_count,
-    mapmagic_url: r.mapmagic_url ?? undefined,
-    mapmagic_embed: r.mapmagic_embed ?? undefined,
-    cover_url: r.cover_url ?? undefined,
-    images: r.route_images?.map((img) => img.url),
-    created_at: r.created_at,
-  };
-}
-
-function dbToEvent(e: DbEvent): CycleEvent {
-  return {
-    id: e.id,
-    title: e.title,
-    description: e.description,
-    start_date: e.start_date ?? "",
-    end_date: e.end_date ?? "",
-    organizer: {
-      id: e.organizer_id,
-      name: e.organizer?.name ?? "Организатор",
-      initials: (e.organizer?.name ?? "?").split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
-      color: "#7C5CFC",
-      avatar_url: e.organizer?.avatar_url ?? null,
-      km_total: 0, routes_count: 0, events_count: 0,
-    },
-    route: e.route ? dbRouteToRoute(e.route as DbRoute) : {
-      id: "", title: "", description: "", region: "", distance_km: 0,
-      elevation_m: 0, duration_min: 0, difficulty: "medium" as const,
-      surface: [], bike_types: [], route_types: [], tags: [],
-      author: { id: "", name: "", initials: "", color: "", avatar_url: null, km_total: 0, routes_count: 0, events_count: 0 },
-      riders_today: 0, likes: 0, created_at: "",
-    },
-    days: e.event_days?.map((d) => ({
-      day: d.day_number,
-      date: d.date ?? "",
-      title: d.title ?? "",
-      distance_km: d.distance_km ?? 0,
-      start_point: d.start_point ?? "",
-      end_point: d.end_point ?? "",
-      description: d.description ?? "",
-    })) ?? [],
-    participants: e.event_participants?.map((p) => {
-      const name = p.profile?.name ?? "Участник";
-      return {
-        id: p.user_id,
-        name,
-        initials: name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
-        color: "#7C5CFC",
-        avatar_url: p.profile?.avatar_url ?? null,
-        km_total: p.profile?.km_total ?? 0,
-        routes_count: p.profile?.routes_count ?? 0,
-        events_count: p.profile?.events_count ?? 0,
-      };
-    }) ?? [],
-    max_participants: e.max_participants ?? undefined,
-    is_private: e.is_private ?? false,
-    cover_url: e.cover_url ?? null,
-    likes: e.likes_count,
-    created_at: e.created_at,
-  };
-}
 
 function RoutesPageInner() {
   const { user } = useAuth();
@@ -179,7 +94,7 @@ function RoutesPageInner() {
       .select("*, author:profiles!author_id(*), route_images(url)")
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
-        if (!error && data) setRoutes(data.map(dbRouteToRoute));
+        if (!error && data) setRoutes(data.map(dbToRoute));
         setRoutesLoading(false);
       });
   }, []);

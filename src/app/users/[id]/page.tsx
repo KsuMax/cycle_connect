@@ -14,49 +14,16 @@ import { AchievementBadge } from "@/components/ui/AchievementBadge";
 import { ProfileShowcase } from "@/components/ui/ProfileShowcase";
 import { AvatarLightbox } from "@/components/ui/AvatarLightbox";
 import { formatDate } from "@/lib/utils";
-import type { Route, RouteType } from "@/types";
-import type { DbRoute, DbProfile } from "@/lib/supabase";
+import type { Route } from "@/types";
+import type { DbProfile } from "@/lib/supabase";
 import { getUserSticker } from "@/lib/stickers";
+import { dbToRoute } from "@/lib/transforms";
 
 interface ProfileEvent {
   id: string;
   title: string;
   start_date: string | null;
   organizer: { name: string } | null;
-}
-
-function dbToRoute(r: DbRoute): Route {
-  return {
-    id: r.id,
-    title: r.title,
-    description: r.description,
-    region: r.region,
-    distance_km: r.distance_km,
-    elevation_m: r.elevation_m,
-    duration_min: r.duration_min,
-    difficulty: r.difficulty,
-    surface: r.surface as Route["surface"],
-    bike_types: r.bike_types as Route["bike_types"],
-    route_types: r.route_types as RouteType[],
-    tags: r.tags,
-    author: {
-      id: r.author_id,
-      name: r.author?.name ?? "Участник",
-      initials: (r.author?.name ?? "?").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase(),
-      color: "#F4632A",
-      avatar_url: r.author?.avatar_url ?? null,
-      km_total: r.author?.km_total ?? 0,
-      routes_count: r.author?.routes_count ?? 0,
-      events_count: r.author?.events_count ?? 0,
-    },
-    riders_today: r.riders_today,
-    likes: r.likes_count,
-    mapmagic_url: r.mapmagic_url ?? undefined,
-    mapmagic_embed: r.mapmagic_embed ?? undefined,
-    cover_url: r.cover_url ?? undefined,
-    images: r.route_images?.map((img: { url: string }) => img.url),
-    created_at: r.created_at,
-  };
 }
 
 type Tab = "routes" | "events" | "achievements";

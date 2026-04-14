@@ -33,7 +33,23 @@ export default function RootLayout({
             <AuthModalWrapper>
               <AchievementsProvider>
                 <NotificationsProvider>
-                  <LikesProvider><EventLikesProvider><FavoritesProvider><RidesProvider><FollowProvider><EventRidesProvider><IntentsProvider>{children}<BottomNav /><AchievementModal /></IntentsProvider></EventRidesProvider></FollowProvider></RidesProvider></FavoritesProvider></EventLikesProvider></LikesProvider>
+                  <LikesProvider>
+                  <EventLikesProvider>
+                    <FavoritesProvider>
+                      <RidesProvider>
+                        <FollowProvider>
+                          <EventRidesProvider>
+                            <IntentsProvider>
+                              {children}
+                              <BottomNav />
+                              <AchievementModal />
+                            </IntentsProvider>
+                          </EventRidesProvider>
+                        </FollowProvider>
+                      </RidesProvider>
+                    </FavoritesProvider>
+                  </EventLikesProvider>
+                </LikesProvider>
                 </NotificationsProvider>
               </AchievementsProvider>
             </AuthModalWrapper>
