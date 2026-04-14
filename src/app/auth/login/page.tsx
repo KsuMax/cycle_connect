@@ -92,7 +92,13 @@ function LoginForm() {
           </form>
         </div>
 
-        <p className="text-center text-sm text-[#71717A] mt-4">
+        <p className="text-center text-sm text-[#71717A] mt-3">
+          <Link href="/auth/forgot-password" className="hover:underline" style={{ color: "#F4632A" }}>
+            Забыл пароль?
+          </Link>
+        </p>
+
+        <p className="text-center text-sm text-[#71717A] mt-2">
           Нет аккаунта?{" "}
           <Link href="/auth/register" className="font-medium hover:underline" style={{ color: "#F4632A" }}>
             Зарегистрироваться
