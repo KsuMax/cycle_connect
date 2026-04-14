@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { MapPin, Link as LinkIcon, ChevronRight, AlertCircle } from "lucide-react";
@@ -11,21 +11,9 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useToast } from "@/lib/context/ToastContext";
 import { useAchievements } from "@/lib/context/AchievementsContext";
 import { supabase } from "@/lib/supabase";
-import type { RouteType, Difficulty } from "@/types";
+import { ROUTE_TYPES, DIFFICULTIES, SURFACES, BIKE_TYPES } from "@/constants/routes";
+import type { RouteType, Difficulty, Surface, BikeType } from "@/types";
 import Link from "next/link";
-
-const ROUTE_TYPES: { value: RouteType; label: string }[] = [
-  { value: "road",   label: "Шоссе" },
-  { value: "gravel", label: "Гревел" },
-  { value: "mtb",    label: "МТБ" },
-  { value: "urban",  label: "Городской" },
-];
-
-const DIFFICULTIES: { value: Difficulty; label: string; emoji: string }[] = [
-  { value: "easy",   label: "Лёгкий",  emoji: "⭐" },
-  { value: "medium", label: "Средний", emoji: "🔥" },
-  { value: "hard",   label: "Сложный", emoji: "💪" },
-];
 
 export default function NewRoutePage() {
   const router = useRouter();
@@ -37,11 +25,14 @@ export default function NewRoutePage() {
   const [description, setDescription] = useState("");
   const [mapUrl, setMapUrl] = useState("");
   const [region, setRegion] = useState("");
+  const [regions, setRegions] = useState<string[]>([]);
   const [distance, setDistance] = useState("");
   const [elevation, setElevation] = useState("");
   const [duration, setDuration] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [routeTypes, setRouteTypes] = useState<RouteType[]>([]);
+  const [surfaces, setSurfaces] = useState<Surface[]>([]);
+  const [bikeTypes, setBikeTypes] = useState<BikeType[]>([]);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -50,9 +41,31 @@ export default function NewRoutePage() {
   const [error, setError] = useState("");
   const [attempted, setAttempted] = useState(false);
 
+  useEffect(() => {
+    supabase
+      .from("regions")
+      .select("name")
+      .order("name")
+      .then(({ data }) => {
+        if (data) setRegions(data.map((r) => r.name));
+      });
+  }, []);
+
   const toggleType = (type: RouteType) => {
     setRouteTypes((prev) =>
       prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+    );
+  };
+
+  const toggleSurface = (s: Surface) => {
+    setSurfaces((prev) =>
+      prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
+    );
+  };
+
+  const toggleBikeType = (b: BikeType) => {
+    setBikeTypes((prev) =>
+      prev.includes(b) ? prev.filter((x) => x !== b) : [...prev, b]
     );
   };
 
@@ -63,7 +76,6 @@ export default function NewRoutePage() {
 
   const canSubmit = title.trim() && routeTypes.length > 0 && !submitting;
 
-  // Build mapmagic embed URL from regular URL
   const buildEmbedUrl = (url: string) => {
     if (!url) return null;
     try {
@@ -83,20 +95,19 @@ export default function NewRoutePage() {
     setSubmitting(true);
     setError("");
 
-    // 1. Insert route
     const { data: routeData, error: routeError } = await supabase
       .from("routes")
       .insert({
         author_id: user.id,
         title: title.trim(),
         description: description.trim(),
-        region: region.trim(),
+        region: region || null,
         distance_km: parseFloat(distance) || 0,
         elevation_m: parseInt(elevation) || 0,
         duration_min: parseInt(duration) || 0,
         difficulty,
-        surface: [],
-        bike_types: [],
+        surface: surfaces,
+        bike_types: bikeTypes,
         route_types: routeTypes,
         tags: [],
         mapmagic_url: mapUrl || null,
@@ -113,7 +124,6 @@ export default function NewRoutePage() {
       return;
     }
 
-    // 2. Upload cover image
     if (coverFile) {
       const ext = coverFile.name.split(".").pop();
       const path = `${routeData.id}/cover.${ext}`;
@@ -126,7 +136,6 @@ export default function NewRoutePage() {
       }
     }
 
-    // 3. Upload images to Supabase Storage
     for (const file of imageFiles) {
       const ext = file.name.split(".").pop();
       const path = `${routeData.id}/${Date.now()}.${ext}`;
@@ -147,7 +156,6 @@ export default function NewRoutePage() {
       }
     }
 
-    // 4. Update author's routes_count
     await supabase
       .from("profiles")
       .update({ routes_count: (profile?.routes_count ?? 0) + 1 })
@@ -239,6 +247,40 @@ export default function NewRoutePage() {
             </div>
           </div>
 
+          {/* Surface */}
+          <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+            <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">Покрытие</label>
+            <p className="text-xs text-[#71717A] mb-3">Можно выбрать несколько</p>
+            <div className="flex flex-wrap gap-2">
+              {SURFACES.map(({ value, label }) => (
+                <button type="button" key={value} onClick={() => toggleSurface(value)}
+                  className="px-4 py-2 rounded-xl text-sm font-medium transition-colors border"
+                  style={surfaces.includes(value)
+                    ? { backgroundColor: "#1C1C1E", color: "white", borderColor: "#1C1C1E" }
+                    : { backgroundColor: "white", color: "#71717A", borderColor: "#E4E4E7" }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Bike types */}
+          <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+            <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">Тип велосипеда</label>
+            <p className="text-xs text-[#71717A] mb-3">Для каких велосипедов подходит маршрут</p>
+            <div className="flex flex-wrap gap-2">
+              {BIKE_TYPES.map(({ value, label }) => (
+                <button type="button" key={value} onClick={() => toggleBikeType(value)}
+                  className="px-4 py-2 rounded-xl text-sm font-medium transition-colors border"
+                  style={bikeTypes.includes(value)
+                    ? { backgroundColor: "#1C1C1E", color: "white", borderColor: "#1C1C1E" }
+                    : { backgroundColor: "white", color: "#71717A", borderColor: "#E4E4E7" }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Map URL */}
           <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
             <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">
@@ -254,10 +296,20 @@ export default function NewRoutePage() {
           <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
             <label className="block text-sm font-semibold text-[#1C1C1E] mb-3">Детали</label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
+              <div className="sm:col-span-2">
                 <label className="text-xs text-[#71717A] mb-1 block flex items-center gap-1"><MapPin size={11} /> Регион</label>
-                <input type="text" placeholder="Карелия" value={region} onChange={(e) => setRegion(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors" />
+                <select value={region} onChange={(e) => setRegion(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-[#E4E4E7] bg-white text-sm outline-none focus:border-[#F4632A] transition-colors appearance-none cursor-pointer"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23A1A1AA' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "right 12px center",
+                  }}>
+                  <option value="">Не указан</option>
+                  {regions.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="text-xs text-[#71717A] mb-1 block">Дистанция, км</label>

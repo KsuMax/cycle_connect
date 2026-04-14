@@ -10,22 +10,12 @@ import Link from "next/link";
 import type { Difficulty, RouteType, Route, CycleEvent } from "@/types";
 import { supabase, type DbRoute, type DbEvent } from "@/lib/supabase";
 import { useAuth } from "@/lib/context/AuthContext";
+import { ROUTE_TYPES, DIFFICULTIES as BASE_DIFFICULTIES } from "@/constants/routes";
 
 const DIFFICULTIES: { value: Difficulty | "all"; label: string }[] = [
   { value: "all", label: "Все" },
-  { value: "easy", label: "Лёгкий" },
-  { value: "medium", label: "Средний" },
-  { value: "hard", label: "Сложный" },
+  ...BASE_DIFFICULTIES,
 ];
-
-const ROUTE_TYPES: { value: RouteType; label: string }[] = [
-  { value: "road",   label: "Шоссе" },
-  { value: "gravel", label: "Гревел" },
-  { value: "mtb",    label: "МТБ" },
-  { value: "urban",  label: "Городской" },
-];
-
-const REGIONS = ["Все регионы", "Карелия", "Санкт-Петербург", "Ленинградская область"];
 
 function dbRouteToRoute(r: DbRoute): Route {
   return {
@@ -131,7 +121,8 @@ function RoutesPageInner() {
   const [difficulty, setDifficulty] = useState<Difficulty | "all">("all");
   const [selectedTypes, setSelectedTypes] = useState<RouteType[]>([]);
   const [maxDistance, setMaxDistance] = useState(300);
-  const [region, setRegion] = useState("Все регионы");
+  const [region, setRegion] = useState("");
+  const [regions, setRegions] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<"newest" | "oldest">("newest");
   const [routes, setRoutes] = useState<Route[]>([]);
@@ -149,6 +140,17 @@ function RoutesPageInner() {
   const [eventMaxDistance, setEventMaxDistance] = useState(500);
   const [eventOnlyWithSpots, setEventOnlyWithSpots] = useState(false);
   const [showEventFilters, setShowEventFilters] = useState(false);
+
+  // ── Load regions ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    supabase
+      .from("regions")
+      .select("name")
+      .order("name")
+      .then(({ data }) => {
+        if (data) setRegions(data.map((r) => r.name));
+      });
+  }, []);
 
   // ── Load routes ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -186,7 +188,7 @@ function RoutesPageInner() {
     if (difficulty !== "all" && route.difficulty !== difficulty) return false;
     if (selectedTypes.length > 0 && !selectedTypes.some((t) => route.route_types.includes(t))) return false;
     if (route.distance_km > maxDistance) return false;
-    if (region !== "Все регионы" && route.region !== region) return false;
+    if (region && route.region !== region) return false;
     return true;
   }).sort((a, b) =>
     sortBy === "oldest"
@@ -194,13 +196,13 @@ function RoutesPageInner() {
       : new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 
-  const hasActiveRouteFilters = difficulty !== "all" || maxDistance < 300 || region !== "Все регионы" || selectedTypes.length > 0;
+  const hasActiveRouteFilters = difficulty !== "all" || maxDistance < 300 || region !== "" || selectedTypes.length > 0;
 
   const resetRouteFilters = () => {
     setDifficulty("all");
     setSelectedTypes([]);
     setMaxDistance(300);
-    setRegion("Все регионы");
+    setRegion("");
   };
 
   // ── Events filtering / sorting ────────────────────────────────────────────
@@ -364,7 +366,14 @@ function RoutesPageInner() {
                 <div className="mb-5">
                   <label className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-2 block">Регион</label>
                   <div className="flex flex-col gap-2">
-                    {REGIONS.map((r) => (
+                    <button onClick={() => setRegion("")}
+                      className="text-left px-3 py-2 rounded-lg text-sm transition-colors"
+                      style={region === ""
+                        ? { backgroundColor: "#FFF0EB", color: "#F4632A", fontWeight: 500 }
+                        : { color: "#71717A" }}>
+                      Все регионы
+                    </button>
+                    {regions.map((r) => (
                       <button key={r} onClick={() => setRegion(r)}
                         className="text-left px-3 py-2 rounded-lg text-sm transition-colors"
                         style={region === r
