@@ -30,7 +30,15 @@ import type { StravaWebhookEvent } from "@/lib/strava/types";
 
 export const dynamic = "force-dynamic";
 
+// TODO: Strava integration is temporarily disabled.
+//       Set to true and configure env vars to re-enable.
+const STRAVA_ENABLED = false;
+
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  if (!STRAVA_ENABLED) {
+    return NextResponse.json({ error: "strava_disabled" }, { status: 503 });
+  }
+
   const env = getStravaEnv();
   const params = request.nextUrl.searchParams;
 
@@ -54,6 +62,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  if (!STRAVA_ENABLED) {
+    return NextResponse.json({ error: "strava_disabled" }, { status: 503 });
+  }
+
   let event: StravaWebhookEvent;
   try {
     event = (await request.json()) as StravaWebhookEvent;

@@ -24,7 +24,15 @@ import { getConnectionByUserId } from "@/lib/strava/client";
 
 export const dynamic = "force-dynamic";
 
+// TODO: Strava integration is temporarily disabled.
+//       Set to true and configure env vars to re-enable.
+const STRAVA_ENABLED = false;
+
 export async function POST(): Promise<NextResponse> {
+  if (!STRAVA_ENABLED) {
+    return NextResponse.json({ error: "strava_disabled" }, { status: 503 });
+  }
+
   const supabase = await createServerSupabase();
   const {
     data: { user },

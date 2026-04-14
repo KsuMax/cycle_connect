@@ -28,6 +28,10 @@ import { exchangeCodeForTokens } from "@/lib/strava/oauth";
 
 export const dynamic = "force-dynamic";
 
+// TODO: Strava integration is temporarily disabled.
+//       Set to true and configure env vars to re-enable.
+const STRAVA_ENABLED = false;
+
 const STATE_COOKIE = "strava_oauth_state";
 const BACKFILL_DAYS = 30;
 
@@ -51,6 +55,12 @@ function successRedirect(): NextResponse {
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  if (!STRAVA_ENABLED) {
+    return NextResponse.redirect(
+      new URL("/profile", process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
+    );
+  }
+
   const searchParams = request.nextUrl.searchParams;
 
   // 0. Short-circuit on "user declined" — Strava redirects with ?error=

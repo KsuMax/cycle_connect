@@ -49,6 +49,10 @@ import {
 
 export const dynamic = "force-dynamic";
 
+// TODO: Strava integration is temporarily disabled.
+//       Set to true and configure env vars to re-enable.
+const STRAVA_ENABLED = false;
+
 const BATCH_SIZE = 20;
 const MAX_RETRIES = 5;
 
@@ -227,9 +231,11 @@ async function bumpRetry(
 // operator can manually drain the queue with curl during incident
 // response — still gated by CRON_SECRET.
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  if (!STRAVA_ENABLED) return NextResponse.json({ ok: true, skipped: "strava_disabled" });
   return handler(request);
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  if (!STRAVA_ENABLED) return NextResponse.json({ ok: true, skipped: "strava_disabled" });
   return handler(request);
 }

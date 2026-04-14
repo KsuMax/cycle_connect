@@ -21,10 +21,18 @@ import { buildAuthorizeUrl } from "@/lib/strava/oauth";
 
 export const dynamic = "force-dynamic";
 
+// TODO: Strava integration is temporarily disabled.
+//       Set to true and configure env vars (STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET, etc.) to re-enable.
+const STRAVA_ENABLED = false;
+
 const STATE_COOKIE = "strava_oauth_state";
 const STATE_COOKIE_MAX_AGE = 60 * 10; // 10 minutes
 
 async function startOAuth(): Promise<NextResponse> {
+  if (!STRAVA_ENABLED) {
+    return NextResponse.json({ error: "strava_disabled" }, { status: 503 });
+  }
+
   const supabase = await createServerSupabase();
   const {
     data: { user },
