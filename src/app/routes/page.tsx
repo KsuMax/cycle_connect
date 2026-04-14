@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { RouteCard } from "@/components/routes/RouteCard";
@@ -123,6 +123,9 @@ function RoutesPageInner() {
   const [maxDistance, setMaxDistance] = useState(300);
   const [region, setRegion] = useState("");
   const [regions, setRegions] = useState<string[]>([]);
+  const [regionSearch, setRegionSearch] = useState("");
+  const [regionOpen, setRegionOpen] = useState(false);
+  const regionRef = useRef<HTMLDivElement>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<"newest" | "oldest">("newest");
   const [routes, setRoutes] = useState<Route[]>([]);
@@ -142,14 +145,31 @@ function RoutesPageInner() {
   const [showEventFilters, setShowEventFilters] = useState(false);
 
   // ── Load regions ──────────────────────────────────────────────────────────
+  const PRIORITY_REGIONS = ["Санкт-Петербург", "Ленинградская область", "Карелия"];
+
   useEffect(() => {
     supabase
       .from("regions")
       .select("name")
       .order("name")
       .then(({ data }) => {
-        if (data) setRegions(data.map((r) => r.name));
+        if (!data) return;
+        const names = data.map((r) => r.name);
+        const priority = PRIORITY_REGIONS.filter((r) => names.includes(r));
+        const rest = names.filter((r) => !PRIORITY_REGIONS.includes(r));
+        setRegions([...priority, ...rest]);
       });
+  }, []);
+
+  // ── Close region combobox on outside click ────────────────────────────────
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (regionRef.current && !regionRef.current.contains(e.target as Node)) {
+        setRegionOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
   // ── Load routes ───────────────────────────────────────────────────────────
@@ -365,23 +385,47 @@ function RoutesPageInner() {
 
                 <div className="mb-5">
                   <label className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-2 block">Регион</label>
-                  <div className="flex flex-col gap-2">
-                    <button onClick={() => setRegion("")}
-                      className="text-left px-3 py-2 rounded-lg text-sm transition-colors"
-                      style={region === ""
-                        ? { backgroundColor: "#FFF0EB", color: "#F4632A", fontWeight: 500 }
-                        : { color: "#71717A" }}>
-                      Все регионы
-                    </button>
-                    {regions.map((r) => (
-                      <button key={r} onClick={() => setRegion(r)}
-                        className="text-left px-3 py-2 rounded-lg text-sm transition-colors"
-                        style={region === r
-                          ? { backgroundColor: "#FFF0EB", color: "#F4632A", fontWeight: 500 }
-                          : { color: "#71717A" }}>
-                        {r}
-                      </button>
-                    ))}
+                  <div className="relative" ref={regionRef}>
+                    <input
+                      type="text"
+                      placeholder={region || "Все регионы"}
+                      value={regionOpen ? regionSearch : (region || "")}
+                      onFocus={() => { setRegionOpen(true); setRegionSearch(""); }}
+                      onChange={(e) => setRegionSearch(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border text-sm outline-none transition-colors"
+                      style={{
+                        borderColor: region ? "#F4632A" : "#E4E4E7",
+                        color: region && !regionOpen ? "#F4632A" : "#1C1C1E",
+                        fontWeight: region && !regionOpen ? 500 : 400,
+                      }}
+                    />
+                    {regionOpen && (
+                      <div className="absolute z-10 top-full mt-1 w-full bg-white border border-[#E4E4E7] rounded-xl shadow-lg overflow-hidden">
+                        <button
+                          type="button"
+                          onMouseDown={() => { setRegion(""); setRegionOpen(false); setRegionSearch(""); }}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-[#F5F4F1] transition-colors"
+                          style={region === "" ? { color: "#F4632A", fontWeight: 500 } : { color: "#71717A" }}>
+                          Все регионы
+                        </button>
+                        {regions
+                          .filter((r) => r.toLowerCase().includes(regionSearch.toLowerCase()))
+                          .map((r) => (
+                            <button
+                              key={r}
+                              type="button"
+                              onMouseDown={() => { setRegion(r); setRegionOpen(false); setRegionSearch(""); }}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-[#F5F4F1] transition-colors"
+                              style={region === r ? { color: "#F4632A", fontWeight: 500 } : { color: "#1C1C1E" }}>
+                              {r}
+                            </button>
+                          ))
+                        }
+                        {regions.filter((r) => r.toLowerCase().includes(regionSearch.toLowerCase())).length === 0 && (
+                          <p className="px-3 py-2 text-sm text-[#A1A1AA]">Ничего не найдено</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
