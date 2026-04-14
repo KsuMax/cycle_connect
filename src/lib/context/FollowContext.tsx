@@ -16,6 +16,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/context/AuthContext";
+import { useToast } from "@/lib/context/ToastContext";
 
 interface FollowContextValue {
   followedIds: Set<string>;
@@ -35,6 +36,7 @@ const FollowContext = createContext<FollowContextValue>({
 
 export function FollowProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
   const [loaded, setLoaded] = useState(false);
 
@@ -48,23 +50,43 @@ export function FollowProvider({ children }: { children: React.ReactNode }) {
       .from("user_follows")
       .select("following_id")
       .eq("follower_id", user.id)
-      .then(({ data }) => {
-        if (data) setFollowedIds(new Set(data.map((r: { following_id: string }) => r.following_id)));
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("[FollowContext] failed to load follows", error.message);
+        } else if (data) {
+          setFollowedIds(new Set(data.map((r: { following_id: string }) => r.following_id)));
+        }
         setLoaded(true);
       });
   }, [user]);
 
   const follow = useCallback(async (userId: string) => {
     if (!user) return;
+    // Optimistic update
     setFollowedIds((prev) => new Set([...prev, userId]));
-    await supabase.from("user_follows").insert({ follower_id: user.id, following_id: userId });
-  }, [user]);
+    const { error } = await supabase
+      .from("user_follows")
+      .insert({ follower_id: user.id, following_id: userId });
+    if (error) {
+      setFollowedIds((prev) => { const next = new Set(prev); next.delete(userId); return next; });
+      showToast("Не удалось подписаться — попробуй ещё раз", "error");
+    }
+  }, [user, showToast]);
 
   const unfollow = useCallback(async (userId: string) => {
     if (!user) return;
+    // Optimistic update
     setFollowedIds((prev) => { const next = new Set(prev); next.delete(userId); return next; });
-    await supabase.from("user_follows").delete().eq("follower_id", user.id).eq("following_id", userId);
-  }, [user]);
+    const { error } = await supabase
+      .from("user_follows")
+      .delete()
+      .eq("follower_id", user.id)
+      .eq("following_id", userId);
+    if (error) {
+      setFollowedIds((prev) => new Set([...prev, userId]));
+      showToast("Не удалось отписаться — попробуй ещё раз", "error");
+    }
+  }, [user, showToast]);
 
   const isFollowing = useCallback((userId: string) => followedIds.has(userId), [followedIds]);
 

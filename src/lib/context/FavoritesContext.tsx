@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "./AuthContext";
+import { useToast } from "./ToastContext";
 
 const STORAGE_KEY = "cc_favorites";
 
@@ -16,6 +17,7 @@ const FavoritesContext = createContext<FavoritesContextValue | null>(null);
 
 export function FavoritesProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -24,7 +26,11 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
         .from("route_favorites")
         .select("route_id")
         .eq("user_id", user.id)
-        .then(({ data }) => {
+        .then(({ data, error }) => {
+          if (error) {
+            console.error("[FavoritesContext] failed to load favorites", error.message);
+            return;
+          }
           if (data) setFavorites(new Set(data.map((r: { route_id: string }) => r.route_id)));
         });
     } else {
@@ -39,20 +45,26 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
 
   const toggleFavorite = useCallback(async (routeId: string) => {
     const wasFavorite = favorites.has(routeId);
+
+    // Optimistic update
     const next = new Set(favorites);
     wasFavorite ? next.delete(routeId) : next.add(routeId);
     setFavorites(next);
 
     if (user) {
-      if (wasFavorite) {
-        await supabase.from("route_favorites").delete().eq("user_id", user.id).eq("route_id", routeId);
-      } else {
-        await supabase.from("route_favorites").insert({ user_id: user.id, route_id: routeId });
+      const { error } = wasFavorite
+        ? await supabase.from("route_favorites").delete().eq("user_id", user.id).eq("route_id", routeId)
+        : await supabase.from("route_favorites").insert({ user_id: user.id, route_id: routeId });
+
+      if (error) {
+        // Rollback optimistic update
+        setFavorites(favorites);
+        showToast("Не удалось обновить избранное — попробуй ещё раз", "error");
       }
     } else {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(next)));
     }
-  }, [user, favorites]);
+  }, [user, favorites, showToast]);
 
   const isFavorite = useCallback((routeId: string) => favorites.has(routeId), [favorites]);
 

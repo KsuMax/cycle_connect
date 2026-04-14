@@ -27,14 +27,18 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       setLoaded(true);
       return;
     }
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("notifications")
       .select("*, actor:profiles!actor_id(id, name, avatar_url)")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(50);
 
-    if (data) setNotifications(data as unknown as DbNotification[]);
+    if (error) {
+      console.error("[NotificationsContext] failed to load notifications", error.message);
+    } else if (data) {
+      setNotifications(data as unknown as DbNotification[]);
+    }
     setLoaded(true);
   }, [user]);
 
@@ -42,7 +46,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     loadNotifications();
   }, [loadNotifications]);
 
-  // Subscribe to realtime notifications
+  // Subscribe to realtime notifications — append single row instead of refetching all 50
   useEffect(() => {
     if (!user) return;
 
@@ -56,9 +60,16 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           table: "notifications",
           filter: `user_id=eq.${user.id}`,
         },
-        () => {
-          // Reload on new notification
-          loadNotifications();
+        async (payload) => {
+          const newId = (payload.new as { id: string }).id;
+          const { data, error } = await supabase
+            .from("notifications")
+            .select("*, actor:profiles!actor_id(id, name, avatar_url)")
+            .eq("id", newId)
+            .single();
+          if (!error && data) {
+            setNotifications((prev) => [data as unknown as DbNotification, ...prev]);
+          }
         },
       )
       .subscribe();
@@ -66,7 +77,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, loadNotifications]);
+  }, [user]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 

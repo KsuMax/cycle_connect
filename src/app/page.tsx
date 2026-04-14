@@ -109,13 +109,19 @@ export default function FeedPage() {
       .select("*, author:profiles!author_id(*), route_images(url)")
       .order("likes_count", { ascending: false })
       .limit(4)
-      .then(({ data }) => { if (data) setRoutes(data.map(dbToRoute)); });
+      .then(({ data, error }) => {
+        if (error) { console.error("[FeedPage] routes fetch failed", error.message); return; }
+        if (data) setRoutes(data.map(dbToRoute));
+      });
 
     supabase.from("events")
       .select("*, organizer:profiles!organizer_id(*), route:routes(*), event_days(*), event_participants(user_id, profile:profiles!user_id(*))")
       .order("created_at", { ascending: false })
       .limit(2)
-      .then(({ data }) => { if (data) setEvents(data.map(dbToEvent)); });
+      .then(({ data, error }) => {
+        if (error) { console.error("[FeedPage] events fetch failed", error.message); return; }
+        if (data) setEvents(data.map(dbToEvent));
+      });
   }, []);
 
   return (
