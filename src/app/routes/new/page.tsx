@@ -6,13 +6,15 @@ import { Header } from "@/components/layout/Header";
 import { MapPin, Link as LinkIcon, ChevronRight, AlertCircle } from "lucide-react";
 import { ImageUpload } from "@/components/routes/ImageUpload";
 import { CoverUpload } from "@/components/routes/CoverUpload";
+import { GpxUpload } from "@/components/routes/GpxUpload";
+import { ExitPointsEditor, type ExitPointDraft } from "@/components/routes/ExitPointsEditor";
 import { DayEditor } from "@/components/events/DayEditor";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useToast } from "@/lib/context/ToastContext";
 import { useAchievements } from "@/lib/context/AchievementsContext";
 import { supabase } from "@/lib/supabase";
 import { ROUTE_TYPES, DIFFICULTIES, SURFACES, BIKE_TYPES } from "@/constants/routes";
-import type { RouteType, Difficulty, Surface, BikeType } from "@/types";
+import type { RouteType, Difficulty, Surface, BikeType, ExitPointsStatus } from "@/types";
 import Link from "next/link";
 
 export default function NewRoutePage() {
@@ -37,6 +39,9 @@ export default function NewRoutePage() {
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [gpxFile, setGpxFile] = useState<File | null>(null);
+  const [exitStatus, setExitStatus] = useState<ExitPointsStatus>("unknown");
+  const [exitPoints, setExitPoints] = useState<ExitPointDraft[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [attempted, setAttempted] = useState(false);
@@ -112,6 +117,7 @@ export default function NewRoutePage() {
         tags: [],
         mapmagic_url: mapUrl || null,
         mapmagic_embed: buildEmbedUrl(mapUrl),
+        exit_points_status: exitStatus,
         likes_count: 0,
         riders_today: 0,
       })
@@ -153,6 +159,34 @@ export default function NewRoutePage() {
           url: publicUrl,
           storage_path: path,
         });
+      }
+    }
+
+    // GPX upload (optional)
+    if (gpxFile) {
+      const path = `${routeData.id}/route.gpx`;
+      const { error: gpxError } = await supabase.storage
+        .from("route-gpx")
+        .upload(path, gpxFile, { upsert: true, contentType: "application/gpx+xml" });
+      if (!gpxError) {
+        await supabase.from("routes").update({ gpx_path: path }).eq("id", routeData.id);
+      }
+    }
+
+    // Exit points (optional)
+    if (exitStatus === "has" && exitPoints.length > 0) {
+      const rows = exitPoints
+        .filter((p) => p.title.trim().length > 0)
+        .map((p, idx) => ({
+          route_id: routeData.id,
+          order_idx: idx,
+          title: p.title.trim(),
+          kind: p.kind,
+          distance_km_from_start: p.distance_km_from_start === "" ? null : Number(p.distance_km_from_start),
+          note: p.note.trim() || null,
+        }));
+      if (rows.length > 0) {
+        await supabase.from("route_exit_points").insert(rows);
       }
     }
 
@@ -290,6 +324,25 @@ export default function NewRoutePage() {
             <input type="url" placeholder="https://mapmagic.app/map?routes=..."
               value={mapUrl} onChange={(e) => setMapUrl(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors font-mono" />
+          </div>
+
+          {/* GPX file */}
+          <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+            <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">GPX-файл</label>
+            <p className="text-xs text-[#71717A] mb-3">Экспортируй из MapMagic и загрузи — пользователи смогут скачать его одной кнопкой</p>
+            <GpxUpload currentName={gpxFile?.name ?? null} onChange={setGpxFile} />
+          </div>
+
+          {/* Exit points */}
+          <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+            <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">Точки схода с маршрута</label>
+            <p className="text-xs text-[#71717A] mb-3">Где можно сойти при поломке, плохой погоде или усталости</p>
+            <ExitPointsEditor
+              status={exitStatus}
+              onStatusChange={setExitStatus}
+              points={exitPoints}
+              onPointsChange={setExitPoints}
+            />
           </div>
 
           {/* Details */}

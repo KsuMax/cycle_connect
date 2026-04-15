@@ -19,7 +19,8 @@ import { useAuthModal } from "@/components/ui/AuthModal";
 import { useToast } from "@/lib/context/ToastContext";
 import { useAchievements } from "@/lib/context/AchievementsContext";
 import { RideIntentsSection } from "@/components/routes/RideIntentsSection";
-import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users } from "lucide-react";
+import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users, Download, Train, Bus, CarTaxiFront, Route as RouteIcon } from "lucide-react";
+import type { ExitPointKind } from "@/types";
 import { formatDate } from "@/lib/utils";
 import { sanitizeHtml } from "@/lib/sanitize";
 import type { Route, RouteType } from "@/types";
@@ -52,6 +53,71 @@ type RideButtonState =
   | { type: "has_intent"; intentDate: string; intentId: string }
   | { type: "ridden"; count: number };
 
+const EXIT_KIND_META: Record<ExitPointKind, { label: string; icon: React.ReactNode }> = {
+  train: { label: "Электричка", icon: <Train size={14} /> },
+  bus:   { label: "Автобус",     icon: <Bus size={14} /> },
+  taxi:  { label: "Такси",       icon: <CarTaxiFront size={14} /> },
+  road:  { label: "Трасса",      icon: <RouteIcon size={14} /> },
+  other: { label: "Другое",      icon: <MapPin size={14} /> },
+};
+
+function GpxFreshnessBadge({ updatedAt, routeCreatedAt }: { updatedAt: string | null | undefined; routeCreatedAt: string }) {
+  if (!updatedAt) return null;
+  const updatedMs = new Date(updatedAt).getTime();
+  const createdMs = new Date(routeCreatedAt).getTime();
+  // Treat as "fresh" if GPX was uploaded within 10 minutes of route creation
+  if (Math.abs(updatedMs - createdMs) < 10 * 60 * 1000) {
+    return <span className="text-[11px] text-[#71717A]">Загружен вместе с маршрутом</span>;
+  }
+  const days = Math.floor((Date.now() - updatedMs) / (1000 * 60 * 60 * 24));
+  const label = days === 0 ? "сегодня" : days === 1 ? "вчера" : `${days} дн. назад`;
+  return <span className="text-[11px] text-[#71717A]">Обновлён {label}</span>;
+}
+
+function ExitPointsSection({ status, points }: { status: import("@/types").ExitPointsStatus; points: import("@/types").ExitPoint[] }) {
+  if (status === "unknown") return null;
+  if (status === "none") {
+    return (
+      <div className="bg-white rounded-2xl p-4 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+        <div className="flex items-center gap-2 text-sm text-[#71717A]">
+          <MapPin size={14} /> Точек схода нет — маршрут автономный
+        </div>
+      </div>
+    );
+  }
+  if (points.length === 0) return null;
+  return (
+    <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+      <h2 className="font-semibold text-[#1C1C1E] mb-3 flex items-center gap-2">
+        <MapPin size={16} /> Точки схода
+      </h2>
+      <ul className="space-y-2">
+        {points.map((p) => {
+          const meta = EXIT_KIND_META[p.kind];
+          return (
+            <li key={p.id} className="flex items-start gap-3 p-3 rounded-xl border border-[#E4E4E7] bg-[#FAFAFA]">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                style={{ backgroundColor: "#F5F4F1", color: "#1C1C1E" }}>
+                {meta.icon}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-medium text-[#1C1C1E]">{p.title}</span>
+                  <span className="text-[11px] text-[#71717A]">{meta.label}</span>
+                  {p.distance_km_from_start != null && (
+                    <span className="text-[11px] text-[#71717A]">· {p.distance_km_from_start} км от старта</span>
+                  )}
+                </div>
+                {p.note && <div className="text-xs text-[#71717A] mt-0.5">{p.note}</div>}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 export default function RouteDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { user } = useAuth();
@@ -78,7 +144,7 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
     async function load() {
       const { data, error } = await supabase
         .from("routes")
-        .select("*, author:profiles!author_id(*), route_images(url)")
+        .select("*, author:profiles!author_id(*), route_images(url), route_exit_points(*)")
         .eq("id", id)
         .single();
 
@@ -321,16 +387,31 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
                   </div>
                 </div>
               )}
-              {route.mapmagic_url && (
-                <div className="p-3 border-t border-[#F5F4F1]">
-                  <a href={route.mapmagic_url} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs font-medium hover:underline"
-                    style={{ color: "#F4632A" }}>
-                    <ExternalLink size={13} /> Открыть полный маршрут
-                  </a>
+              {(route.mapmagic_url || route.gpx_url) && (
+                <div className="p-3 border-t border-[#F5F4F1] flex flex-wrap gap-4 items-center">
+                  {route.mapmagic_url && (
+                    <a href={route.mapmagic_url} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-medium hover:underline"
+                      style={{ color: "#F4632A" }}>
+                      <ExternalLink size={13} /> Открыть в MapMagic
+                    </a>
+                  )}
+                  {route.gpx_url && (
+                    <>
+                      <a href={route.gpx_url} download
+                        className="inline-flex items-center gap-1.5 text-xs font-medium hover:underline"
+                        style={{ color: "#0BBFB5" }}>
+                        <Download size={13} /> Скачать GPX
+                      </a>
+                      <GpxFreshnessBadge updatedAt={route.gpx_updated_at} routeCreatedAt={route.created_at} />
+                    </>
+                  )}
                 </div>
               )}
             </div>
+
+            {/* Exit points */}
+            <ExitPointsSection status={route.exit_points_status} points={route.exit_points ?? []} />
 
             {/* Gallery */}
             {route.images && route.images.length > 0 && <RouteGallery images={route.images} />}

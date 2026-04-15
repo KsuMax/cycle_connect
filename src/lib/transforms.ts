@@ -6,7 +6,15 @@
  */
 
 import type { DbProfile, DbRoute, DbEvent } from "@/lib/supabase";
-import type { Route, CycleEvent, User, RouteType } from "@/types";
+import type { Route, CycleEvent, User, RouteType, ExitPoint } from "@/types";
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+
+/** Turn a stored `gpx_path` (e.g. "<route_id>/route.gpx") into a public URL. */
+export function gpxPathToUrl(path: string | null | undefined): string | null {
+  if (!path || !SUPABASE_URL) return null;
+  return `${SUPABASE_URL}/storage/v1/object/public/route-gpx/${path}`;
+}
 
 function toInitials(name: string): string {
   return name
@@ -54,6 +62,20 @@ export function dbToRoute(r: DbRoute): Route {
     mapmagic_embed: r.mapmagic_embed ?? undefined,
     cover_url: r.cover_url ?? undefined,
     images: r.route_images?.map((img) => img.url),
+    gpx_url: gpxPathToUrl(r.gpx_path),
+    gpx_updated_at: r.gpx_updated_at ?? null,
+    exit_points_status: r.exit_points_status ?? "unknown",
+    exit_points: r.route_exit_points
+      ?.slice()
+      .sort((a, b) => a.order_idx - b.order_idx)
+      .map<ExitPoint>((p) => ({
+        id: p.id,
+        title: p.title,
+        kind: p.kind,
+        distance_km_from_start: p.distance_km_from_start,
+        note: p.note,
+        order_idx: p.order_idx,
+      })),
     created_at: r.created_at,
   };
 }
@@ -64,7 +86,7 @@ const EMPTY_ROUTE: Route = {
   difficulty: "medium",
   surface: [], bike_types: [], route_types: [], tags: [],
   author: { id: "", name: "", initials: "", color: "", avatar_url: null, km_total: 0, routes_count: 0, events_count: 0 },
-  riders_today: 0, likes: 0, created_at: "",
+  riders_today: 0, likes: 0, exit_points_status: "unknown", created_at: "",
 };
 
 export function dbToEvent(e: DbEvent): CycleEvent {

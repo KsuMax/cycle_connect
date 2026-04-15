@@ -2,6 +2,17 @@ export type Difficulty = "easy" | "medium" | "hard";
 export type Surface = "asphalt" | "gravel" | "dirt" | "mixed";
 export type BikeType = "road" | "mountain" | "gravel" | "any";
 export type RouteType = "road" | "gravel" | "mtb" | "urban";
+export type ExitPointKind = "train" | "bus" | "taxi" | "road" | "other";
+export type ExitPointsStatus = "has" | "none" | "unknown";
+
+export interface ExitPoint {
+  id: string;
+  title: string;
+  kind: ExitPointKind;
+  distance_km_from_start?: number | null;
+  note?: string | null;
+  order_idx: number;
+}
 
 export interface User {
   id: string;
@@ -35,6 +46,10 @@ export interface Route {
   mapmagic_embed?: string; // iframe-ready URL
   cover_url?: string;
   images?: string[];
+  gpx_url?: string | null;
+  gpx_updated_at?: string | null;
+  exit_points_status: ExitPointsStatus;
+  exit_points?: ExitPoint[];
   created_at: string;
 }
 

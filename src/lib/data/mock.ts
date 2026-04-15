@@ -33,6 +33,7 @@ export const MOCK_ROUTES: Route[] = [
       "https://picsum.photos/seed/karelia2/800/500",
       "https://picsum.photos/seed/karelia3/800/500",
     ],
+    exit_points_status: "unknown",
     created_at: "2025-03-10",
   },
   {
@@ -53,6 +54,7 @@ export const MOCK_ROUTES: Route[] = [
     likes: 83,
     mapmagic_url: "https://mapmagic.app/",
     mapmagic_embed: "https://mapmagic.app/",
+    exit_points_status: "unknown",
     created_at: "2025-02-14",
   },
   {
@@ -77,6 +79,7 @@ export const MOCK_ROUTES: Route[] = [
       "https://picsum.photos/seed/velopohod1/800/500",
       "https://picsum.photos/seed/velopohod2/800/500",
     ],
+    exit_points_status: "unknown",
     created_at: "2025-03-01",
   },
   {
@@ -95,6 +98,7 @@ export const MOCK_ROUTES: Route[] = [
     author: MOCK_USERS[1],
     riders_today: 7,
     likes: 124,
+    exit_points_status: "unknown",
     created_at: "2025-01-20",
   },
   {
@@ -113,6 +117,7 @@ export const MOCK_ROUTES: Route[] = [
     author: MOCK_USERS[2],
     riders_today: 1,
     likes: 56,
+    exit_points_status: "unknown",
     created_at: "2025-02-28",
   },
 ];

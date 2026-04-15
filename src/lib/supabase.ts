@@ -119,12 +119,29 @@ export interface DbRoute {
   mapmagic_url: string | null;
   mapmagic_embed: string | null;
   cover_url: string | null;
+  gpx_path: string | null;
+  gpx_updated_at: string | null;
+  exit_points_status: "has" | "none" | "unknown";
   likes_count: number;
   riders_today: number;
   created_at: string;
   // joined
   author?: DbProfile;
   route_images?: { url: string }[];
+  route_exit_points?: DbRouteExitPoint[];
+}
+
+export interface DbRouteExitPoint {
+  id: string;
+  route_id: string;
+  order_idx: number;
+  title: string;
+  kind: "train" | "bus" | "taxi" | "road" | "other";
+  lat: number | null;
+  lng: number | null;
+  distance_km_from_start: number | null;
+  note: string | null;
+  created_at: string;
 }
 
 export interface DbEvent {

@@ -6,11 +6,13 @@ import { Header } from "@/components/layout/Header";
 import { MapPin, Link as LinkIcon, ChevronRight, AlertCircle, ChevronLeft } from "lucide-react";
 import { ImageUpload } from "@/components/routes/ImageUpload";
 import { CoverUpload } from "@/components/routes/CoverUpload";
+import { GpxUpload } from "@/components/routes/GpxUpload";
+import { ExitPointsEditor, type ExitPointDraft } from "@/components/routes/ExitPointsEditor";
 import { DayEditor } from "@/components/events/DayEditor";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase, proxyImageUrl } from "@/lib/supabase";
 import { ROUTE_TYPES, DIFFICULTIES, SURFACES, BIKE_TYPES } from "@/constants/routes";
-import type { RouteType, Difficulty, Surface, BikeType } from "@/types";
+import type { RouteType, Difficulty, Surface, BikeType, ExitPointsStatus } from "@/types";
 import Link from "next/link";
 
 export default function EditRoutePage({ params }: { params: Promise<{ id: string }> }) {
@@ -39,6 +41,11 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
   const [existingImages, setExistingImages] = useState<{ url: string; storage_path: string }[]>([]);
   const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
   const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
+  const [existingGpxPath, setExistingGpxPath] = useState<string | null>(null);
+  const [gpxFile, setGpxFile] = useState<File | null>(null);
+  const [gpxCleared, setGpxCleared] = useState(false);
+  const [exitStatus, setExitStatus] = useState<ExitPointsStatus>("unknown");
+  const [exitPoints, setExitPoints] = useState<ExitPointDraft[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -57,7 +64,7 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
     async function load() {
       const { data, error: fetchError } = await supabase
         .from("routes")
-        .select("*, route_images(url, storage_path)")
+        .select("*, route_images(url, storage_path), route_exit_points(*)")
         .eq("id", id)
         .single();
 
@@ -86,6 +93,28 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
       setBikeTypes(data.bike_types ?? []);
       setCoverPreview(data.cover_url ?? null);
       setExistingImages(data.route_images ?? []);
+      setExistingGpxPath(data.gpx_path ?? null);
+      setExitStatus(data.exit_points_status ?? "unknown");
+      const pts = (data.route_exit_points ?? []) as Array<{
+        id: string;
+        title: string;
+        kind: "train" | "bus" | "taxi" | "road" | "other";
+        distance_km_from_start: number | null;
+        note: string | null;
+        order_idx: number;
+      }>;
+      setExitPoints(
+        pts
+          .slice()
+          .sort((a, b) => a.order_idx - b.order_idx)
+          .map((p) => ({
+            id: p.id,
+            title: p.title,
+            kind: p.kind,
+            distance_km_from_start: p.distance_km_from_start != null ? String(p.distance_km_from_start) : "",
+            note: p.note ?? "",
+          }))
+      );
       setLoading(false);
     }
     load();
@@ -148,6 +177,7 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
         route_types: routeTypes,
         mapmagic_url: mapUrl || null,
         mapmagic_embed: buildEmbedUrl(mapUrl),
+        exit_points_status: exitStatus,
       })
       .eq("id", id);
 
@@ -188,6 +218,39 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
           url: publicUrl,
           storage_path: path,
         });
+      }
+    }
+
+    // GPX: upload new file, or clear existing
+    if (gpxFile) {
+      const path = `${id}/route.gpx`;
+      const { error: gpxError } = await supabase.storage
+        .from("route-gpx")
+        .upload(path, gpxFile, { upsert: true, contentType: "application/gpx+xml" });
+      if (!gpxError) {
+        // Force gpx_updated_at refresh even if path is unchanged
+        await supabase.from("routes").update({ gpx_path: path, gpx_updated_at: new Date().toISOString() }).eq("id", id);
+      }
+    } else if (gpxCleared && existingGpxPath) {
+      await supabase.storage.from("route-gpx").remove([existingGpxPath]);
+      await supabase.from("routes").update({ gpx_path: null, gpx_updated_at: null }).eq("id", id);
+    }
+
+    // Exit points: replace-all strategy (simpler than diffing)
+    await supabase.from("route_exit_points").delete().eq("route_id", id);
+    if (exitStatus === "has" && exitPoints.length > 0) {
+      const rows = exitPoints
+        .filter((p) => p.title.trim().length > 0)
+        .map((p, idx) => ({
+          route_id: id,
+          order_idx: idx,
+          title: p.title.trim(),
+          kind: p.kind,
+          distance_km_from_start: p.distance_km_from_start === "" ? null : Number(p.distance_km_from_start),
+          note: p.note.trim() || null,
+        }));
+      if (rows.length > 0) {
+        await supabase.from("route_exit_points").insert(rows);
       }
     }
 
@@ -336,6 +399,29 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
             <input type="url" placeholder="https://mapmagic.app/map?routes=..."
               value={mapUrl} onChange={(e) => setMapUrl(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors font-mono" />
+          </div>
+
+          {/* GPX file */}
+          <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+            <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">GPX-файл</label>
+            <p className="text-xs text-[#71717A] mb-3">Экспортируй из MapMagic — участники смогут скачать свежий трек</p>
+            <GpxUpload
+              currentName={gpxFile?.name ?? (existingGpxPath && !gpxCleared ? "route.gpx" : null)}
+              onChange={(f) => { setGpxFile(f); if (f) setGpxCleared(false); }}
+              onClear={() => setGpxCleared(true)}
+            />
+          </div>
+
+          {/* Exit points */}
+          <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+            <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">Точки схода с маршрута</label>
+            <p className="text-xs text-[#71717A] mb-3">Места, где можно сойти с маршрута — электричка, автобус, такси</p>
+            <ExitPointsEditor
+              status={exitStatus}
+              onStatusChange={setExitStatus}
+              points={exitPoints}
+              onPointsChange={setExitPoints}
+            />
           </div>
 
           {/* Details */}
