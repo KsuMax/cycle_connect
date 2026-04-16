@@ -40,16 +40,12 @@ async function sendTg(chatId: number, text: string): Promise<boolean> {
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return json({ error: "method not allowed" }, 405);
 
-  // Verify caller JWT
+  // Verify caller JWT using the service-role client (no ANON_KEY needed).
   const authHeader = req.headers.get("Authorization") ?? "";
-  const jwt = authHeader.replace("Bearer ", "");
+  const jwt = authHeader.replace("Bearer ", "").trim();
   if (!jwt) return json({ error: "unauthorized" }, 401);
 
-  const userDb = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
-    auth: { persistSession: false },
-    global: { headers: { Authorization: `Bearer ${jwt}` } },
-  });
-  const { data: { user }, error: authErr } = await userDb.auth.getUser();
+  const { data: { user }, error: authErr } = await adminDb.auth.getUser(jwt);
   if (authErr || !user) return json({ error: "unauthorized" }, 401);
 
   let body: { mode?: string; intentId?: string; joinerId?: string };

@@ -4,9 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Bike, Plus, X, Calendar, Users, ChevronRight, Bell } from "lucide-react";
 import { Avatar, AvatarGroup } from "@/components/ui/Avatar";
-import { ContactButton } from "@/components/ui/ContactButton";
 import { supabase, type DbRideIntent, type DbProfile } from "@/lib/supabase";
-import { dbToUser } from "@/lib/transforms";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useAuthModal } from "@/components/ui/AuthModal";
 import { useToast } from "@/lib/context/ToastContext";
@@ -396,9 +394,6 @@ function IntentCard({
           </div>
           <div className="text-xs text-[#A1A1AA]">{formatDate(intent.planned_date)}</div>
         </div>
-        {creator && !isCreator && (
-          <ContactButton user={dbToUser(creator)} />
-        )}
       </div>
 
       {intent.note && (
@@ -452,26 +447,6 @@ function IntentCard({
         )}
       </div>
 
-      {/* Expanded participant roster with contact buttons — only when the
-          viewer is part of this intent (creator or joined). Avoids leaking
-          "who's planning" to randoms and keeps the card compact otherwise. */}
-      {(isCreator || isParticipant) && participants.length > 0 && (
-        <div className="mt-2 pl-10 space-y-1">
-          {participants
-            .filter((p) => p.user_id !== currentUserId)
-            .map((p) => {
-              const profile = p.profile as DbProfile | undefined;
-              if (!profile) return null;
-              const u = dbToUser(profile);
-              return (
-                <div key={p.user_id} className="flex items-center justify-between text-xs text-[#71717A]">
-                  <span className="truncate">{u.name}</span>
-                  <ContactButton user={u} />
-                </div>
-              );
-            })}
-        </div>
-      )}
     </div>
   );
 }
