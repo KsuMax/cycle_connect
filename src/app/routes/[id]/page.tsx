@@ -226,10 +226,9 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
 
   const handleLike = async () => {
     if (!requireAuth("поставить лайк")) return;
-    const prev = likeCount;
     const willLike = !liked;
-    setLikeCount(willLike ? prev + 1 : prev - 1);
-    await toggleLike(route.id, prev);
+    setLikeCount(willLike ? likeCount + 1 : likeCount - 1);
+    await toggleLike(route.id);
     showToast(willLike ? "Маршрут отмечен" : "Лайк убран", "info");
   };
 

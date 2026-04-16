@@ -7,7 +7,7 @@ import { useToast } from "./ToastContext";
 
 interface EventLikesContextValue {
   isLiked: (eventId: string) => boolean;
-  toggleLike: (eventId: string, currentCount: number) => Promise<void>;
+  toggleLike: (eventId: string) => Promise<void>;
 }
 
 const EventLikesContext = createContext<EventLikesContextValue | null>(null);
@@ -37,7 +37,7 @@ export function EventLikesProvider({ children }: { children: ReactNode }) {
 
   const isLiked = useCallback((eventId: string) => liked.has(eventId), [liked]);
 
-  const toggleLike = useCallback(async (eventId: string, currentCount: number) => {
+  const toggleLike = useCallback(async (eventId: string) => {
     if (!user) return;
     const wasLiked = liked.has(eventId);
 
@@ -60,13 +60,7 @@ export function EventLikesProvider({ children }: { children: ReactNode }) {
         return next;
       });
       showToast("Не удалось обновить лайк — попробуй ещё раз", "error");
-      return;
     }
-
-    await supabase
-      .from("events")
-      .update({ likes_count: wasLiked ? currentCount - 1 : currentCount + 1 })
-      .eq("id", eventId);
   }, [user, liked, showToast]);
 
   return (

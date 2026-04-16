@@ -549,7 +549,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                       if (!requireAuth("поставить лайк")) return;
                       const wasLiked = isLiked(event.id);
                       setLikeCount((c) => wasLiked ? c - 1 : c + 1);
-                      await toggleLike(event.id, likeCount);
+                      await toggleLike(event.id);
                       showToast(wasLiked ? "Лайк убран" : "Мероприятие отмечено", "info");
                     }}
                     className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-[#E4E4E7] text-sm transition-colors hover:bg-[#F5F4F1]"

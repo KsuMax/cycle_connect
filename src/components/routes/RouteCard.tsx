@@ -45,9 +45,8 @@ export function RouteCard({ route, compact = false }: RouteCardProps) {
   const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (!user) { router.push("/auth/login"); return; }
-    const prev = likeCount;
-    setLikeCount(liked ? prev - 1 : prev + 1);
-    await toggleLike(route.id, prev);
+    setLikeCount(liked ? likeCount - 1 : likeCount + 1);
+    await toggleLike(route.id);
   };
 
   return (

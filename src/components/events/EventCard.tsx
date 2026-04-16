@@ -57,9 +57,8 @@ export function EventCard({ event }: EventCardProps) {
     e.preventDefault();
     if (!requireAuth("поставить лайк")) return;
     const willLike = !liked;
-    const newCount = willLike ? likeCount + 1 : likeCount - 1;
-    setLikeCount(newCount);
-    await toggleLike(event.id, likeCount);
+    setLikeCount(willLike ? likeCount + 1 : likeCount - 1);
+    await toggleLike(event.id);
     showToast(willLike ? "Мероприятие отмечено" : "Лайк убран", "info");
   };
 
