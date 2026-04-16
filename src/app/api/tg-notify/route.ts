@@ -19,7 +19,7 @@ import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? "";
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://cycleconnect.ru";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://cycleconnect.cc";
 
 async function sendTg(chatId: number, text: string): Promise<boolean> {
   if (!BOT_TOKEN) return false;
