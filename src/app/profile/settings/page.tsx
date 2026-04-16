@@ -75,30 +75,41 @@ export default function SettingsPage() {
   }, [profile, user]);
 
   const handleLinkTelegram = async () => {
+    setError(null);
     setTgLinking(true);
+
+    // Open a blank window SYNCHRONOUSLY (before any await) so the browser
+    // doesn't treat it as a popup and block it. We'll set the URL after fetch.
+    const win = window.open("", "_blank");
+
     try {
       const res = await fetch("/api/tg-link", { method: "POST" });
       const { code, botUsername, error: err } = await res.json();
+
       if (err || !code || !botUsername) {
-        setError(err ?? "Не удалось сгенерировать ссылку");
+        win?.close();
+        setError(err ?? "Не удалось сгенерировать ссылку. Убедись, что NEXT_PUBLIC_TELEGRAM_BOT_USERNAME задан в переменных окружения.");
         return;
       }
-      // Open bot deep-link in a new tab — user types /start <code> there
-      window.open(`https://t.me/${botUsername}?start=${code}`, "_blank");
-      // Poll profile for 30 s to detect chat_id being set
+
+      const url = `https://t.me/${botUsername}?start=${code}`;
+      if (win) {
+        win.location.href = url;
+      } else {
+        // Fallback: link if window was blocked anyway
+        setError(`Браузер заблокировал всплывающее окно. Открой вручную: ${url}`);
+      }
+
+      // Poll profile every 2 s up to 30 s to detect chat_id being set by bot
       let attempts = 0;
       const poll = setInterval(async () => {
         attempts++;
         await refreshProfile();
-        // profile in closure is stale; check by re-fetching via auth context
-        setTgLinked((prev) => {
-          // will be reset properly on next render via useEffect
-          return prev;
-        });
         if (attempts >= 15) clearInterval(poll);
       }, 2000);
-      // Will be cleared by the component unmount naturally too
+      void poll;
     } catch {
+      win?.close();
       setError("Не удалось открыть Telegram");
     } finally {
       setTgLinking(false);
