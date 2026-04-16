@@ -109,12 +109,12 @@ export function RouteCard({ route, compact = false }: RouteCardProps) {
             {getRouteEventStatus(route.id) === "upcoming" ? (
               <span className="inline-block ml-1.5 align-middle -translate-y-px text-[11px] font-semibold px-2 py-0.5 rounded-md"
                 style={{ backgroundColor: "#EFF6FF", color: "#2563EB" }}>
-                Скоро катну
+                Скоро еду
               </span>
             ) : getRouteIntentStatus(route.id) ? (
               <span className="inline-block ml-1.5 align-middle -translate-y-px text-[11px] font-semibold px-2 py-0.5 rounded-md"
                 style={{ backgroundColor: "#F0FDF4", color: "#16A34A" }}>
-                Планирую
+                Запланировано
               </span>
             ) : null}
           </h3>

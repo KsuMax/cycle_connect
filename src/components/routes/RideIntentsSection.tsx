@@ -43,7 +43,7 @@ export function RideIntentsSection({ routeId, routeTitle, intents, onIntentsChan
   const today = new Date().toISOString().split("T")[0];
 
   const handleStartCreate = () => {
-    if (!requireAuth("создать план поездки")) return;
+    if (!requireAuth("запланировать поездку")) return;
     setFormStep("form");
     setPlannedDate("");
     setNote("");
@@ -101,7 +101,7 @@ export function RideIntentsSection({ routeId, routeTitle, intents, onIntentsChan
       .from("ride_intent_participants")
       .insert({ intent_id: intent.id, user_id: user.id });
 
-    showToast("План создан! Другие смогут присоединиться", "success");
+    showToast("Поездка запланирована! Другие смогут присоединиться", "success");
     setFormStep("closed");
     setSubmitting(false);
     onIntentsChange();
@@ -195,7 +195,7 @@ export function RideIntentsSection({ routeId, routeTitle, intents, onIntentsChan
       {futureIntents.length > 0 ? (
         <>
           <h3 className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-3 flex items-center gap-1.5">
-            <Bike size={12} /> Планируют поездку
+            <Bike size={12} /> Запланированные поездки
           </h3>
           <div className="space-y-2 mb-3">
             {futureIntents.map(intent => (
@@ -212,8 +212,8 @@ export function RideIntentsSection({ routeId, routeTitle, intents, onIntentsChan
         </>
       ) : (
         <div className="text-center mb-3">
-          <div className="text-sm font-semibold text-[#1C1C1E] mb-0.5">Хочешь проехать этот маршрут?</div>
-          <div className="text-xs text-[#A1A1AA]">Нажми кнопку — другие увидят и смогут присоединиться</div>
+          <div className="text-sm font-semibold text-[#1C1C1E] mb-0.5">Планируешь этот маршрут?</div>
+          <div className="text-xs text-[#A1A1AA]">Запланируй дату — другие увидят и смогут присоединиться</div>
         </div>
       )}
 
@@ -223,7 +223,7 @@ export function RideIntentsSection({ routeId, routeTitle, intents, onIntentsChan
           onClick={handleStartCreate}
           className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-1.5 border border-dashed border-[#D1D1D6] text-[#71717A] hover:border-[#F4632A] hover:text-[#F4632A] hover:bg-[#FFF8F5]"
         >
-          <Plus size={14} /> Хочу катнуть
+          <Plus size={14} /> Запланировать дату
         </button>
       )}
 

@@ -99,7 +99,7 @@ export default function FeedPage() {
               style={{ background: "linear-gradient(135deg, #0BBFB5 0%, #7C5CFC 100%)" }}>
               <div>
                 <p className="text-white font-semibold text-sm mb-0.5">Планируешь поездку?</p>
-                <p className="text-white/80 text-xs">Создай мероприятие или нажми «Хочу катнуть» на любом маршруте</p>
+                <p className="text-white/80 text-xs">Создай мероприятие или нажми «Запланировать дату» на любом маршруте</p>
               </div>
               <Link href="/events/new"
                 className="shrink-0 bg-white font-semibold text-xs px-4 py-2.5 rounded-xl hover:bg-white/90 transition-colors whitespace-nowrap"

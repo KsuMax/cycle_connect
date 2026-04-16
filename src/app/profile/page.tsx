@@ -493,7 +493,7 @@ export default function ProfilePage() {
                 </div>
               ) : (
                 <EmptyState icon={<Bike size={28} />} title="Нет прокатанных маршрутов"
-                  text='Открой любой маршрут и нажми "Катнуть", чтобы добавить его в свои поездки'
+                  text='Открой любой маршрут и нажми "Отметить проезд", чтобы добавить его в свои поездки'
                   action={<Link href="/routes" className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl text-white" style={{ backgroundColor: "#F4632A" }}>
                     <Bike size={16} /> Найти маршрут
                   </Link>}

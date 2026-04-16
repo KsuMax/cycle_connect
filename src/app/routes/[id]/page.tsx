@@ -290,7 +290,7 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
             className="w-full py-2.5 rounded-xl text-sm font-semibold text-center cursor-default select-none"
             style={{ backgroundColor: "#EFF6FF", color: "#2563EB" }}
           >
-            Скоро катну
+            Скоро еду
           </div>
           {rideState.eventDate && (
             <div
@@ -311,7 +311,7 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
             className="w-full py-2.5 rounded-xl text-sm font-semibold text-center cursor-default select-none"
             style={{ backgroundColor: "#F0FDF4", color: "#16A34A" }}
           >
-            Планирую
+            Запланировано
           </div>
           {rideState.intentDate && (
             <div
@@ -338,7 +338,7 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
             className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors"
             style={{ backgroundColor: "#F4632A", color: "white" }}
           >
-            Катнуть ещё
+            Проехал ещё раз
           </button>
           <div className="text-center text-xs text-[#A1A1AA]">
             Проехал {rideState.count} {rideState.count === 1 ? "раз" : rideState.count < 5 ? "раза" : "раз"} · {rideState.count * route!.distance_km} км
@@ -353,13 +353,13 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
         onClick={() => {
           if (!requireAuth("отметить маршрут")) return;
           addRide(route!.id, route!.distance_km);
-          showToast("Маршрут отмечен как проеханный!", "success");
+          showToast("Проезд отмечен! +" + route!.distance_km + " км", "success");
           checkAndAward("ride_added", { routeId: route!.id, authorId: route!.author.id, distanceKm: route!.distance_km });
         }}
         className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors"
         style={{ backgroundColor: "#1C1C1E", color: "white" }}
       >
-        Катнуть
+        Отметить проезд
       </button>
     );
   }
@@ -477,6 +477,9 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
               )}
 
               {/* Actions */}
+              <div className="pt-1 border-t border-[#F4F4F5] mb-3 mt-1">
+                <span className="text-[11px] font-semibold text-[#A1A1AA] uppercase tracking-wide">История проездов</span>
+              </div>
               <div className="flex gap-2">
                 <RideButton />
                 <button onClick={handleFavorite}
