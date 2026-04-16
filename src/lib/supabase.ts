@@ -71,6 +71,11 @@ export interface DbProfile {
   telegram_username?: string | null;
   contact_email?: string | null;
   email_public?: boolean;
+  // TG bot linking (migration 013)
+  telegram_chat_id?: number | null;
+  tg_link_code?: string | null;
+  tg_link_code_exp?: string | null;
+  tg_notify_intents?: boolean;
 }
 
 /**

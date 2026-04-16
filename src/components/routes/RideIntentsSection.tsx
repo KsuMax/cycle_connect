@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Bike, Plus, X, Calendar, Users, ChevronRight } from "lucide-react";
+import { Bike, Plus, X, Calendar, Users, ChevronRight, Bell } from "lucide-react";
 import { Avatar, AvatarGroup } from "@/components/ui/Avatar";
 import { ContactButton } from "@/components/ui/ContactButton";
 import { supabase, type DbRideIntent, type DbProfile } from "@/lib/supabase";
@@ -321,6 +321,33 @@ function IntentCard({
   onLeave: () => void;
   onDelete: () => void;
 }) {
+  const { showToast } = useToast();
+  const [notifying, setNotifying] = useState(false);
+
+  const handleNotify = async () => {
+    setNotifying(true);
+    try {
+      const res = await fetch("/api/tg-notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intentId: intent.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Ошибка");
+      const { sent, skipped } = data as { sent: number; skipped: number };
+      if (sent === 0) {
+        showToast("Никто ещё не привязал Telegram — ссылка отправлена не была", "info");
+      } else {
+        showToast(`Отправлено ${sent} уведомлени${sent === 1 ? "е" : sent < 5 ? "я" : "й"}`, "success");
+      }
+      void skipped;
+    } catch (e) {
+      showToast((e as Error).message ?? "Не удалось отправить", "error");
+    } finally {
+      setNotifying(false);
+    }
+  };
+
   const creator = intent.creator as DbProfile | undefined;
   const participants = intent.participants ?? [];
   const isCreator = currentUserId === intent.creator_id;
@@ -379,12 +406,25 @@ function IntentCard({
         )}
 
         {isCreator ? (
-          <button
-            onClick={onDelete}
-            className="text-xs font-medium text-red-400 hover:text-red-500 transition-colors px-2 py-1"
-          >
-            Отменить
-          </button>
+          <div className="flex items-center gap-1">
+            {participants.length > 1 && (
+              <button
+                onClick={handleNotify}
+                disabled={notifying}
+                className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                style={{ backgroundColor: "#E6F4FB", color: "#0088CC" }}
+                title="Отправить TG-уведомление всем участникам"
+              >
+                <Bell size={11} /> {notifying ? "…" : "Позвать всех"}
+              </button>
+            )}
+            <button
+              onClick={onDelete}
+              className="text-xs font-medium text-red-400 hover:text-red-500 transition-colors px-2 py-1"
+            >
+              Отменить
+            </button>
+          </div>
         ) : isParticipant ? (
           <button
             onClick={onLeave}

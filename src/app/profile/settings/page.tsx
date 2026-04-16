@@ -44,6 +44,9 @@ export default function SettingsPage() {
   const [telegramUsername, setTelegramUsername] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [emailPublic, setEmailPublic] = useState(false);
+  const [tgLinked, setTgLinked] = useState(false);
+  const [tgNotifyIntents, setTgNotifyIntents] = useState(true);
+  const [tgLinking, setTgLinking] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -65,9 +68,42 @@ export default function SettingsPage() {
       setTelegramUsername(profile.telegram_username ?? "");
       setContactEmail(profile.contact_email ?? "");
       setEmailPublic(profile.email_public ?? false);
+      setTgLinked(!!profile.telegram_chat_id);
+      setTgNotifyIntents(profile.tg_notify_intents !== false);
     }
     if (user) setEmail(user.email ?? "");
   }, [profile, user]);
+
+  const handleLinkTelegram = async () => {
+    setTgLinking(true);
+    try {
+      const res = await fetch("/api/tg-link", { method: "POST" });
+      const { code, botUsername, error: err } = await res.json();
+      if (err || !code || !botUsername) {
+        setError(err ?? "Не удалось сгенерировать ссылку");
+        return;
+      }
+      // Open bot deep-link in a new tab — user types /start <code> there
+      window.open(`https://t.me/${botUsername}?start=${code}`, "_blank");
+      // Poll profile for 30 s to detect chat_id being set
+      let attempts = 0;
+      const poll = setInterval(async () => {
+        attempts++;
+        await refreshProfile();
+        // profile in closure is stale; check by re-fetching via auth context
+        setTgLinked((prev) => {
+          // will be reset properly on next render via useEffect
+          return prev;
+        });
+        if (attempts >= 15) clearInterval(poll);
+      }, 2000);
+      // Will be cleared by the component unmount naturally too
+    } catch {
+      setError("Не удалось открыть Telegram");
+    } finally {
+      setTgLinking(false);
+    }
+  };
 
   const strength = getPasswordStrength(password);
 
@@ -108,6 +144,7 @@ export default function SettingsPage() {
       telegram_username: tgTrimmed || null,
       contact_email: contactEmailTrimmed || null,
       email_public: emailPublic && !!contactEmailTrimmed,
+      tg_notify_intents: tgNotifyIntents,
     };
     const { error: profileError } = await supabase
       .from("profiles")
@@ -246,6 +283,41 @@ export default function SettingsPage() {
                 Показывать другим участникам
               </label>
             </Field>
+          </Section>
+
+          {/* TG Bot */}
+          <Section title="Telegram-уведомления">
+            <p className="text-xs text-[#71717A] -mt-2">
+              Привяжи аккаунт, чтобы получать уведомления о совместных покатушках.
+            </p>
+            {tgLinked ? (
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-[#F0FDF4] border border-[#BBF7D0]">
+                <Check size={14} className="text-green-600 shrink-0" />
+                <span className="text-sm text-green-700 font-medium">Telegram привязан</span>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleLinkTelegram}
+                disabled={tgLinking}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors disabled:opacity-60"
+                style={{ backgroundColor: "#E6F4FB", color: "#0088CC" }}
+              >
+                <Send size={15} />
+                {tgLinking ? "Открываю бот…" : "Привязать Telegram"}
+              </button>
+            )}
+            {tgLinked && (
+              <label className="flex items-center gap-2 text-xs text-[#71717A] cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={tgNotifyIntents}
+                  onChange={(e) => setTgNotifyIntents(e.target.checked)}
+                  className="w-4 h-4 rounded border-[#E4E4E7] accent-[#F4632A]"
+                />
+                Уведомлять о совместных катаниях (ride intents)
+              </label>
+            )}
           </Section>
 
           {/* Account */}
