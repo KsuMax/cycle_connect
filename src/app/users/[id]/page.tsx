@@ -9,6 +9,7 @@ import { supabase, proxyImageUrl } from "@/lib/supabase";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useFollow } from "@/lib/context/FollowContext";
 import { Map, Calendar, Globe, ExternalLink, UserPlus, UserCheck, ChevronRight, Trophy } from "lucide-react";
+import { ContactButton } from "@/components/ui/ContactButton";
 import { useAchievements } from "@/lib/context/AchievementsContext";
 import { AchievementBadge } from "@/components/ui/AchievementBadge";
 import { ProfileShowcase } from "@/components/ui/ProfileShowcase";
@@ -198,7 +199,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                     <p className="text-sm font-medium mt-0.5" style={{ color: "#F4632A" }}>@{profile.username}</p>
                   )}
                   {profile.bio && <p className="text-sm text-[#71717A] mt-1">{profile.bio}</p>}
-                  {(profile.website || profile.strava_url) && (
+                  {(profile.website || profile.strava_url || profile.telegram_username) && (
                     <div className="flex items-center gap-3 mt-2 flex-wrap">
                       {profile.website && (
                         <a href={profile.website} target="_blank" rel="noopener noreferrer"
@@ -218,6 +219,13 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                           Strava
                           <ExternalLink size={10} />
                         </a>
+                      )}
+                      {!isOwnProfile && (
+                        <ContactButton
+                          user={{ name: profile.name, telegram_username: profile.telegram_username, contact_email: profile.contact_email }}
+                          variant="inline"
+                          stopPropagation={false}
+                        />
                       )}
                     </div>
                   )}

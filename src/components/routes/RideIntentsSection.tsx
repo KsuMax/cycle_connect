@@ -377,7 +377,7 @@ function IntentCard({
 
   return (
     <div className="rounded-xl border border-[#E4E4E7] p-3">
-      <div className="flex items-center gap-2.5 mb-1.5">
+      <Link href={`/users/${intent.creator_id}`} className="flex items-center gap-2.5 mb-1.5 hover:opacity-80 transition-opacity">
         <Avatar user={{
           id: intent.creator_id,
           name: creator?.name ?? "Участник",
@@ -394,7 +394,7 @@ function IntentCard({
           </div>
           <div className="text-xs text-[#A1A1AA]">{formatDate(intent.planned_date)}</div>
         </div>
-      </div>
+      </Link>
 
       {intent.note && (
         <div className="text-xs text-[#71717A] mb-2 pl-10 italic">
