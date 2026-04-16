@@ -13,7 +13,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useEventLikes } from "@/lib/context/EventLikesContext";
 import {
   ChevronLeft, Calendar, Bike, Heart,
-  Share2, Users, MapPin, ExternalLink, Flag, ChevronRight, Pencil, Lock, Trash2, UserPlus, Search, X,
+  Share2, Users, MapPin, ExternalLink, Flag, ChevronRight, Pencil, Lock, Trash2, UserPlus, Search, X, Download,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { useAuthModal } from "@/components/ui/AuthModal";
@@ -22,7 +22,7 @@ import { useAchievements } from "@/lib/context/AchievementsContext";
 import { sanitizeHtml } from "@/lib/sanitize";
 import type { User, Route, EventDay, RouteType } from "@/types";
 import type { DbEvent, DbEventDay, DbProfile, DbRoute } from "@/lib/supabase";
-import { dbToRoute, dbToUser } from "@/lib/transforms";
+import { dbToRoute, dbToUser, gpxPathToUrl } from "@/lib/transforms";
 
 interface EventData {
   id: string;
@@ -39,6 +39,9 @@ interface EventData {
   route: Route | null;
   days: EventDay[];
   participants: User[];
+  /** Event-level GPX URL. Takes precedence over `route.gpx_url` on the detail page. */
+  gpx_url: string | null;
+  gpx_updated_at: string | null;
 }
 
 function dbToEventData(data: DbEvent): EventData {
@@ -76,6 +79,8 @@ function dbToEventData(data: DbEvent): EventData {
     route,
     days,
     participants,
+    gpx_url: gpxPathToUrl(data.gpx_path, "event-gpx"),
+    gpx_updated_at: data.gpx_updated_at ?? null,
   };
 }
 
@@ -307,21 +312,45 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               </div>
             </div>
 
-            {/* Map embed */}
-            {event.route?.mapmagic_embed && (
-              <div className="bg-white rounded-2xl overflow-hidden border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-                <iframe src={event.route.mapmagic_embed} className="w-full" style={{ height: 380, border: "none" }} allowFullScreen title={event.route.title} />
-                <div className="px-4 py-2.5 border-t border-[#F5F4F1] flex items-center justify-between">
-                  <span className="text-xs text-[#71717A]">Маршрут: {event.route.title}</span>
-                  {event.route.mapmagic_url && (
-                    <a href={event.route.mapmagic_url} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs hover:underline" style={{ color: "#F4632A" }}>
-                      Открыть в MapMagic <ExternalLink size={11} />
-                    </a>
+            {/* Map embed + GPX.
+                Event's own GPX takes precedence; otherwise fall back to the
+                linked route's GPX so organizers who didn't upload anything
+                still get the download button "broadcast" from the route. */}
+            {(() => {
+              const gpxUrl = event.gpx_url ?? event.route?.gpx_url ?? null;
+              const gpxUpdatedAt = event.gpx_url ? event.gpx_updated_at : event.route?.gpx_updated_at ?? null;
+              const hasEmbed = !!event.route?.mapmagic_embed;
+              if (!hasEmbed && !gpxUrl && !event.route?.mapmagic_url) return null;
+              return (
+                <div className="bg-white rounded-2xl overflow-hidden border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+                  {hasEmbed && (
+                    <iframe src={event.route!.mapmagic_embed} className="w-full" style={{ height: 380, border: "none" }} allowFullScreen title={event.route!.title} />
                   )}
+                  <div className="px-4 py-2.5 border-t border-[#F5F4F1] flex items-center justify-between flex-wrap gap-x-4 gap-y-2">
+                    <span className="text-xs text-[#71717A]">
+                      {event.route ? `Маршрут: ${event.route.title}` : "Трек мероприятия"}
+                    </span>
+                    <div className="flex items-center gap-4 flex-wrap">
+                      {event.route?.mapmagic_url && (
+                        <a href={event.route.mapmagic_url} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs hover:underline" style={{ color: "#F4632A" }}>
+                          Открыть в MapMagic <ExternalLink size={11} />
+                        </a>
+                      )}
+                      {gpxUrl && (
+                        <a href={gpxUrl} download
+                          className="inline-flex items-center gap-1 text-xs font-medium hover:underline" style={{ color: "#0BBFB5" }}>
+                          <Download size={11} /> Скачать GPX
+                        </a>
+                      )}
+                      {gpxUrl && gpxUpdatedAt && !event.gpx_url && (
+                        <span className="text-[11px] text-[#A1A1AA]">трек из маршрута</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Description */}
             {event.description && (

@@ -160,6 +160,8 @@ export interface DbEvent {
   likes_count: number;
   is_private: boolean;
   cover_url: string | null;
+  gpx_path: string | null;
+  gpx_updated_at: string | null;
   created_at: string;
   // joined
   organizer?: DbProfile;

@@ -10,10 +10,13 @@ import type { Route, CycleEvent, User, RouteType, ExitPoint } from "@/types";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
-/** Turn a stored `gpx_path` (e.g. "<route_id>/route.gpx") into a public URL. */
-export function gpxPathToUrl(path: string | null | undefined): string | null {
+/** Turn a stored `gpx_path` into a public URL. Defaults to the route-gpx bucket. */
+export function gpxPathToUrl(
+  path: string | null | undefined,
+  bucket: "route-gpx" | "event-gpx" = "route-gpx",
+): string | null {
   if (!path || !SUPABASE_URL) return null;
-  return `${SUPABASE_URL}/storage/v1/object/public/route-gpx/${path}`;
+  return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
 }
 
 function toInitials(name: string): string {

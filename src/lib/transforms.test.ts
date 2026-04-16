@@ -55,6 +55,8 @@ const event: DbEvent = {
   likes_count: 15,
   is_private: false,
   cover_url: null,
+  gpx_path: null,
+  gpx_updated_at: null,
   created_at: "2024-04-01T00:00:00Z",
   organizer: profile,
   route,

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { CoverUpload } from "@/components/routes/CoverUpload";
+import { GpxUpload } from "@/components/routes/GpxUpload";
 import { Plus, Trash2, ChevronLeft, Calendar, Bike, AlertCircle, Lock } from "lucide-react";
 
 interface DayForm {
@@ -50,6 +51,9 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   const [routes, setRoutes] = useState<RouteOption[]>([]);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [existingGpxPath, setExistingGpxPath] = useState<string | null>(null);
+  const [gpxFile, setGpxFile] = useState<File | null>(null);
+  const [gpxCleared, setGpxCleared] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -82,6 +86,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         setMaxParticipants(ev.max_participants ? String(ev.max_participants) : "");
         setIsPrivate(ev.is_private ?? false);
         setCoverPreview(ev.cover_url ?? null);
+        setExistingGpxPath(ev.gpx_path ?? null);
 
         const loadedDays: DayForm[] = (ev.event_days ?? [])
           .sort((a: { day_number: number }, b: { day_number: number }) => a.day_number - b.day_number)
@@ -159,6 +164,21 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
     } else if (coverPreview === null) {
       // Cover was removed
       await supabase.from("events").update({ cover_url: null }).eq("id", id);
+    }
+
+    // 2b. GPX: upload new file, or clear existing
+    if (gpxFile) {
+      const path = `${id}/route.gpx`;
+      const { error: gpxError } = await supabase.storage
+        .from("event-gpx")
+        .upload(path, gpxFile, { upsert: true, contentType: "application/gpx+xml" });
+      if (!gpxError) {
+        // Force gpx_updated_at refresh even if path is unchanged
+        await supabase.from("events").update({ gpx_path: path, gpx_updated_at: new Date().toISOString() }).eq("id", id);
+      }
+    } else if (gpxCleared && existingGpxPath) {
+      await supabase.storage.from("event-gpx").remove([existingGpxPath]);
+      await supabase.from("events").update({ gpx_path: null, gpx_updated_at: null }).eq("id", id);
     }
 
     // 3. Replace all days: delete old, insert new
@@ -313,6 +333,20 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                 {selectedRoute.title} · {selectedRoute.distance_km} км · {selectedRoute.region}
               </div>
             )}
+          </div>
+
+          {/* GPX file (event-level) */}
+          <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+            <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">GPX-файл мероприятия</label>
+            <p className="text-xs text-[#71717A] mb-3">
+              Необязательно. Если загрузишь — участники смогут скачать его прямо с мероприятия.
+              Иначе кнопка скачивания подтянется из выбранного маршрута.
+            </p>
+            <GpxUpload
+              currentName={gpxFile?.name ?? (existingGpxPath && !gpxCleared ? "route.gpx" : null)}
+              onChange={(f) => { setGpxFile(f); if (f) setGpxCleared(false); }}
+              onClear={() => setGpxCleared(true)}
+            />
           </div>
 
           {/* Days */}

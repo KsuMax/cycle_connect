@@ -11,6 +11,7 @@ import { useAchievements } from "@/lib/context/AchievementsContext";
 import { supabase } from "@/lib/supabase";
 import { MOCK_ROUTES } from "@/lib/data/mock";
 import { CoverUpload } from "@/components/routes/CoverUpload";
+import { GpxUpload } from "@/components/routes/GpxUpload";
 import { Plus, Trash2, ChevronLeft, Calendar, Bike, AlertCircle } from "lucide-react";
 import Link from "next/link";
 
@@ -55,6 +56,7 @@ function CreateEventForm() {
   const [days, setDays] = useState<DayForm[]>([newDay(0)]);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [gpxFile, setGpxFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [attempted, setAttempted] = useState(false);
@@ -128,6 +130,18 @@ function CreateEventForm() {
           .from("route-images")
           .getPublicUrl(uploadData.path);
         await supabase.from("events").update({ cover_url: urlData.publicUrl }).eq("id", eventData.id);
+      }
+    }
+
+    // 2b. Upload event-level GPX (optional). Takes precedence over the
+    //     linked route's GPX on the detail page.
+    if (gpxFile) {
+      const path = `${eventData.id}/route.gpx`;
+      const { error: gpxError } = await supabase.storage
+        .from("event-gpx")
+        .upload(path, gpxFile, { upsert: true, contentType: "application/gpx+xml" });
+      if (!gpxError) {
+        await supabase.from("events").update({ gpx_path: path }).eq("id", eventData.id);
       }
     }
 
@@ -275,6 +289,19 @@ function CreateEventForm() {
                 {selectedRoute.title} · {selectedRoute.distance_km} км · {selectedRoute.region}
               </div>
             )}
+          </div>
+
+          {/* GPX file (event-level) */}
+          <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+            <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">GPX-файл мероприятия</label>
+            <p className="text-xs text-[#71717A] mb-3">
+              Необязательно. Если загрузишь — участники смогут скачать его прямо с мероприятия.
+              Иначе кнопка скачивания подтянется из выбранного маршрута.
+            </p>
+            <GpxUpload
+              currentName={gpxFile?.name ?? null}
+              onChange={setGpxFile}
+            />
           </div>
 
           {/* Days */}
