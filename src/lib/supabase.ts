@@ -67,6 +67,10 @@ export interface DbProfile {
   strava_last_activity_at?: string | null;
   strava_show_activities?: boolean;
   strava_sport_types?: string[];
+  // Contact fields (migration 012)
+  telegram_username?: string | null;
+  contact_email?: string | null;
+  email_public?: boolean;
 }
 
 /**

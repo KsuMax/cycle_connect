@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { ArrowLeft, Eye, EyeOff, Check, X, LogOut } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Check, X, LogOut, Send } from "lucide-react";
 import Link from "next/link";
 
 function getPasswordStrength(password: string): { score: number; label: string; color: string } {
@@ -41,6 +41,9 @@ export default function SettingsPage() {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [website, setWebsite] = useState("");
+  const [telegramUsername, setTelegramUsername] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [emailPublic, setEmailPublic] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -59,6 +62,9 @@ export default function SettingsPage() {
       setName(profile.name ?? "");
       setUsername(profile.username ?? "");
       setWebsite(profile.website ?? "");
+      setTelegramUsername(profile.telegram_username ?? "");
+      setContactEmail(profile.contact_email ?? "");
+      setEmailPublic(profile.email_public ?? false);
     }
     if (user) setEmail(user.email ?? "");
   }, [profile, user]);
@@ -82,11 +88,26 @@ export default function SettingsPage() {
 
     setSaving(true);
 
+    // Validate TG username format before sending (mirror DB constraint).
+    const tgTrimmed = telegramUsername.trim().replace(/^@/, "");
+    if (tgTrimmed && !/^[A-Za-z0-9_]{5,32}$/.test(tgTrimmed)) {
+      setError("Telegram-никнейм: 5–32 латинских буквы, цифры или _");
+      return;
+    }
+    const contactEmailTrimmed = contactEmail.trim();
+    if (contactEmailTrimmed && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contactEmailTrimmed)) {
+      setError("Контактный e-mail: проверь формат");
+      return;
+    }
+
     // Update profile table
-    const profileUpdate: Record<string, string | null> = {
+    const profileUpdate: Record<string, string | boolean | null> = {
       name: name.trim(),
       username: username.trim() || null,
       website: website.trim() || null,
+      telegram_username: tgTrimmed || null,
+      contact_email: contactEmailTrimmed || null,
+      email_public: emailPublic && !!contactEmailTrimmed,
     };
     const { error: profileError } = await supabase
       .from("profiles")
@@ -178,6 +199,52 @@ export default function SettingsPage() {
                   className={`${INPUT_CLS} pl-7`}
                 />
               </div>
+            </Field>
+          </Section>
+
+          {/* Contacts */}
+          <Section title="Контакты">
+            <p className="text-xs text-[#71717A] -mt-2">
+              Чтобы с тобой могли связаться участники совместных катаний.
+            </p>
+            <Field label="Telegram" htmlFor="tg">
+              <div className="relative">
+                <Send size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A1A1AA]" />
+                <span className="absolute left-9 top-1/2 -translate-y-1/2 text-[#A1A1AA] text-sm">@</span>
+                <input
+                  id="tg"
+                  type="text"
+                  value={telegramUsername}
+                  onChange={(e) => setTelegramUsername(e.target.value.replace(/^@/, "").replace(/\s/g, ""))}
+                  placeholder="ksumax"
+                  className={`${INPUT_CLS} pl-14`}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                />
+              </div>
+              <p className="text-[11px] text-[#A1A1AA] mt-1">Кнопка «Написать» откроет чат в Telegram</p>
+            </Field>
+            <Field label="Контактный e-mail" htmlFor="contact-email">
+              <input
+                id="contact-email"
+                type="email"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+                placeholder="rider@example.com"
+                className={INPUT_CLS}
+                autoCapitalize="none"
+                autoCorrect="off"
+              />
+              <label className="mt-2 flex items-center gap-2 text-xs text-[#71717A] cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={emailPublic}
+                  onChange={(e) => setEmailPublic(e.target.checked)}
+                  className="w-4 h-4 rounded border-[#E4E4E7] accent-[#F4632A]"
+                  disabled={!contactEmail.trim()}
+                />
+                Показывать другим участникам
+              </label>
             </Field>
           </Section>
 

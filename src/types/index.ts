@@ -24,6 +24,10 @@ export interface User {
   km_total: number;
   routes_count: number;
   events_count: number;
+  // Public contact (Sprint 2). Always optional — callers should hide the UI
+  // when both are empty.
+  telegram_username?: string | null;
+  contact_email?: string | null;
 }
 
 export interface Route {

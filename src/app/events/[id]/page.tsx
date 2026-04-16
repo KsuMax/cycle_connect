@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Avatar, AvatarGroup } from "@/components/ui/Avatar";
+import { ContactButton } from "@/components/ui/ContactButton";
 import { DifficultyBadge, Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { supabase, proxyImageUrl } from "@/lib/supabase";
@@ -395,12 +396,27 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 )}
               </div>
               <div className="flex flex-wrap gap-3">
-                {event.participants.map((p) => (
-                  <Link key={p.id} href={`/users/${p.id}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                    <Avatar user={p} size="sm" />
-                    <span className="text-sm text-[#1C1C1E]">{p.name}</span>
-                  </Link>
-                ))}
+                {event.participants.map((p) => {
+                  // Show the contact button only to viewers who are part of the
+                  // event (organizer, admin, or fellow participant) — don't leak
+                  // TG / e-mail to random passers-by.
+                  const viewerIsInsider =
+                    !!user && (
+                      user.id === event.organizer.id ||
+                      isAdmin ||
+                      event.participants.some((x) => x.id === user.id)
+                    );
+                  const showContact = viewerIsInsider && user?.id !== p.id;
+                  return (
+                    <div key={p.id} className="flex items-center gap-2">
+                      <Link href={`/users/${p.id}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                        <Avatar user={p} size="sm" />
+                        <span className="text-sm text-[#1C1C1E]">{p.name}</span>
+                      </Link>
+                      {showContact && <ContactButton user={p} />}
+                    </div>
+                  );
+                })}
                 {event.participants.length === 0 && (
                   <p className="text-sm text-[#A1A1AA]">Пока никто не записался</p>
                 )}
@@ -424,13 +440,18 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           <aside>
             <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7] sticky top-24"
               style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-              <Link href={`/users/${event.organizer.id}`} className="flex items-center gap-3 mb-4 pb-4 border-b border-[#F5F4F1] hover:opacity-80 transition-opacity">
-                <Avatar user={event.organizer} size="md" />
-                <div>
-                  <div className="text-xs text-[#71717A]">Организатор</div>
-                  <div className="font-medium text-[#1C1C1E]">{event.organizer.name}</div>
-                </div>
-              </Link>
+              <div className="flex items-center gap-3 mb-4 pb-4 border-b border-[#F5F4F1]">
+                <Link href={`/users/${event.organizer.id}`} className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity">
+                  <Avatar user={event.organizer} size="md" />
+                  <div className="min-w-0">
+                    <div className="text-xs text-[#71717A]">Организатор</div>
+                    <div className="font-medium text-[#1C1C1E] truncate">{event.organizer.name}</div>
+                  </div>
+                </Link>
+                {user?.id !== event.organizer.id && (
+                  <ContactButton user={event.organizer} variant="inline" />
+                )}
+              </div>
 
               {event.is_private && (
                 <div className="flex items-center gap-1.5 text-xs text-[#71717A] bg-[#F5F4F1] rounded-lg px-3 py-2 mb-4">
