@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { proxyImageUrl } from "@/lib/supabase";
 import type { User } from "@/types";
@@ -68,18 +69,34 @@ interface AvatarGroupProps {
   max?: number;
   size?: "sm" | "md";
   label?: string;
+  /** If provided, each avatar becomes a link to the returned URL. */
+  getHref?: (user: User) => string;
 }
 
-export function AvatarGroup({ users, max = 4, size = "sm", label }: AvatarGroupProps) {
+export function AvatarGroup({ users, max = 4, size = "sm", label, getHref }: AvatarGroupProps) {
   const shown = users.slice(0, max);
   const rest = users.length - shown.length;
 
   return (
     <div className="flex items-center gap-2">
       <div className="flex -space-x-1.5">
-        {shown.map((user) => (
-          <Avatar key={user.id} user={user} size={size} className="ring-2 ring-white" />
-        ))}
+        {shown.map((user) => {
+          const avatar = <Avatar key={user.id} user={user} size={size} className="ring-2 ring-white" />;
+          if (getHref) {
+            return (
+              <Link
+                key={user.id}
+                href={getHref(user)}
+                title={user.name}
+                className="hover:z-10 relative transition-transform hover:scale-110"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {avatar}
+              </Link>
+            );
+          }
+          return avatar;
+        })}
         {rest > 0 && (
           <div
             className={cn(
@@ -87,6 +104,7 @@ export function AvatarGroup({ users, max = 4, size = "sm", label }: AvatarGroupP
               size === "sm" ? "w-7 h-7" : "w-9 h-9"
             )}
             style={{ backgroundColor: "#E4E4E7", color: "#71717A" }}
+            title={`Ещё ${rest}`}
           >
             +{rest}
           </div>

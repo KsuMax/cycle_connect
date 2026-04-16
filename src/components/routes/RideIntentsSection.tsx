@@ -404,7 +404,11 @@ function IntentCard({
 
       <div className="flex items-center justify-between pl-10">
         {participants.length > 1 ? (
-          <AvatarGroup users={participantUsers} max={4} />
+          <AvatarGroup
+            users={participantUsers}
+            max={4}
+            getHref={(u) => `/users/${u.id}`}
+          />
         ) : (
           <span className="text-xs text-[#A1A1AA]">Пока один</span>
         )}
@@ -415,9 +419,8 @@ function IntentCard({
               <button
                 onClick={handleNotify}
                 disabled={notifying}
-                className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-                style={{ backgroundColor: "#E6F4FB", color: "#0088CC" }}
-                title="Отправить TG-уведомление всем участникам"
+                title="Всем отметившимся бот пришлёт уведомление с ссылкой на маршрут"
+                className="flex items-center gap-1 text-xs font-medium text-[#0088CC] hover:text-[#006DAF] transition-colors px-2 py-1 disabled:opacity-40"
               >
                 <Bell size={11} /> {notifying ? "…" : "Позвать всех"}
               </button>
