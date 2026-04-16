@@ -1,23 +1,17 @@
 /**
- * tg-notify — Send a Telegram notification to all intent participants.
+ * tg-notify — Telegram notifications for ride intents.
  *
- * Called from the CycleConnect frontend via a Supabase Edge Function invoke.
- * The caller must be authenticated (we verify via the Authorization header).
+ * Supports two modes via request body:
  *
- * Request body (JSON):
- *   { intentId: string }
+ *  mode "joined"    — someone joined an intent; notify the creator.
+ *                     Body: { mode: "joined", intentId: string, joinerId: string }
+ *                     Auth: the joiner's JWT.
  *
- * What it does:
- *   1. Validates the caller is the intent creator.
- *   2. Loads all participants + their telegram_chat_id (where tg_notify_intents=true).
- *   3. Sends a Telegram message to each linked participant.
- *   4. Returns { sent: number, skipped: number }.
+ *  mode "broadcast" — creator broadcasts to all participants.
+ *                     Body: { mode: "broadcast", intentId: string }
+ *                     Auth: must be the creator's JWT.
  *
- * Environment secrets:
- *   TELEGRAM_BOT_TOKEN
- *   SUPABASE_SERVICE_ROLE_KEY  (auto-injected)
- *   SUPABASE_URL               (auto-injected)
- *   NEXT_PUBLIC_SITE_URL       — e.g. https://cycleconnect.ru
+ * Returns { sent: number, skipped: number }
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -44,9 +38,7 @@ async function sendTg(chatId: number, text: string): Promise<boolean> {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method !== "POST") {
-    return json({ error: "method not allowed" }, 405);
-  }
+  if (req.method !== "POST") return json({ error: "method not allowed" }, 405);
 
   // Verify caller JWT
   const authHeader = req.headers.get("Authorization") ?? "";
@@ -57,78 +49,89 @@ Deno.serve(async (req: Request) => {
     auth: { persistSession: false },
     global: { headers: { Authorization: `Bearer ${jwt}` } },
   });
-
   const { data: { user }, error: authErr } = await userDb.auth.getUser();
   if (authErr || !user) return json({ error: "unauthorized" }, 401);
 
-  let body: { intentId?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return json({ error: "invalid json" }, 400);
-  }
+  let body: { mode?: string; intentId?: string; joinerId?: string };
+  try { body = await req.json(); } catch { return json({ error: "invalid json" }, 400); }
 
-  const { intentId } = body;
+  const { mode = "broadcast", intentId, joinerId } = body;
   if (!intentId) return json({ error: "intentId required" }, 400);
 
-  // Load intent + route (to build the message)
+  // Load intent + route
   const { data: intent, error: intentErr } = await adminDb
     .from("ride_intents")
     .select("id, route_id, creator_id, planned_date, note, route:routes(id, title)")
     .eq("id", intentId)
     .single();
-
   if (intentErr || !intent) return json({ error: "intent not found" }, 404);
 
-  // Only the creator can trigger a broadcast
-  if (intent.creator_id !== user.id) {
-    return json({ error: "forbidden" }, 403);
+  const routeTitle = (intent.route as { title?: string } | null)?.title ?? "маршрут";
+  const routeId = intent.route_id as string;
+  const date = formatDate(intent.planned_date as string);
+  const routeUrl = `${SITE_URL}/routes/${routeId}`;
+
+  // ── MODE: joined ──────────────────────────────────────────────────────────
+  if (mode === "joined") {
+    // Load joiner's profile
+    const joinerId_ = joinerId ?? user.id;
+    const { data: joiner } = await adminDb
+      .from("profiles")
+      .select("name")
+      .eq("id", joinerId_)
+      .single();
+    const joinerName = (joiner?.name as string | null) ?? "Участник";
+
+    // Load creator's chat_id
+    const { data: creator } = await adminDb
+      .from("profiles")
+      .select("telegram_chat_id, tg_notify_intents, name")
+      .eq("id", intent.creator_id as string)
+      .single();
+
+    if (!creator?.telegram_chat_id || creator.tg_notify_intents === false) {
+      return json({ sent: 0, skipped: 1 });
+    }
+
+    const text =
+      `🚴 <b>${joinerName}</b> хочет поехать вместе!\n\n` +
+      `📍 <b>${routeTitle}</b>\n` +
+      `📅 ${date}\n` +
+      `\n<a href="${routeUrl}">Открыть маршрут</a>`;
+
+    const ok = await sendTg(creator.telegram_chat_id as number, text);
+    return json({ sent: ok ? 1 : 0, skipped: ok ? 0 : 1 });
   }
 
-  // Load participants with TG linked + notifications on, excluding creator
+  // ── MODE: broadcast ───────────────────────────────────────────────────────
+  // Only the creator can broadcast
+  if (intent.creator_id !== user.id) return json({ error: "forbidden" }, 403);
+
+  const { data: creatorProfile } = await adminDb
+    .from("profiles")
+    .select("name")
+    .eq("id", user.id)
+    .single();
+  const creatorName = (creatorProfile?.name as string | null) ?? "Организатор";
+
   const { data: participants } = await adminDb
     .from("ride_intent_participants")
     .select("user_id, profile:profiles!user_id(telegram_chat_id, tg_notify_intents, name)")
     .eq("intent_id", intentId)
     .neq("user_id", user.id);
 
-  // Load creator name for the message
-  const { data: creatorProfile } = await adminDb
-    .from("profiles")
-    .select("name")
-    .eq("id", user.id)
-    .single();
-
-  const creatorName = (creatorProfile?.name as string | null) ?? "Организатор";
-  const routeTitle = (intent.route as { title?: string } | null)?.title ?? "маршруту";
-  const routeId = intent.route_id;
-  const date = formatDate(intent.planned_date as string);
-  const routeUrl = `${SITE_URL}/routes/${routeId}`;
-
-  const messageText =
+  const text =
     `🚴 <b>${creatorName}</b> зовёт на покатушку!\n\n` +
     `📍 <b>${routeTitle}</b>\n` +
     `📅 ${date}\n` +
-    (intent.note ? `💬 ${intent.note}\n` : "") +
+    (intent.note ? `💬 ${intent.note as string}\n` : "") +
     `\n<a href="${routeUrl}">Открыть маршрут</a>`;
 
-  let sent = 0;
-  let skipped = 0;
-
+  let sent = 0, skipped = 0;
   for (const p of participants ?? []) {
-    const profile = p.profile as {
-      telegram_chat_id?: number | null;
-      tg_notify_intents?: boolean;
-      name?: string | null;
-    } | null;
-
-    if (!profile?.telegram_chat_id || profile.tg_notify_intents === false) {
-      skipped++;
-      continue;
-    }
-
-    const ok = await sendTg(profile.telegram_chat_id, messageText);
-    ok ? sent++ : skipped++;
+    const prof = p.profile as { telegram_chat_id?: number | null; tg_notify_intents?: boolean } | null;
+    if (!prof?.telegram_chat_id || prof.tg_notify_intents === false) { skipped++; continue; }
+    (await sendTg(prof.telegram_chat_id, text)) ? sent++ : skipped++;
   }
 
   return json({ sent, skipped });
@@ -142,10 +145,7 @@ function json(data: unknown, status = 200): Response {
 }
 
 function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString("ru-RU", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
+  return new Date(iso).toLocaleDateString("ru-RU", {
+    day: "numeric", month: "long", year: "numeric",
   });
 }

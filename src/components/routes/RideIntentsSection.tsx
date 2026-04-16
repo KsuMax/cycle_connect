@@ -152,6 +152,15 @@ export function RideIntentsSection({ routeId, routeTitle, intents, onIntentsChan
     showToast("Ты присоединился к поездке!", "success");
     onIntentsChange();
     refreshIntents();
+
+    // Fire-and-forget TG notification to the creator (no await — don't block UI)
+    if (intent.creator_id !== user.id) {
+      fetch("/api/tg-notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intentId: intent.id, mode: "joined", joinerId: user.id }),
+      }).catch(() => {/* silent — non-critical */});
+    }
   };
 
   const handleLeaveIntent = async (intentId: string) => {

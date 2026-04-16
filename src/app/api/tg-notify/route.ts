@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  let body: { intentId?: string };
+  let body: { intentId?: string; mode?: string; joinerId?: string };
   try {
     body = await req.json();
   } catch {
@@ -50,7 +50,11 @@ export async function POST(req: NextRequest) {
       "Content-Type": "application/json",
       Authorization: `Bearer ${session.access_token}`,
     },
-    body: JSON.stringify({ intentId: body.intentId }),
+    body: JSON.stringify({
+      intentId: body.intentId,
+      mode: body.mode ?? "broadcast",
+      joinerId: body.joinerId,
+    }),
   });
 
   const data = await upstream.json();
