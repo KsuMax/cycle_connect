@@ -19,7 +19,7 @@ import { useAuthModal } from "@/components/ui/AuthModal";
 import { useToast } from "@/lib/context/ToastContext";
 import { useAchievements } from "@/lib/context/AchievementsContext";
 import { RideIntentsSection } from "@/components/routes/RideIntentsSection";
-import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users, Download, Train, Bus, CarTaxiFront, Route as RouteIcon } from "lucide-react";
+import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users, Download, Train, Bus, CarTaxiFront, Route as RouteIcon, MoreVertical } from "lucide-react";
 import type { ExitPointKind } from "@/types";
 import { formatDate } from "@/lib/utils";
 import { sanitizeHtml } from "@/lib/sanitize";
@@ -123,7 +123,7 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
   const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { isLiked, toggleLike } = useLikes();
-  const { hasRidden, rideCount, addRide } = useRides();
+  const { hasRidden, rideCount, addRide, removeRide } = useRides();
   const { requireAuth } = useAuthModal();
   const { showToast } = useToast();
   const { checkAndAward } = useAchievements();
@@ -139,6 +139,8 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
   const [relatedEvents, setRelatedEvents] = useState<RelatedEvent[]>([]);
   const [rideIntents, setRideIntents] = useState<DbRideIntent[]>([]);
   const [intentsKey, setIntentsKey] = useState(0);
+  const [showRideMenu, setShowRideMenu] = useState(false);
+  const [removingRide, setRemovingRide] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -328,18 +330,47 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
     if (rideState.type === "ridden") {
       return (
         <div className="flex-1 flex flex-col gap-1">
-          <button
-            onClick={() => {
-              if (!requireAuth("отметить проезд")) return;
-              addRide(route!.id, route!.distance_km);
-              showToast("Проезд отмечен! +" + route!.distance_km + " км", "success");
-              checkAndAward("ride_added", { routeId: route!.id, authorId: route!.author.id, distanceKm: route!.distance_km });
-            }}
-            className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors"
-            style={{ backgroundColor: "#F4632A", color: "white" }}
-          >
-            Проехал ещё раз
-          </button>
+          <div className="flex gap-2 group/rideactions">
+            <button
+              onClick={() => {
+                if (!requireAuth("отметить проезд")) return;
+                addRide(route!.id, route!.distance_km);
+                showToast("Проезд отмечен! +" + route!.distance_km + " км", "success");
+                checkAndAward("ride_added", { routeId: route!.id, authorId: route!.author.id, distanceKm: route!.distance_km });
+              }}
+              className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+              style={{ backgroundColor: "#F4632A", color: "white" }}
+            >
+              Проехал ещё раз
+            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowRideMenu(!showRideMenu)}
+                className="w-10 h-10 rounded-xl border border-[#E4E4E7] flex items-center justify-center text-[#A1A1AA] hover:text-[#1C1C1E] hover:border-[#F4632A] transition-colors"
+                title="Ещё действия"
+              >
+                <MoreVertical size={16} />
+              </button>
+              {showRideMenu && (
+                <div className="absolute right-0 top-full mt-1 bg-white rounded-lg border border-[#E4E4E7] shadow-lg z-10 min-w-48"
+                  style={{ boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)" }}>
+                  <button
+                    onClick={async () => {
+                      setRemovingRide(true);
+                      await removeRide(route!.id);
+                      showToast("Запись отменена", "info");
+                      setShowRideMenu(false);
+                      setRemovingRide(false);
+                    }}
+                    disabled={removingRide}
+                    className="w-full px-4 py-2.5 text-left text-sm font-medium text-red-500 hover:bg-red-50 transition-colors first:rounded-t-lg last:rounded-b-lg disabled:opacity-50"
+                  >
+                    {removingRide ? "..." : "Отменить проезд"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
           <div className="text-center text-xs text-[#A1A1AA]">
             Проехал {rideState.count} {rideState.count === 1 ? "раз" : rideState.count < 5 ? "раза" : "раз"} · {rideState.count * route!.distance_km} км
           </div>
