@@ -331,18 +331,24 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
       return (
         <div className="flex-1 flex flex-col gap-1">
           <div className="flex gap-2 group/rideactions">
-            <button
-              onClick={() => {
-                if (!requireAuth("отметить проезд")) return;
-                addRide(route!.id, route!.distance_km);
-                showToast("Проезд отмечен! +" + route!.distance_km + " км", "success");
-                checkAndAward("ride_added", { routeId: route!.id, authorId: route!.author.id, distanceKm: route!.distance_km });
-              }}
-              className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors"
-              style={{ backgroundColor: "#F4632A", color: "white" }}
-            >
-              Проехал ещё раз
-            </button>
+            <div className="flex-1 relative group/ridebtn">
+              <button
+                onClick={() => {
+                  if (!requireAuth("отметить проезд")) return;
+                  addRide(route!.id, route!.distance_km);
+                  showToast("Проезд отмечен! +" + route!.distance_km + " км", "success");
+                  checkAndAward("ride_added", { routeId: route!.id, authorId: route!.author.id, distanceKm: route!.distance_km });
+                }}
+                className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors"
+                style={{ backgroundColor: "#F4632A", color: "white" }}
+              >
+                Проехал ещё раз
+              </button>
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap opacity-0 group-hover/ridebtn:opacity-100 transition-opacity pointer-events-none z-10"
+                style={{ backgroundColor: "#1C1C1E", color: "white" }}>
+                Если ты уже ездил этот маршрут, нажимай, чтобы отметиться
+              </div>
+            </div>
             <div className="relative">
               <button
                 onClick={() => setShowRideMenu(!showRideMenu)}
@@ -380,18 +386,24 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
 
     // not_ridden
     return (
-      <button
-        onClick={() => {
-          if (!requireAuth("отметить маршрут")) return;
-          addRide(route!.id, route!.distance_km);
-          showToast("Проезд отмечен! +" + route!.distance_km + " км", "success");
-          checkAndAward("ride_added", { routeId: route!.id, authorId: route!.author.id, distanceKm: route!.distance_km });
-        }}
-        className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors"
-        style={{ backgroundColor: "#1C1C1E", color: "white" }}
-      >
-        Отметить проезд
-      </button>
+      <div className="flex-1 relative group/ridebtn">
+        <button
+          onClick={() => {
+            if (!requireAuth("отметить маршрут")) return;
+            addRide(route!.id, route!.distance_km);
+            showToast("Проезд отмечен! +" + route!.distance_km + " км", "success");
+            checkAndAward("ride_added", { routeId: route!.id, authorId: route!.author.id, distanceKm: route!.distance_km });
+          }}
+          className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors"
+          style={{ backgroundColor: "#1C1C1E", color: "white" }}
+        >
+          Отметить проезд
+        </button>
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap opacity-0 group-hover/ridebtn:opacity-100 transition-opacity pointer-events-none z-10"
+          style={{ backgroundColor: "#1C1C1E", color: "white" }}>
+          Если ты уже ездил этот маршрут, нажимай, чтобы отметиться
+        </div>
+      </div>
     );
   }
 
