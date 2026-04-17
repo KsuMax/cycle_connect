@@ -76,6 +76,18 @@ export default function SettingsPage() {
     if (user) setEmail(user.email ?? "");
   }, [profile, user]);
 
+  const handleUnlinkTelegram = async () => {
+    if (!user) return;
+    setError(null);
+    const { error: err } = await supabase
+      .from("profiles")
+      .update({ telegram_chat_id: null, tg_link_code: null, tg_link_code_exp: null })
+      .eq("id", user.id);
+    if (err) { setError(err.message); return; }
+    await refreshProfile();
+    setTgLinked(false);
+  };
+
   const handleLinkTelegram = async () => {
     setError(null);
     setTgLinking(true);
@@ -305,9 +317,18 @@ export default function SettingsPage() {
               Привяжи аккаунт, чтобы получать уведомления о совместных покатушках.
             </p>
             {tgLinked ? (
-              <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-[#F0FDF4] border border-[#BBF7D0]">
-                <Check size={14} className="text-green-600 shrink-0" />
-                <span className="text-sm text-green-700 font-medium">Telegram привязан</span>
+              <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-[#F0FDF4] border border-[#BBF7D0]">
+                <div className="flex items-center gap-2">
+                  <Check size={14} className="text-green-600 shrink-0" />
+                  <span className="text-sm text-green-700 font-medium">Telegram привязан</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleUnlinkTelegram}
+                  className="text-xs text-[#71717A] hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50"
+                >
+                  Отвязать
+                </button>
               </div>
             ) : (
               <button
