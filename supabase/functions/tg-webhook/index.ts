@@ -89,9 +89,12 @@ function extractFromText(query: string): RouteFilters {
   const hasExplicitDist = extractDistance(q, out);
 
   if (!hasExplicitDist) {
-    if (/вечер|после работы|часик|1[–\-–—]2\s*час|пару час|час-другой/.test(q)) {
+    const hoursMatch = q.match(/(?:на\s+)?(\d+)\s*час/);
+    if (hoursMatch) {
+      out.distance_max = Math.min(parseInt(hoursMatch[1], 10) * 25, 150);
+    } else if (/вечер|после работы|пару час|час-другой/.test(q)) {
       out.distance_max = 60;
-    } else if (/полдня|несколько час|3[–\-–—]4\s*час/.test(q)) {
+    } else if (/полдня|несколько час/.test(q)) {
       out.distance_max = 80;
     } else if (/на день|целый день|однодневн/.test(q)) {
       out.distance_max = 150;
