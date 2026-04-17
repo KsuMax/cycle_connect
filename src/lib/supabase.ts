@@ -130,6 +130,8 @@ export interface DbRoute {
   cover_url: string | null;
   gpx_path: string | null;
   gpx_updated_at: string | null;
+  start_point: unknown | null;
+  route_line: unknown | null;
   exit_points_status: "has" | "none" | "unknown";
   likes_count: number;
   riders_today: number;

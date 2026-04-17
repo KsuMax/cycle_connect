@@ -13,6 +13,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useToast } from "@/lib/context/ToastContext";
 import { useAchievements } from "@/lib/context/AchievementsContext";
 import { supabase } from "@/lib/supabase";
+import { parseGpxFile, toWktPoint, toWktLinestring } from "@/lib/gpx";
 import { ROUTE_TYPES, DIFFICULTIES, SURFACES, BIKE_TYPES } from "@/constants/routes";
 import type { RouteType, Difficulty, Surface, BikeType, ExitPointsStatus } from "@/types";
 import Link from "next/link";
@@ -170,6 +171,18 @@ export default function NewRoutePage() {
         .upload(path, gpxFile, { upsert: true, contentType: "application/gpx+xml" });
       if (!gpxError) {
         await supabase.from("routes").update({ gpx_path: path }).eq("id", routeData.id);
+        try {
+          const { startPoint, trackpoints } = await parseGpxFile(gpxFile);
+          if (startPoint) {
+            await supabase.rpc("update_route_geometry", {
+              route_id: routeData.id,
+              start_wkt: toWktPoint(startPoint.lat, startPoint.lng),
+              line_wkt: toWktLinestring(trackpoints) ?? undefined,
+            });
+          }
+        } catch {
+          // Non-critical — geometry extraction failed, proximity search won't work for this route
+        }
       }
     }
 

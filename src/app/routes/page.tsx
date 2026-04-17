@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { EventCard } from "@/components/events/EventCard";
-import { Search, SlidersHorizontal, X, Plus, Map, Calendar } from "lucide-react";
+import { Search, SlidersHorizontal, X, Plus, Map, Calendar, LocateFixed, Loader2 } from "lucide-react";
 import Link from "next/link";
 import type { Difficulty, RouteType, Route, CycleEvent, Surface } from "@/types";
 import { supabase } from "@/lib/supabase";
@@ -57,6 +57,13 @@ function RoutesPageInner() {
   const [sortBy, setSortBy] = useState<"newest" | "oldest">("newest");
   const [routes, setRoutes] = useState<Route[]>([]);
   const [routesLoading, setRoutesLoading] = useState(true);
+
+  // ── Near-me filter ────────────────────────────────────────────────────────
+  const [nearMeActive, setNearMeActive] = useState(false);
+  const [nearMeRadius, setNearMeRadius] = useState(25);
+  const [nearMeIds, setNearMeIds] = useState<Set<string> | null>(null);
+  const [nearMeLoading, setNearMeLoading] = useState(false);
+  const [nearMeError, setNearMeError] = useState<string | null>(null);
 
   // ── Events state ──────────────────────────────────────────────────────────
   const [events, setEvents] = useState<CycleEvent[]>([]);
@@ -126,6 +133,45 @@ function RoutesPageInner() {
       });
   }, [activeTab, eventsLoaded]);
 
+  // ── Near-me: request location + call RPC ─────────────────────────────────
+  const activateNearMe = useCallback(async (radius: number) => {
+    setNearMeLoading(true);
+    setNearMeError(null);
+    try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
+      );
+      const { latitude: lat, longitude: lng } = pos.coords;
+      const { data, error } = await supabase.rpc("routes_near_location", {
+        lat,
+        lng,
+        radius_km: radius,
+      });
+      if (error) throw error;
+      setNearMeIds(new Set((data as { id: string }[]).map((r) => r.id)));
+      setNearMeActive(true);
+    } catch (err) {
+      const msg = err instanceof GeolocationPositionError
+        ? err.code === 1 ? "Доступ к геолокации запрещён" : "Не удалось определить местоположение"
+        : "Ошибка поиска маршрутов";
+      setNearMeError(msg);
+      setNearMeActive(false);
+    } finally {
+      setNearMeLoading(false);
+    }
+  }, []);
+
+  const deactivateNearMe = useCallback(() => {
+    setNearMeActive(false);
+    setNearMeIds(null);
+    setNearMeError(null);
+  }, []);
+
+  const handleNearMeRadiusChange = useCallback((radius: number) => {
+    setNearMeRadius(radius);
+    if (nearMeActive) activateNearMe(radius);
+  }, [nearMeActive, activateNearMe]);
+
   // ── Routes filtering / sorting ────────────────────────────────────────────
   const toggleType = (type: RouteType) =>
     setSelectedTypes((prev) => prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]);
@@ -137,6 +183,7 @@ function RoutesPageInner() {
   const maxKm = maxDistance === "" ? null : Number(maxDistance);
 
   const filtered = routes.filter((route) => {
+    if (nearMeActive && nearMeIds !== null && !nearMeIds.has(route.id)) return false;
     if (search && !route.title.toLowerCase().includes(search.toLowerCase())) return false;
     if (difficulty !== "all" && route.difficulty !== difficulty) return false;
     if (selectedTypes.length > 0 && !selectedTypes.some((t) => route.route_types.includes(t))) return false;
@@ -154,7 +201,8 @@ function RoutesPageInner() {
   );
 
   const hasActiveRouteFilters =
-    difficulty !== "all"
+    nearMeActive
+    || difficulty !== "all"
     || locationScope !== "all"
     || selectedTypes.length > 0
     || selectedSurfaces.length > 0
@@ -163,6 +211,7 @@ function RoutesPageInner() {
     || region !== "";
 
   const resetRouteFilters = () => {
+    deactivateNearMe();
     setDifficulty("all");
     setSelectedTypes([]);
     setSelectedSurfaces([]);
@@ -286,6 +335,42 @@ function RoutesPageInner() {
                     <option value="newest">По дате (сначала новые)</option>
                     <option value="oldest">По дате (сначала старые)</option>
                   </select>
+                </div>
+
+                {/* Near me */}
+                <div className="mb-5">
+                  <label className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-2 block">Рядом со мной</label>
+                  <button
+                    onClick={() => nearMeActive ? deactivateNearMe() : activateNearMe(nearMeRadius)}
+                    disabled={nearMeLoading}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-colors"
+                    style={nearMeActive
+                      ? { backgroundColor: "#F4632A", color: "white", borderColor: "#F4632A" }
+                      : { backgroundColor: "white", color: "#71717A", borderColor: "#E4E4E7" }}>
+                    {nearMeLoading
+                      ? <Loader2 size={15} className="animate-spin" />
+                      : <LocateFixed size={15} />}
+                    {nearMeLoading ? "Определяю..." : nearMeActive ? "Рядом со мной ✓" : "Найти рядом со мной"}
+                  </button>
+                  {nearMeActive && (
+                    <div className="mt-2">
+                      <div className="text-xs text-[#71717A] mb-1.5">Радиус поиска</div>
+                      <div className="flex gap-1">
+                        {[10, 25, 50, 100].map((r) => (
+                          <button key={r} onClick={() => handleNearMeRadiusChange(r)}
+                            className="flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors border"
+                            style={nearMeRadius === r
+                              ? { backgroundColor: "#F4632A", color: "white", borderColor: "#F4632A" }
+                              : { backgroundColor: "white", color: "#71717A", borderColor: "#E4E4E7" }}>
+                            {r} км
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {nearMeError && (
+                    <p className="mt-1.5 text-xs text-red-500">{nearMeError}</p>
+                  )}
                 </div>
 
                 <div className="mb-5">
@@ -532,6 +617,34 @@ function RoutesPageInner() {
                     <option value="newest">По дате (сначала новые)</option>
                     <option value="oldest">По дате (сначала старые)</option>
                   </select>
+                </div>
+                {/* Near me — mobile */}
+                <div>
+                  <div className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-2">Рядом со мной</div>
+                  <button
+                    onClick={() => nearMeActive ? deactivateNearMe() : activateNearMe(nearMeRadius)}
+                    disabled={nearMeLoading}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-colors"
+                    style={nearMeActive
+                      ? { backgroundColor: "#F4632A", color: "white", borderColor: "#F4632A" }
+                      : { backgroundColor: "white", color: "#71717A", borderColor: "#E4E4E7" }}>
+                    {nearMeLoading ? <Loader2 size={15} className="animate-spin" /> : <LocateFixed size={15} />}
+                    {nearMeLoading ? "Определяю..." : nearMeActive ? "Рядом со мной ✓" : "Найти рядом со мной"}
+                  </button>
+                  {nearMeActive && (
+                    <div className="flex gap-1 mt-2">
+                      {[10, 25, 50, 100].map((r) => (
+                        <button key={r} onClick={() => handleNearMeRadiusChange(r)}
+                          className="flex-1 py-1.5 rounded-lg text-xs font-medium border transition-colors"
+                          style={nearMeRadius === r
+                            ? { backgroundColor: "#F4632A", color: "white", borderColor: "#F4632A" }
+                            : { backgroundColor: "white", color: "#71717A", borderColor: "#E4E4E7" }}>
+                          {r} км
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {nearMeError && <p className="mt-1.5 text-xs text-red-500">{nearMeError}</p>}
                 </div>
                 <div>
                   <div className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-2">Где</div>

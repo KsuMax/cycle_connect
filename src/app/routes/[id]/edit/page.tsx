@@ -11,6 +11,7 @@ import { ExitPointsEditor, type ExitPointDraft } from "@/components/routes/ExitP
 import { DayEditor } from "@/components/events/DayEditor";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase, proxyImageUrl } from "@/lib/supabase";
+import { parseGpxFile, toWktPoint, toWktLinestring } from "@/lib/gpx";
 import { ROUTE_TYPES, DIFFICULTIES, SURFACES, BIKE_TYPES } from "@/constants/routes";
 import type { RouteType, Difficulty, Surface, BikeType, ExitPointsStatus } from "@/types";
 import Link from "next/link";
@@ -230,10 +231,23 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
       if (!gpxError) {
         // Force gpx_updated_at refresh even if path is unchanged
         await supabase.from("routes").update({ gpx_path: path, gpx_updated_at: new Date().toISOString() }).eq("id", id);
+        try {
+          const { startPoint, trackpoints } = await parseGpxFile(gpxFile);
+          if (startPoint) {
+            await supabase.rpc("update_route_geometry", {
+              route_id: id,
+              start_wkt: toWktPoint(startPoint.lat, startPoint.lng),
+              line_wkt: toWktLinestring(trackpoints) ?? undefined,
+            });
+          }
+        } catch {
+          // Non-critical
+        }
       }
     } else if (gpxCleared && existingGpxPath) {
       await supabase.storage.from("route-gpx").remove([existingGpxPath]);
       await supabase.from("routes").update({ gpx_path: null, gpx_updated_at: null }).eq("id", id);
+      await supabase.rpc("clear_route_geometry", { route_id: id });
     }
 
     // Exit points: replace-all strategy (simpler than diffing)
