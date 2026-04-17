@@ -106,6 +106,23 @@ function extractFromText(query: string): RouteFilters {
     out.bike_types = ["gravel"];
   }
 
+  // Region — matched against all inflected forms (genitive, prepositional, etc.)
+  const REGIONS: Array<[RegExp, string]> = [
+    [/карел/i,                          "Карелия"],
+    [/санкт.петербург|питер\b|спб\b/i,  "Санкт-Петербург"],
+    [/ленинград|лен\.?\s*обл/i,         "Ленинградская область"],
+    [/подмосков/i,                      "Подмосковье"],
+    [/москв/i,                          "Москва"],
+    [/краснодар|кубан/i,                "Краснодарский край"],
+    [/крым/i,                           "Крым"],
+    [/алтай/i,                          "Алтай"],
+    [/байкал/i,                         "Байкал"],
+    [/урал/i,                           "Урал"],
+  ];
+  for (const [pattern, region] of REGIONS) {
+    if (pattern.test(q)) { out.region = region; break; }
+  }
+
   return out;
 }
 
@@ -183,6 +200,7 @@ function mergeFilters(ai: RouteFilters, regex: RouteFilters): RouteFilters {
   if (regex.surface?.length && !merged.surface?.length) merged.surface = regex.surface;
   if (regex.bike_types?.length && !merged.bike_types?.length) merged.bike_types = regex.bike_types;
   if (regex.route_types?.length && !merged.route_types?.length) merged.route_types = regex.route_types;
+  if (regex.region && !merged.region) merged.region = regex.region;
 
   return merged;
 }
