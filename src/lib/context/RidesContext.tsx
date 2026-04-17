@@ -12,8 +12,8 @@ interface RidesContextValue {
   ridesLoaded: boolean;
   /** Add one ride (manual or auto from event). Does NOT remove rides. */
   addRide: (routeId: string, distanceKm?: number, eventId?: string) => Promise<void>;
-  /** Remove one ride record. Returns true on success, false if DB rejected it. */
-  removeRide: (routeId: string) => Promise<boolean>;
+  /** Remove one ride record. Returns true on success, error string on failure. */
+  removeRide: (routeId: string) => Promise<true | string>;
   hasRidden: (routeId: string) => boolean;
   rideCount: (routeId: string) => number;
 }
@@ -98,23 +98,18 @@ export function RidesProvider({ children }: { children: ReactNode }) {
     });
   }, [user]);
 
-  const removeRide = useCallback(async (routeId: string): Promise<boolean> => {
+  const removeRide = useCallback(async (routeId: string): Promise<true | string> => {
     if (user) {
-      // Use an RPC function that atomically selects + deletes the latest ride.
-      // This avoids PostgREST LIMIT-on-DELETE limitation and RLS edge cases.
       const { data, error } = await supabase.rpc("delete_latest_ride", {
         p_route_id: routeId,
       });
 
       if (error) {
-        console.error("[removeRide] rpc failed", error);
-        return false;
+        return error.message ?? JSON.stringify(error);
       }
 
       if (data === false) {
-        // No matching ride found in DB
-        console.warn("[removeRide] no ride found for", routeId);
-        return false;
+        return "no ride found in DB";
       }
       // km_total is updated automatically by the trg_sync_km_total DB trigger
     }
@@ -130,7 +125,7 @@ export function RidesProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(next)));
       return next;
     });
-    return true;
+    return true as const;
   }, [user]);
 
   const hasRidden = useCallback((routeId: string) => (rideCounts.get(routeId) ?? 0) > 0, [rideCounts]);

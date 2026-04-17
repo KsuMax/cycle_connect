@@ -363,11 +363,11 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
                   <button
                     onClick={async () => {
                       setRemovingRide(true);
-                      const ok = await removeRide(route!.id);
-                      if (ok) {
+                      const result = await removeRide(route!.id);
+                      if (result === true) {
                         showToast("Запись отменена", "info");
                       } else {
-                        showToast("Не удалось отменить — попробуй ещё раз", "error");
+                        showToast("Ошибка: " + String(result), "error");
                       }
                       setShowRideMenu(false);
                       setRemovingRide(false);
