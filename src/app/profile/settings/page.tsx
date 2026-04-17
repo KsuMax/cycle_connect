@@ -41,6 +41,7 @@ export default function SettingsPage() {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [website, setWebsite] = useState("");
+  const [stravaUrl, setStravaUrl] = useState("");
   const [telegramUsername, setTelegramUsername] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [emailPublic, setEmailPublic] = useState(false);
@@ -65,6 +66,7 @@ export default function SettingsPage() {
       setName(profile.name ?? "");
       setUsername(profile.username ?? "");
       setWebsite(profile.website ?? "");
+      setStravaUrl(profile.strava_url ?? "");
       setTelegramUsername(profile.telegram_username ?? "");
       setContactEmail(profile.contact_email ?? "");
       setEmailPublic(profile.email_public ?? false);
@@ -152,6 +154,7 @@ export default function SettingsPage() {
       name: name.trim(),
       username: username.trim() || null,
       website: website.trim() || null,
+      strava_url: stravaUrl.trim() || null,
       telegram_username: tgTrimmed || null,
       contact_email: contactEmailTrimmed || null,
       email_public: emailPublic && !!contactEmailTrimmed,
@@ -437,6 +440,22 @@ export default function SettingsPage() {
                 placeholder="https://example.com"
                 className={INPUT_CLS}
               />
+            </Field>
+            <Field label="Strava" htmlFor="strava-url">
+              <div className="relative">
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2" width="14" height="14" viewBox="0 0 24 24" fill="#FC4C02">
+                  <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
+                </svg>
+                <input
+                  id="strava-url"
+                  type="url"
+                  value={stravaUrl}
+                  onChange={(e) => setStravaUrl(e.target.value)}
+                  placeholder="https://www.strava.com/athletes/..."
+                  className={`${INPUT_CLS} pl-9`}
+                />
+              </div>
+              <p className="text-[11px] text-[#A1A1AA] mt-1">Ссылка на профиль Strava</p>
             </Field>
           </Section>
 
