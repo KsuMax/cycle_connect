@@ -49,24 +49,54 @@ export interface RouteResult {
   tags: string[];
 }
 
+// ─── Distance helper ──────────────────────────────────────────────────────────
+
+/** Parses distance from any common phrasing. Returns true if something was found. */
+function extractDistance(q: string, out: RouteFilters): boolean {
+  // "от X до Y" — explicit range
+  const range = q.match(/от\s+(\d+)\s+до\s+(\d+)/);
+  if (range) {
+    out.distance_min = parseInt(range[1], 10);
+    out.distance_max = parseInt(range[2], 10);
+    return true;
+  }
+
+  // Explicit max: "до 50", "до 50 км", "не более 50", "километров до 50"
+  const maxMatch =
+    q.match(/(?:до|не\s*бол[её]е?|не\s*больше|максимум)\s+(\d+)\s*(?:км|километр\w*)?/) ||
+    q.match(/(?:км|километр\w+)\s+до\s+(\d+)/);
+  if (maxMatch) {
+    out.distance_max = parseInt(maxMatch[1], 10);
+    return true;
+  }
+
+  // Target: "50 км", "50км", "50 километров", "около 50"
+  const target =
+    q.match(/(\d+)\s*(?:км|километр\w*)/) ||
+    q.match(/около\s+(\d+)/);
+  if (target) {
+    const n = parseInt(target[1], 10);
+    out.distance_target = n;
+    out.distance_min = Math.max(1, Math.round(n * 0.75));
+    out.distance_max = Math.round(n * 1.25);
+    return true;
+  }
+
+  return false;
+}
+
 // ─── Regex extraction (always runs, reliable for explicit values) ──────────────
 
 function extractFromText(query: string): RouteFilters {
   const out: RouteFilters = {};
   const q = query.toLowerCase();
 
-  // Explicit distance: "50 км", "50км", "около 50 км", "на 50"
-  const kmMatch = q.match(/(\d+)\s*км/);
-  if (kmMatch) {
-    const n = parseInt(kmMatch[1], 10);
-    out.distance_target = n;
-    out.distance_min = Math.max(1, Math.round(n * 0.75)); // −25%
-    out.distance_max = Math.round(n * 1.25);              // +25%
-  }
+  // Distance extraction — handles all common Russian phrasings
+  const hasExplicitDist = extractDistance(q, out);
 
-  // Time hints → cap distance_max (don't override explicit km)
-  if (!kmMatch) {
-    if (/вечер|часик|1[–\-–—]2\s*час|пару час|час-другой/.test(q)) {
+  // Time / context hints → distance_max cap (only when no explicit distance)
+  if (!hasExplicitDist) {
+    if (/вечер|после работы|часик|1[–\-–—]2\s*час|пару час|час-другой/.test(q)) {
       out.distance_max = 60;
     } else if (/полдня|несколько час|3[–\-–—]4\s*час/.test(q)) {
       out.distance_max = 80;
