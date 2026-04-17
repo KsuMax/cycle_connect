@@ -43,6 +43,7 @@ type DbCommentRow = {
   id: string;
   text: string;
   created_at: string;
+  likes_count: number;
   author: { id: string; name: string; avatar_url?: string | null; km_total: number; routes_count: number; events_count: number } | null;
 };
 
@@ -52,7 +53,7 @@ function dbToComment(row: DbCommentRow): CommentData {
     id: row.id,
     text: row.text,
     created_at: row.created_at,
-    likes: 0,
+    likes: row.likes_count ?? 0,
     author: {
       id: row.author?.id ?? "",
       name,
@@ -79,7 +80,7 @@ export function RouteComments({ routeId }: RouteCommentsProps) {
   const loadComments = useCallback(async () => {
     const { data } = await supabase
       .from("route_comments")
-      .select("id, text, created_at, author:profiles!author_id(id, name, avatar_url, km_total, routes_count, events_count)")
+      .select("id, text, created_at, likes_count, author:profiles!author_id(id, name, avatar_url, km_total, routes_count, events_count)")
       .eq("route_id", routeId)
       .order("created_at", { ascending: true });
 
@@ -99,7 +100,7 @@ export function RouteComments({ routeId }: RouteCommentsProps) {
     const { data, error } = await supabase
       .from("route_comments")
       .insert({ route_id: routeId, author_id: user.id, text: trimmed })
-      .select("id, text, created_at, author:profiles!author_id(id, name, avatar_url, km_total, routes_count, events_count)")
+      .select("id, text, created_at, likes_count, author:profiles!author_id(id, name, avatar_url, km_total, routes_count, events_count)")
       .single();
 
     if (!error && data) {
@@ -112,17 +113,19 @@ export function RouteComments({ routeId }: RouteCommentsProps) {
     setSubmitting(false);
   };
 
-  const toggleLike = (id: string) => {
+  const toggleLike = async (id: string) => {
+    const isLiked = likedIds.has(id);
     setLikedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (isLiked) next.delete(id); else next.add(id);
       return next;
     });
     setComments((prev) =>
       prev.map((c) =>
-        c.id === id ? { ...c, likes: likedIds.has(id) ? c.likes - 1 : c.likes + 1 } : c
+        c.id === id ? { ...c, likes: isLiked ? c.likes - 1 : c.likes + 1 } : c
       )
     );
+    await supabase.rpc("increment_comment_likes", { comment_id: id, delta: isLiked ? -1 : 1 });
   };
 
   const currentUserAvatar: User | null = profile
