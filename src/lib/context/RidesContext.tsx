@@ -100,29 +100,20 @@ export function RidesProvider({ children }: { children: ReactNode }) {
 
   const removeRide = useCallback(async (routeId: string): Promise<boolean> => {
     if (user) {
-      // Find the most recent ride for this user+route, then delete it by id.
-      // Two-step because PostgREST doesn't support LIMIT on DELETE directly.
-      const { data: rides, error: selectError } = await supabase
-        .from("route_rides")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("route_id", routeId)
-        .order("created_at", { ascending: false })
-        .limit(1);
+      // Use an RPC function that atomically selects + deletes the latest ride.
+      // This avoids PostgREST LIMIT-on-DELETE limitation and RLS edge cases.
+      const { data, error } = await supabase.rpc("delete_latest_ride", {
+        p_route_id: routeId,
+      });
 
-      if (selectError || !rides || rides.length === 0) {
-        console.error("[removeRide] select failed", selectError);
+      if (error) {
+        console.error("[removeRide] rpc failed", error);
         return false;
       }
 
-      const rideId = (rides[0] as { id: string }).id;
-      const { error: deleteError } = await supabase
-        .from("route_rides")
-        .delete()
-        .eq("id", rideId);
-
-      if (deleteError) {
-        console.error("[removeRide] delete failed", deleteError);
+      if (data === false) {
+        // No matching ride found in DB
+        console.warn("[removeRide] no ride found for", routeId);
         return false;
       }
       // km_total is updated automatically by the trg_sync_km_total DB trigger
