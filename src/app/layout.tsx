@@ -14,6 +14,7 @@ import { NotificationsProvider } from "@/lib/context/NotificationsContext";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { AuthModalWrapper } from "@/components/ui/AuthModalWrapper";
 import { AchievementModal } from "@/components/ui/AchievementModal";
+import { AiSearchWidget } from "@/components/ui/AiSearchWidget";
 
 export const metadata: Metadata = {
   title: "CycleConnect — велосипедное сообщество",
@@ -41,6 +42,7 @@ export default function RootLayout({
                           <EventRidesProvider>
                             <IntentsProvider>
                               {children}
+                              <AiSearchWidget />
                               <BottomNav />
                               <AchievementModal />
                             </IntentsProvider>
