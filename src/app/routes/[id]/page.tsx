@@ -367,7 +367,7 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
                       if (result === true) {
                         showToast("Запись отменена", "info");
                       } else {
-                        showToast("Ошибка: " + String(result), "error");
+                        showToast("Не удалось отменить — попробуй ещё раз", "error");
                       }
                       setShowRideMenu(false);
                       setRemovingRide(false);
