@@ -12,8 +12,8 @@ interface RidesContextValue {
   ridesLoaded: boolean;
   /** Add one ride (manual or auto from event). Does NOT remove rides. */
   addRide: (routeId: string, distanceKm?: number, eventId?: string) => Promise<void>;
-  /** Remove one ride record. Decrements count and syncs to DB. */
-  removeRide: (routeId: string) => Promise<void>;
+  /** Remove one ride record. Returns true on success, false if DB rejected it. */
+  removeRide: (routeId: string) => Promise<boolean>;
   hasRidden: (routeId: string) => boolean;
   rideCount: (routeId: string) => number;
 }
@@ -98,27 +98,34 @@ export function RidesProvider({ children }: { children: ReactNode }) {
     });
   }, [user]);
 
-  const removeRide = useCallback(async (routeId: string) => {
+  const removeRide = useCallback(async (routeId: string): Promise<boolean> => {
     if (user) {
-      try {
-        // Delete the most recent ride for this user + route
-        // We delete by finding the latest ride and removing it
-        const { data: rides, error: selectError } = await supabase
-          .from("route_rides")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("route_id", routeId)
-          .order("created_at", { ascending: false })
-          .limit(1);
+      // Find the most recent ride for this user+route, then delete it by id.
+      // Two-step because PostgREST doesn't support LIMIT on DELETE directly.
+      const { data: rides, error: selectError } = await supabase
+        .from("route_rides")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("route_id", routeId)
+        .order("created_at", { ascending: false })
+        .limit(1);
 
-        if (!selectError && rides && rides.length > 0) {
-          const rideId = (rides[0] as { id: string }).id;
-          await supabase.from("route_rides").delete().eq("id", rideId);
-          // km_total is updated automatically by the trg_sync_km_total DB trigger
-        }
-      } catch {
-        // Supabase unavailable — persist locally only
+      if (selectError || !rides || rides.length === 0) {
+        console.error("[removeRide] select failed", selectError);
+        return false;
       }
+
+      const rideId = (rides[0] as { id: string }).id;
+      const { error: deleteError } = await supabase
+        .from("route_rides")
+        .delete()
+        .eq("id", rideId);
+
+      if (deleteError) {
+        console.error("[removeRide] delete failed", deleteError);
+        return false;
+      }
+      // km_total is updated automatically by the trg_sync_km_total DB trigger
     }
 
     setRideCounts((prev) => {
@@ -132,6 +139,7 @@ export function RidesProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(next)));
       return next;
     });
+    return true;
   }, [user]);
 
   const hasRidden = useCallback((routeId: string) => (rideCounts.get(routeId) ?? 0) > 0, [rideCounts]);
