@@ -103,7 +103,7 @@ function RoutesPageInner() {
   useEffect(() => {
     supabase
       .from("routes")
-      .select("*, author:profiles!author_id(*), route_images(url)")
+      .select("*, author:profiles!author_id(*), route_images(url), route_comments(id, text, likes_count, created_at, author:profiles!author_id(name))")
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
         if (!error && data) setRoutes(data.map(dbToRoute));

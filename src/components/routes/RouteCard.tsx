@@ -162,6 +162,10 @@ export function RouteCard({ route, compact = false }: RouteCardProps) {
                 users={[route.author]}
                 label={`${route.riders_today} ${route.riders_today === 1 ? "едет" : "едут"} сегодня`}
               />
+            ) : route.top_comment ? (
+              <span className="text-xs text-[#71717A] line-clamp-1 flex-1 mr-2 italic">
+                «{route.top_comment.text}»
+              </span>
             ) : (
               <span className="text-xs text-[#A1A1AA]">Будь первым</span>
             )}

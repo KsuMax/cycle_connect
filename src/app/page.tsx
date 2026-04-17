@@ -19,7 +19,7 @@ export default function FeedPage() {
 
   useEffect(() => {
     supabase.from("routes")
-      .select("*, author:profiles!author_id(*), route_images(url)")
+      .select("*, author:profiles!author_id(*), route_images(url), route_comments(id, text, likes_count, created_at, author:profiles!author_id(name))")
       .order("likes_count", { ascending: false })
       .limit(4)
       .then(({ data, error }) => {

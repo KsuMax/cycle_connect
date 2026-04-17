@@ -30,6 +30,11 @@ export interface User {
   contact_email?: string | null;
 }
 
+export interface RouteTopComment {
+  text: string;
+  author_name: string;
+}
+
 export interface Route {
   id: string;
   title: string;
@@ -54,6 +59,7 @@ export interface Route {
   gpx_updated_at?: string | null;
   exit_points_status: ExitPointsStatus;
   exit_points?: ExitPoint[];
+  top_comment?: RouteTopComment | null;
   created_at: string;
 }
 

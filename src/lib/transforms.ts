@@ -6,7 +6,7 @@
  */
 
 import type { DbProfile, DbRoute, DbEvent } from "@/lib/supabase";
-import type { Route, CycleEvent, User, RouteType, ExitPoint } from "@/types";
+import type { Route, RouteTopComment, CycleEvent, User, RouteType, ExitPoint } from "@/types";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
@@ -82,8 +82,21 @@ export function dbToRoute(r: DbRoute): Route {
         note: p.note,
         order_idx: p.order_idx,
       })),
+    top_comment: pickTopComment(r.route_comments),
     created_at: r.created_at,
   };
+}
+
+function pickTopComment(
+  comments: DbRoute["route_comments"],
+): RouteTopComment | null {
+  if (!comments || comments.length === 0) return null;
+  const sorted = [...comments].sort((a, b) => {
+    if (b.likes_count !== a.likes_count) return b.likes_count - a.likes_count;
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+  const top = sorted[0];
+  return { text: top.text, author_name: top.author?.name ?? "Участник" };
 }
 
 const EMPTY_ROUTE: Route = {

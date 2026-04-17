@@ -138,6 +138,7 @@ export interface DbRoute {
   author?: DbProfile;
   route_images?: { url: string }[];
   route_exit_points?: DbRouteExitPoint[];
+  route_comments?: { id: string; text: string; likes_count: number; created_at: string; author: { name: string } | null }[];
 }
 
 export interface DbRouteExitPoint {
