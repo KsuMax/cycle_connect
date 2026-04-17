@@ -21,47 +21,14 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
-const SYSTEM_PROMPT = `You are a cycling route assistant for CycleConnect, a Russian cycling community platform.
-Parse the user's message (Russian or English) and extract route search filters.
-Return ONLY a valid JSON object — no explanation, no markdown, no code blocks.
-
-Possible fields (all optional):
-{
-  "difficulty": "easy" | "medium" | "hard",
-  "distance_min": number (km),
-  "distance_max": number (km),
-  "elevation_max": number (meters),
-  "surface": array of "asphalt" | "gravel" | "dirt" | "mixed",
-  "route_types": array of "road" | "gravel" | "mtb" | "urban",
-  "bike_types": array of "road" | "mountain" | "gravel",
-  "region": string — choose closest match from [Карелия, Санкт-Петербург, Ленинградская область, Москва, Подмосковье, Краснодарский край, Крым, Алтай, Байкал, Урал],
-  "search_text": string — keywords to search in title and description
-}
-
-Interpretation rules:
-- лёгкий / несложный / начинающий / для новичка → difficulty: "easy"
-- средний / умеренный / обычный → difficulty: "medium"
-- сложный / тяжёлый / экстрим / профессиональный → difficulty: "hard"
-- "2 часа" / "пару часов" → distance_max: 60
-- "полдня" / "несколько часов" → distance_max: 80
-- "на день" / "целый день" / "однодневный" → distance_max: 150
-- "50 км" → distance_min: 45, distance_max: 55 (±10% tolerance)
-- асфальт / шоссе / дорога → surface includes "asphalt"
-- гравий / грунт / грунтовка → surface includes "gravel"
-- грязь / бездорожье / лес → surface includes "dirt"
-- шоссейный велосипед → bike_types: ["road"]
-- горный велосипед / mtb / эндуро → bike_types: ["mountain"], route_types: ["mtb"]
-- гравийный велосипед / гравел → bike_types: ["gravel"]
-- город / городской / по городу → route_types: ["urban"]
-- горы / горный маршрут → route_types: ["mtb"]
-- Nature keywords (море, озеро, лес, горы, вода, природа) → add to search_text
-- Omit any field you cannot confidently extract
-- Return {} if no filters can be determined`;
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface RouteFilters {
   difficulty?: string;
   distance_min?: number;
   distance_max?: number;
+  /** Target distance for relevance sorting — not passed to SQL */
+  distance_target?: number;
   elevation_max?: number;
   surface?: string[];
   route_types?: string[];
@@ -82,7 +49,89 @@ export interface RouteResult {
   tags: string[];
 }
 
-async function parseFilters(query: string): Promise<RouteFilters> {
+// ─── Regex extraction (always runs, reliable for explicit values) ──────────────
+
+function extractFromText(query: string): RouteFilters {
+  const out: RouteFilters = {};
+  const q = query.toLowerCase();
+
+  // Explicit distance: "50 км", "50км", "около 50 км", "на 50"
+  const kmMatch = q.match(/(\d+)\s*км/);
+  if (kmMatch) {
+    const n = parseInt(kmMatch[1], 10);
+    out.distance_target = n;
+    out.distance_min = Math.max(1, Math.round(n * 0.75)); // −25%
+    out.distance_max = Math.round(n * 1.25);              // +25%
+  }
+
+  // Time hints → cap distance_max (don't override explicit km)
+  if (!kmMatch) {
+    if (/вечер|часик|1[–\-–—]2\s*час|пару час|час-другой/.test(q)) {
+      out.distance_max = 60;
+    } else if (/полдня|несколько час|3[–\-–—]4\s*час/.test(q)) {
+      out.distance_max = 80;
+    } else if (/на день|целый день|однодневн/.test(q)) {
+      out.distance_max = 150;
+    }
+  }
+
+  // Urban / near-city hints
+  if (/\bгород|\bпо городу|недалеко от город|рядом с город|окраин/.test(q)) {
+    out.route_types = ["urban"];
+  }
+
+  // Difficulty
+  if (/несложн|лёгк|легк|начинающ|для новичк|простой/.test(q)) {
+    out.difficulty = "easy";
+  } else if (/сложн|тяжёл|тяжел|экстрим/.test(q)) {
+    out.difficulty = "hard";
+  } else if (/средн|умеренн/.test(q)) {
+    out.difficulty = "medium";
+  }
+
+  // Surface
+  const surface: string[] = [];
+  if (/асфальт|шоссе/.test(q)) surface.push("asphalt");
+  if (/гравий|грунтовк|грунт/.test(q)) surface.push("gravel");
+  if (/грязь|бездорожье/.test(q)) surface.push("dirt");
+  if (surface.length) out.surface = surface;
+
+  // Bike type
+  if (/горный вел|mtb|эндуро/.test(q)) {
+    out.bike_types = ["mountain"];
+    if (!out.route_types) out.route_types = ["mtb"];
+  } else if (/шоссейн/.test(q)) {
+    out.bike_types = ["road"];
+  } else if (/гравийн|гравел/.test(q)) {
+    out.bike_types = ["gravel"];
+  }
+
+  return out;
+}
+
+// ─── System prompt ────────────────────────────────────────────────────────────
+
+const SYSTEM_PROMPT = `You are a cycling route search assistant for CycleConnect (Russian community).
+Extract search filters from the user message. Return ONLY raw JSON, no markdown, no explanation.
+
+Output schema (all fields optional):
+{"difficulty":"easy"|"medium"|"hard","distance_min":number,"distance_max":number,"distance_target":number,"elevation_max":number,"surface":["asphalt"|"gravel"|"dirt"|"mixed"],"route_types":["road"|"gravel"|"mtb"|"urban"],"bike_types":["road"|"mountain"|"gravel"],"region":"Карелия"|"Санкт-Петербург"|"Ленинградская область"|"Москва"|"Подмосковье"|"Краснодарский край"|"Крым"|"Алтай"|"Байкал"|"Урал","search_text":"string"}
+
+Rules (apply all that match):
+1. If user says "N км" → distance_target=N, distance_min=N*0.75, distance_max=N*1.25
+2. "вечером"/"часик"/"1-2 часа" → distance_max=60 (if no explicit km)
+3. "полдня" → distance_max=80; "на день" → distance_max=150
+4. "несложный"/"лёгкий"/"для новичка" → difficulty="easy"; "средний" → "medium"; "сложный" → "hard"
+5. "по городу"/"городской"/"недалеко от города" → route_types=["urban"]
+6. "горы"/"горный маршрут" → route_types=["mtb"]
+7. "асфальт"/"шоссе" → surface=["asphalt"]; "гравий"/"грунт" → ["gravel"]
+8. Region names → region field
+9. Nature words (море, озеро, лес) → search_text
+10. Return {} only if truly nothing can be extracted`;
+
+// ─── AI filter parsing ────────────────────────────────────────────────────────
+
+async function parseAI(query: string): Promise<RouteFilters> {
   if (!OPENROUTER_API_KEY) return {};
   try {
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -99,26 +148,57 @@ async function parseFilters(query: string): Promise<RouteFilters> {
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: query },
         ],
-        max_tokens: 250,
+        max_tokens: 200,
         temperature: 0.1,
       }),
     });
     const data = await res.json();
-    const raw: string = data.choices?.[0]?.message?.content ?? "{}";
-    const cleaned = raw.replace(/```json?\s*/gi, "").replace(/```/g, "").trim();
-    return JSON.parse(cleaned) as RouteFilters;
+    const raw: string = data.choices?.[0]?.message?.content ?? "";
+    // Extract JSON object even if model wraps it in text/markdown
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return {};
+    return JSON.parse(match[0]) as RouteFilters;
   } catch {
     return {};
   }
 }
 
+// ─── Merge: regex is authoritative for explicit values ────────────────────────
+
+function mergeFilters(ai: RouteFilters, regex: RouteFilters): RouteFilters {
+  const merged = { ...ai };
+
+  // Regex wins for distance when the user explicitly said "N km"
+  if (regex.distance_target) {
+    merged.distance_target = regex.distance_target;
+    merged.distance_min = regex.distance_min;
+    merged.distance_max = regex.distance_max;
+  } else if (regex.distance_max && !merged.distance_max) {
+    // Time-hint cap (вечером etc.) only when AI didn't set anything
+    merged.distance_max = regex.distance_max;
+  }
+
+  // Regex wins for explicit categorical signals
+  if (regex.difficulty && !merged.difficulty) merged.difficulty = regex.difficulty;
+  if (regex.surface?.length && !merged.surface?.length) merged.surface = regex.surface;
+  if (regex.bike_types?.length && !merged.bike_types?.length) merged.bike_types = regex.bike_types;
+  if (regex.route_types?.length && !merged.route_types?.length) merged.route_types = regex.route_types;
+
+  return merged;
+}
+
+// ─── Supabase query ───────────────────────────────────────────────────────────
+
 async function searchRoutes(filters: RouteFilters): Promise<RouteResult[]> {
+  const hasDistanceTarget = filters.distance_target != null;
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let q: any = supabase
     .from("routes")
     .select("id, title, distance_km, elevation_m, duration_min, difficulty, region, cover_url, tags")
-    .order("created_at", { ascending: false })
-    .limit(6);
+    // Fetch more when we need to re-rank by distance closeness
+    .limit(hasDistanceTarget ? 30 : 6)
+    .order("created_at", { ascending: false });
 
   if (filters.difficulty) q = q.eq("difficulty", filters.difficulty);
   if (filters.distance_min) q = q.gte("distance_km", filters.distance_min);
@@ -135,8 +215,21 @@ async function searchRoutes(filters: RouteFilters): Promise<RouteResult[]> {
   }
 
   const { data } = await q;
-  return (data as RouteResult[]) ?? [];
+  let results: RouteResult[] = (data as RouteResult[]) ?? [];
+
+  // Re-rank by closeness to target distance, then take top 6
+  if (hasDistanceTarget && results.length > 1) {
+    const target = filters.distance_target!;
+    results.sort((a, b) =>
+      Math.abs(a.distance_km - target) - Math.abs(b.distance_km - target),
+    );
+    results = results.slice(0, 6);
+  }
+
+  return results;
 }
+
+// ─── Handler ──────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
@@ -146,7 +239,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "query required" }, { status: 400 });
   }
 
-  const filters = await parseFilters(query);
+  const [aiFilters, regexFilters] = await Promise.all([
+    parseAI(query),
+    Promise.resolve(extractFromText(query)),
+  ]);
+
+  const filters = mergeFilters(aiFilters, regexFilters);
   const routes = await searchRoutes(filters);
 
   return NextResponse.json({ routes, filters });
