@@ -52,6 +52,37 @@ interface DbRoute {
 
 // ─── Regex extraction (always runs, reliable for explicit values) ──────────────
 
+// ─── Geolocation: nearest region ─────────────────────────────────────────────
+
+const REGION_CENTERS: [string, number, number][] = [
+  ["Санкт-Петербург",       59.95,  30.32],
+  ["Ленинградская область", 60.07,  30.58],
+  ["Карелия",               62.50,  32.50],
+  ["Москва",                55.75,  37.62],
+  ["Подмосковье",           55.75,  37.20],
+  ["Краснодарский край",    45.04,  38.98],
+  ["Крым",                  45.30,  34.00],
+  ["Алтай",                 52.00,  85.00],
+  ["Байкал",                53.00, 107.00],
+  ["Урал",                  56.50,  60.00],
+];
+
+function closestRegion(lat: number, lng: number): string {
+  let best = REGION_CENTERS[0][0];
+  let bestDist = Infinity;
+  for (const [name, rlat, rlng] of REGION_CENTERS) {
+    const d = Math.hypot(lat - rlat, lng - rlng);
+    if (d < bestDist) { bestDist = d; best = name; }
+  }
+  return best;
+}
+
+function needsLocation(q: string): boolean {
+  return /рядом|поблизости|около меня|возле меня|недалеко от меня/i.test(q);
+}
+
+// ─── Distance helper ──────────────────────────────────────────────────────────
+
 function extractDistance(q: string, out: RouteFilters): boolean {
   const range = q.match(/от\s+(\d+)\s+до\s+(\d+)/);
   if (range) {
@@ -323,6 +354,23 @@ async function sendMessage(chatId: number, text: string): Promise<void> {
   });
 }
 
+/** Sends a reply keyboard with a "Share location" button. */
+async function sendLocationRequest(chatId: number): Promise<void> {
+  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: "📍 Поделись своим местоположением, и я найду ближайшие маршруты:",
+      reply_markup: {
+        keyboard: [[{ text: "📍 Отправить местоположение", request_location: true }]],
+        resize_keyboard: true,
+        one_time_keyboard: true,
+      },
+    }),
+  });
+}
+
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -336,9 +384,24 @@ Deno.serve(async (req: Request) => {
   }
 
   const message = update.message;
-  if (!message?.text) return new Response("ok");
+  if (!message) return new Response("ok");
 
   const chatId = message.chat.id;
+
+  // ── Location message → search by nearest region ───────────────────────────
+  if (message.location) {
+    const { latitude, longitude } = message.location;
+    const region = closestRegion(latitude, longitude);
+    await sendMessage(chatId,
+      `📍 Местоположение получено. Ищу маршруты в регионе <b>${escapeHtml(region)}</b>...`
+    );
+    const routes = await searchRoutes({ region });
+    await sendMessage(chatId, formatResults(routes, `рядом с тобой (${region})`));
+    return new Response("ok");
+  }
+
+  if (!message.text) return new Response("ok");
+
   const text = message.text.trim();
 
   // ── /start — account linking ──────────────────────────────────────────────
@@ -398,6 +461,12 @@ Deno.serve(async (req: Request) => {
   // ── Ignore other / commands ───────────────────────────────────────────────
   if (text.startsWith("/")) return new Response("ok");
 
+  // ── Location request in text → ask to share via Telegram ─────────────────
+  if (needsLocation(text)) {
+    await sendLocationRequest(chatId);
+    return new Response("ok");
+  }
+
   // ── All other text → AI route search ─────────────────────────────────────
   await sendMessage(chatId, "🔍 Ищу маршруты...");
 
@@ -424,4 +493,5 @@ interface TelegramMessage {
   chat: { id: number; type: string };
   from?: { id: number; username?: string; first_name?: string };
   text?: string;
+  location?: { latitude: number; longitude: number };
 }

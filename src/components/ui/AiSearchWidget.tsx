@@ -2,14 +2,14 @@
 
 import { useState, useRef, useEffect, FormEvent } from "react";
 import Link from "next/link";
-import { Sparkles, X, ArrowUp, MapPin, Mountain } from "lucide-react";
+import { Sparkles, X, ArrowUp, MapPin, Mountain, LocateFixed } from "lucide-react";
 import type { RouteResult } from "@/app/api/ai-search/route";
 
 const SUGGESTIONS = [
+  "Маршруты рядом со мной",
   "Лёгкий маршрут на 50 км",
   "Горный MTB в Карелии",
   "Городская покатушка на 2 часа",
-  "Гравийный маршрут вдали от трасс",
 ];
 
 const DIFFICULTY_STYLES: Record<string, string> = {
@@ -24,11 +24,33 @@ const DIFFICULTY_LABELS: Record<string, string> = {
   hard: "Сложный",
 };
 
+/** Returns true when the query implies the user wants location-based results. */
+function needsLocation(q: string): boolean {
+  return /рядом|поблизости|около меня|возле меня|недалеко от меня|near me/i.test(q);
+}
+
+/** Ask for geolocation — returns coords or throws. */
+function requestCoords(): Promise<{ lat: number; lng: number }> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("not_supported"));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      (err) => reject(err),
+      { timeout: 10_000, maximumAge: 60_000 },
+    );
+  });
+}
+
 export function AiSearchWidget() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [routes, setRoutes] = useState<RouteResult[] | null>(null);
+  const [detectedRegion, setDetectedRegion] = useState<string | null>(null);
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -39,14 +61,12 @@ export function AiSearchWidget() {
       setRoutes(null);
       setQuery("");
       setError("");
+      setDetectedRegion(null);
     }
   }, [open]);
 
-  // Close on Escape
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, []);
@@ -58,15 +78,39 @@ export function AiSearchWidget() {
     setLoading(true);
     setError("");
     setRoutes(null);
+    setDetectedRegion(null);
+
+    let lat: number | undefined;
+    let lng: number | undefined;
+
+    if (needsLocation(trimmed)) {
+      setLocating(true);
+      try {
+        ({ lat, lng } = await requestCoords());
+      } catch (err) {
+        const isPermission = err instanceof GeolocationPositionError && err.code === 1;
+        setError(
+          isPermission
+            ? "Доступ к геолокации запрещён. Разреши в настройках браузера или укажи регион вручную."
+            : "Не удалось определить местоположение. Укажи город или регион в запросе.",
+        );
+        setLoading(false);
+        setLocating(false);
+        return;
+      }
+      setLocating(false);
+    }
+
     try {
       const res = await fetch("/api/ai-search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: trimmed }),
+        body: JSON.stringify({ query: trimmed, lat, lng }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Ошибка поиска");
       setRoutes(data.routes ?? []);
+      if (data.filters?.region) setDetectedRegion(data.filters.region);
     } catch {
       setError("Не удалось выполнить поиск. Попробуй ещё раз.");
     } finally {
@@ -115,10 +159,7 @@ export function AiSearchWidget() {
         className={`fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-3xl transition-transform duration-300 ease-out flex flex-col
           sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:rounded-3xl sm:w-[600px] sm:max-h-[80vh]
           ${open ? "translate-y-0 sm:-translate-y-1/2" : "translate-y-full sm:translate-y-[-40%] sm:opacity-0 sm:pointer-events-none"}`}
-        style={{
-          maxHeight: "90dvh",
-          boxShadow: "0 -4px 40px 0 rgb(0 0 0 / 0.18)",
-        }}
+        style={{ maxHeight: "90dvh", boxShadow: "0 -4px 40px 0 rgb(0 0 0 / 0.18)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Handle (mobile) */}
@@ -129,10 +170,7 @@ export function AiSearchWidget() {
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-3 pb-4 flex-shrink-0">
           <div className="flex items-center gap-2">
-            <span
-              className="flex items-center justify-center w-8 h-8 rounded-xl"
-              style={{ backgroundColor: "#EDE9FF" }}
-            >
+            <span className="flex items-center justify-center w-8 h-8 rounded-xl" style={{ backgroundColor: "#EDE9FF" }}>
               <Sparkles size={16} style={{ color: "#7C5CFC" }} />
             </span>
             <div>
@@ -156,12 +194,9 @@ export function AiSearchWidget() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSearch(query);
-                }
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSearch(query); }
               }}
-              placeholder='Например: "лёгкий маршрут 60 км в Карелии"'
+              placeholder='Например: "маршруты рядом со мной" или "60 км несложный"'
               rows={2}
               className="flex-1 resize-none rounded-2xl border border-[#E4E4E7] px-4 py-3 text-sm text-[#1C1C1E] placeholder-[#A1A1AA] focus:outline-none focus:border-[#7C5CFC] focus:ring-2 focus:ring-[#7C5CFC]/20 transition-colors"
               style={{ maxHeight: 120 }}
@@ -184,25 +219,39 @@ export function AiSearchWidget() {
           </div>
         </form>
 
-        {/* Scrollable content area */}
+        {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto px-5 pb-6" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 24px)" }}>
-          {/* Suggestions (idle state) */}
+
+          {/* Suggestions */}
           {!loading && routes === null && !error && (
             <div className="flex flex-wrap gap-2 pt-1">
               {SUGGESTIONS.map((s) => (
                 <button
                   key={s}
                   onClick={() => onSuggestion(s)}
-                  className="text-xs px-3 py-1.5 rounded-full border border-[#E4E4E7] text-[#3F3F46] hover:border-[#7C5CFC] hover:text-[#7C5CFC] transition-colors"
+                  className={`text-xs px-3 py-1.5 rounded-full border transition-colors flex items-center gap-1
+                    ${s.includes("рядом")
+                      ? "border-[#7C5CFC]/30 text-[#7C5CFC] bg-[#F5F3FF] hover:bg-[#EDE9FF]"
+                      : "border-[#E4E4E7] text-[#3F3F46] hover:border-[#7C5CFC] hover:text-[#7C5CFC]"
+                    }`}
                 >
+                  {s.includes("рядом") && <LocateFixed size={11} />}
                   {s}
                 </button>
               ))}
             </div>
           )}
 
+          {/* Locating indicator */}
+          {locating && (
+            <div className="flex items-center gap-2 pt-3 text-sm text-[#7C5CFC]">
+              <LocateFixed size={16} className="animate-pulse" />
+              Определяю твоё местоположение...
+            </div>
+          )}
+
           {/* Loading skeleton */}
-          {loading && (
+          {loading && !locating && (
             <div className="space-y-3 pt-1">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="rounded-2xl border border-[#E4E4E7] p-4 animate-pulse">
@@ -214,9 +263,7 @@ export function AiSearchWidget() {
           )}
 
           {/* Error */}
-          {error && (
-            <p className="text-sm text-red-500 pt-2">{error}</p>
-          )}
+          {error && <p className="text-sm text-red-500 pt-2">{error}</p>}
 
           {/* No results */}
           {!loading && routes !== null && routes.length === 0 && (
@@ -230,7 +277,10 @@ export function AiSearchWidget() {
           {!loading && routes !== null && routes.length > 0 && (
             <div className="space-y-2.5 pt-1">
               <p className="text-xs text-[#71717A] mb-3">
-                Найдено {routes.length} маршрут{routes.length === 1 ? "" : routes.length < 5 ? "а" : "ов"} по запросу «{query}»
+                {detectedRegion
+                  ? `📍 ${detectedRegion} · ${routes.length} маршрут${routes.length === 1 ? "" : routes.length < 5 ? "а" : "ов"}`
+                  : `Найдено ${routes.length} маршрут${routes.length === 1 ? "" : routes.length < 5 ? "а" : "ов"} по запросу «${query}»`
+                }
               </p>
               {routes.map((r) => (
                 <Link
@@ -240,11 +290,7 @@ export function AiSearchWidget() {
                   className="flex items-start gap-3 rounded-2xl border border-[#E4E4E7] p-4 hover:border-[#7C5CFC]/40 hover:bg-[#FAFAFF] transition-colors group"
                 >
                   {r.cover_url ? (
-                    <img
-                      src={r.cover_url}
-                      alt=""
-                      className="w-14 h-14 rounded-xl object-cover flex-shrink-0"
-                    />
+                    <img src={r.cover_url} alt="" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
                   ) : (
                     <div className="w-14 h-14 rounded-xl bg-[#F5F4F1] flex items-center justify-center flex-shrink-0">
                       <MapPin size={20} className="text-[#A1A1AA]" />
@@ -255,16 +301,14 @@ export function AiSearchWidget() {
                       {r.title}
                     </p>
                     <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-1">
-                      <span className="text-xs text-[#71717A] flex items-center gap-1">
+                      <span className="text-xs text-[#71717A]">
                         <span className="text-[#1C1C1E] font-medium">{r.distance_km}</span> км
                       </span>
                       <span className="text-xs text-[#71717A] flex items-center gap-1">
                         <Mountain size={11} />
                         <span className="text-[#1C1C1E] font-medium">{r.elevation_m}</span> м
                       </span>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${DIFFICULTY_STYLES[r.difficulty] ?? "bg-gray-50 text-gray-600"}`}
-                      >
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${DIFFICULTY_STYLES[r.difficulty] ?? "bg-gray-50 text-gray-600"}`}>
                         {DIFFICULTY_LABELS[r.difficulty] ?? r.difficulty}
                       </span>
                     </div>
