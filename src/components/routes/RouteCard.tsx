@@ -64,7 +64,7 @@ export function RouteCard({ route, compact = false, priority = false }: RouteCar
         <div className="relative overflow-hidden" style={{ height: compact ? 140 : 180 }}>
           {route.cover_url ? (
             <img
-              src={proxyImageUrl(route.cover_url, { width: 800 }) ?? route.cover_url}
+              src={proxyImageUrl(route.cover_url) ?? route.cover_url}
               alt={route.title}
               className="w-full h-full object-cover"
               loading={priority ? "eager" : "lazy"}

@@ -103,7 +103,7 @@ export function EventCard({ event, priority = false }: EventCardProps) {
           {hasCover && (
             <>
               <img
-                src={proxyImageUrl(event.cover_url, { width: 800 }) ?? event.cover_url!}
+                src={proxyImageUrl(event.cover_url) ?? event.cover_url!}
                 alt={event.title}
                 className="absolute inset-0 w-full h-full object-cover"
                 loading={priority ? "eager" : "lazy"}

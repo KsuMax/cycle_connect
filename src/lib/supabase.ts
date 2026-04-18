@@ -24,45 +24,16 @@ export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
-export interface ImageTransformOptions {
-  width?: number;
-  height?: number;
-  /** Default: 'webp' */
-  format?: "webp" | "avif" | "origin";
-  /** Default: 'cover' */
-  resize?: "cover" | "contain" | "fill";
-  quality?: number;
-}
-
 /**
  * Rewrite a Supabase storage URL to go through our proxy when in the browser.
  * DB stores absolute URLs like "https://xxx.supabase.co/storage/v1/object/public/..."
  * In Russia these are blocked, so we rewrite them to "/api/supabase/storage/..."
- *
- * When `transform` is provided the Supabase Image Transformation endpoint is used
- * (/storage/v1/render/image/public/…) which resizes and converts the image server-side.
  */
-export function proxyImageUrl(
-  url: string | null | undefined,
-  transform?: ImageTransformOptions,
-): string | null | undefined {
+export function proxyImageUrl(url: string | null | undefined): string | null | undefined {
   if (!url || !isBrowser) return url;
   try {
     const parsed = new URL(url);
     if (parsed.hostname.endsWith(".supabase.co") || parsed.hostname.endsWith(".supabase.in")) {
-      if (transform) {
-        const transformedPath = parsed.pathname.replace(
-          "/storage/v1/object/public/",
-          "/storage/v1/render/image/public/",
-        );
-        const params = new URLSearchParams(parsed.search);
-        if (transform.width) params.set("width", String(transform.width));
-        if (transform.height) params.set("height", String(transform.height));
-        params.set("format", transform.format ?? "webp");
-        params.set("resize", transform.resize ?? "cover");
-        if (transform.quality) params.set("quality", String(transform.quality));
-        return `/api/supabase${transformedPath}?${params.toString()}`;
-      }
       return `/api/supabase${parsed.pathname}${parsed.search}`;
     }
   } catch {
