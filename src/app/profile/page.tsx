@@ -375,9 +375,12 @@ export default function ProfilePage() {
               <Send size={18} className="text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-[#1C1C1E] text-sm mb-1">Подключи Telegram-бот</h3>
+              <h3 className="font-semibold text-[#1C1C1E] text-sm mb-1">Подключи Telegram-бота</h3>
+              <p className="text-xs text-[#4A7FA5] mb-1">
+                Твоя следующая покатушка найдётся сама — бот подскажет, кто хочет присоединиться или уже ищет компанию.
+              </p>
               <p className="text-xs text-[#4A7FA5] mb-3">
-                Получай уведомления, когда кто-то хочет присоединиться к твоей покатушке — прямо в Telegram
+                А ещё подберёт маршруты прямо в Telegram по твоему описанию — открыл и поехал 🚴‍♀️
               </p>
               <Link href="/profile/settings"
                 className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg text-white transition-opacity hover:opacity-90"
