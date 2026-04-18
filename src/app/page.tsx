@@ -1,6 +1,7 @@
 import { createServerSupabase } from "@/lib/supabase-server";
 import { dbToRoute, dbToEvent } from "@/lib/transforms";
 import type { Route, CycleEvent } from "@/types";
+import type { DbRoute, DbEvent } from "@/lib/supabase";
 import { FeedClient } from "./FeedClient";
 import { ROUTE_LIST_SELECT, EVENT_LIST_SELECT } from "@/lib/queries";
 
@@ -20,8 +21,8 @@ export default async function FeedPage() {
       .limit(2),
   ]);
 
-  const initialRoutes: Route[] = routesResult.data?.map(dbToRoute) ?? [];
-  const initialEvents: CycleEvent[] = eventsResult.data?.map(dbToEvent) ?? [];
+  const initialRoutes: Route[] = (routesResult.data as unknown as DbRoute[])?.map(dbToRoute) ?? [];
+  const initialEvents: CycleEvent[] = (eventsResult.data as unknown as DbEvent[])?.map(dbToEvent) ?? [];
 
   return <FeedClient initialRoutes={initialRoutes} initialEvents={initialEvents} />;
 }

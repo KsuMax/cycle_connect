@@ -13,6 +13,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { ROUTE_TYPES, DIFFICULTIES as BASE_DIFFICULTIES, SURFACES } from "@/constants/routes";
 import { dbToRoute, dbToEvent } from "@/lib/transforms";
 import { ROUTE_LIST_SELECT, EVENT_LIST_SELECT, PAGE_SIZE } from "@/lib/queries";
+import type { DbRoute, DbEvent } from "@/lib/supabase";
 
 type LocationScope = "all" | "city" | "out";
 const LOCATION_SCOPES: { value: LocationScope; label: string }[] = [
@@ -128,7 +129,7 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
       .limit(PAGE_SIZE)
       .then(({ data, error }) => {
         if (!error && data) {
-          const mapped = data.map(dbToRoute);
+          const mapped = (data as unknown as DbRoute[]).map(dbToRoute);
           setRoutes(mapped);
           setRoutesOffset(mapped.length);
           setHasMoreRoutes(mapped.length >= PAGE_SIZE);
@@ -148,7 +149,7 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
       .limit(PAGE_SIZE)
       .then(({ data, error }) => {
         if (!error && data) {
-          const mapped = data.map(dbToEvent);
+          const mapped = (data as unknown as DbEvent[]).map(dbToEvent);
           setEvents(mapped);
           setEventsOffset(mapped.length);
           setHasMoreEvents(mapped.length >= PAGE_SIZE);
@@ -206,7 +207,7 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
       .order("created_at", { ascending: false })
       .range(routesOffset, routesOffset + PAGE_SIZE - 1);
     if (!error && data) {
-      const mapped = data.map(dbToRoute);
+      const mapped = (data as unknown as DbRoute[]).map(dbToRoute);
       setRoutes((prev) => [...prev, ...mapped]);
       setRoutesOffset((prev) => prev + mapped.length);
       setHasMoreRoutes(mapped.length >= PAGE_SIZE);
@@ -223,7 +224,7 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
       .order("start_date", { ascending: true })
       .range(eventsOffset, eventsOffset + PAGE_SIZE - 1);
     if (!error && data) {
-      const mapped = data.map(dbToEvent);
+      const mapped = (data as unknown as DbEvent[]).map(dbToEvent);
       setEvents((prev) => [...prev, ...mapped]);
       setEventsOffset((prev) => prev + mapped.length);
       setHasMoreEvents(mapped.length >= PAGE_SIZE);

@@ -26,6 +26,32 @@ const securityHeaders = [
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
 const nextConfig: NextConfig = {
+  transpilePackages: [
+    "@tiptap/core",
+    "@tiptap/react",
+    "@tiptap/pm",
+    "@tiptap/starter-kit",
+    "@tiptap/extension-placeholder",
+    "@tiptap/extension-image",
+    "@tiptap/extension-gapcursor",
+    "@tiptap/extension-bold",
+    "@tiptap/extension-italic",
+    "@tiptap/extension-heading",
+    "@tiptap/extension-bullet-list",
+    "@tiptap/extension-ordered-list",
+    "@tiptap/extension-list-item",
+    "@tiptap/extension-code",
+    "@tiptap/extension-code-block",
+    "@tiptap/extension-blockquote",
+    "@tiptap/extension-hard-break",
+    "@tiptap/extension-horizontal-rule",
+    "@tiptap/extension-paragraph",
+    "@tiptap/extension-text",
+    "@tiptap/extension-document",
+    "@tiptap/extension-dropcursor",
+    "@tiptap/extension-strike",
+    "@tiptap/extension-underline",
+  ],
   async headers() {
     return [
       {
