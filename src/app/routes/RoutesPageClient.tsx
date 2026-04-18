@@ -377,7 +377,7 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
           {/* ── ROUTES tab: filters sidebar (desktop) ─────────────────────── */}
           {activeTab === "routes" && (
             <aside className="hidden lg:block">
-              <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7] sticky top-24" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+              <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7] sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold text-[#1C1C1E]">Фильтры</h3>
                   {hasActiveRouteFilters && (
@@ -388,13 +388,49 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
                 </div>
 
                 <div className="mb-5">
-                  <label className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-2 block">Сортировка</label>
-                  <select value={sortBy} onChange={(e) => setSortBy(e.target.value as "newest" | "oldest")}
-                    className="w-full px-3 py-2 rounded-xl border border-[#E4E4E7] bg-white text-sm outline-none focus:border-[#F4632A] transition-colors appearance-none cursor-pointer"
-                    style={selectStyle}>
-                    <option value="newest">По дате (сначала новые)</option>
-                    <option value="oldest">По дате (сначала старые)</option>
-                  </select>
+                  <label className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-2 block">Регион</label>
+                  <div className="relative" ref={regionRef}>
+                    <input
+                      type="text"
+                      placeholder={region || "Все регионы"}
+                      value={regionOpen ? regionSearch : (region || "")}
+                      onFocus={() => { setRegionOpen(true); setRegionSearch(""); }}
+                      onChange={(e) => setRegionSearch(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border text-sm outline-none transition-colors"
+                      style={{
+                        borderColor: region ? "#F4632A" : "#E4E4E7",
+                        color: region && !regionOpen ? "#F4632A" : "#1C1C1E",
+                        fontWeight: region && !regionOpen ? 500 : 400,
+                      }}
+                    />
+                    {regionOpen && (
+                      <div className="absolute z-10 top-full mt-1 w-full bg-white border border-[#E4E4E7] rounded-xl shadow-lg overflow-hidden">
+                        <button
+                          type="button"
+                          onMouseDown={() => { setRegion(""); setRegionOpen(false); setRegionSearch(""); }}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-[#F5F4F1] transition-colors"
+                          style={region === "" ? { color: "#F4632A", fontWeight: 500 } : { color: "#71717A" }}>
+                          Все регионы
+                        </button>
+                        {regions
+                          .filter((r) => r.toLowerCase().includes(regionSearch.toLowerCase()))
+                          .map((r) => (
+                            <button
+                              key={r}
+                              type="button"
+                              onMouseDown={() => { setRegion(r); setRegionOpen(false); setRegionSearch(""); }}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-[#F5F4F1] transition-colors"
+                              style={region === r ? { color: "#F4632A", fontWeight: 500 } : { color: "#1C1C1E" }}>
+                              {r}
+                            </button>
+                          ))
+                        }
+                        {regions.filter((r) => r.toLowerCase().includes(regionSearch.toLowerCase())).length === 0 && (
+                          <p className="px-3 py-2 text-sm text-[#A1A1AA]">Ничего не найдено</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Near me */}
@@ -505,52 +541,6 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
                       className="w-full px-3 py-2 rounded-xl border border-[#E4E4E7] bg-white text-sm outline-none focus:border-[#F4632A] transition-colors" />
                   </div>
                 </div>
-
-                <div className="mb-5">
-                  <label className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-2 block">Регион</label>
-                  <div className="relative" ref={regionRef}>
-                    <input
-                      type="text"
-                      placeholder={region || "Все регионы"}
-                      value={regionOpen ? regionSearch : (region || "")}
-                      onFocus={() => { setRegionOpen(true); setRegionSearch(""); }}
-                      onChange={(e) => setRegionSearch(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border text-sm outline-none transition-colors"
-                      style={{
-                        borderColor: region ? "#F4632A" : "#E4E4E7",
-                        color: region && !regionOpen ? "#F4632A" : "#1C1C1E",
-                        fontWeight: region && !regionOpen ? 500 : 400,
-                      }}
-                    />
-                    {regionOpen && (
-                      <div className="absolute z-10 top-full mt-1 w-full bg-white border border-[#E4E4E7] rounded-xl shadow-lg overflow-hidden">
-                        <button
-                          type="button"
-                          onMouseDown={() => { setRegion(""); setRegionOpen(false); setRegionSearch(""); }}
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-[#F5F4F1] transition-colors"
-                          style={region === "" ? { color: "#F4632A", fontWeight: 500 } : { color: "#71717A" }}>
-                          Все регионы
-                        </button>
-                        {regions
-                          .filter((r) => r.toLowerCase().includes(regionSearch.toLowerCase()))
-                          .map((r) => (
-                            <button
-                              key={r}
-                              type="button"
-                              onMouseDown={() => { setRegion(r); setRegionOpen(false); setRegionSearch(""); }}
-                              className="w-full text-left px-3 py-2 text-sm hover:bg-[#F5F4F1] transition-colors"
-                              style={region === r ? { color: "#F4632A", fontWeight: 500 } : { color: "#1C1C1E" }}>
-                              {r}
-                            </button>
-                          ))
-                        }
-                        {regions.filter((r) => r.toLowerCase().includes(regionSearch.toLowerCase())).length === 0 && (
-                          <p className="px-3 py-2 text-sm text-[#A1A1AA]">Ничего не найдено</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div>
             </aside>
           )}
@@ -558,7 +548,7 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
           {/* ── EVENTS tab: filters sidebar (desktop) ─────────────────────── */}
           {activeTab === "events" && (
             <aside className="hidden lg:block">
-              <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7] sticky top-24" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+              <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7] sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold text-[#1C1C1E]">Фильтры</h3>
                   {hasActiveEventFilters && (
@@ -566,16 +556,6 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
                       <X size={12} /> Сбросить
                     </button>
                   )}
-                </div>
-
-                <div className="mb-5">
-                  <label className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-2 block">Сортировка</label>
-                  <select value={eventSortBy} onChange={(e) => setEventSortBy(e.target.value as "date_asc" | "date_desc")}
-                    className="w-full px-3 py-2 rounded-xl border border-[#E4E4E7] bg-white text-sm outline-none focus:border-[#7C5CFC] transition-colors appearance-none cursor-pointer"
-                    style={selectStyle}>
-                    <option value="date_asc">По дате (ближайшие сначала)</option>
-                    <option value="date_desc">По дате (дальние сначала)</option>
-                  </select>
                 </div>
 
                 <div className="mb-5">
@@ -670,13 +650,49 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
             {activeTab === "routes" && showFilters && (
               <div className="lg:hidden bg-white rounded-2xl p-4 border border-[#E4E4E7] mb-4 space-y-4">
                 <div>
-                  <div className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-2">Сортировка</div>
-                  <select value={sortBy} onChange={(e) => setSortBy(e.target.value as "newest" | "oldest")}
-                    className="w-full px-3 py-2 rounded-xl border border-[#E4E4E7] bg-white text-sm outline-none focus:border-[#F4632A] transition-colors appearance-none cursor-pointer"
-                    style={selectStyle}>
-                    <option value="newest">По дате (сначала новые)</option>
-                    <option value="oldest">По дате (сначала старые)</option>
-                  </select>
+                  <div className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-2">Регион</div>
+                  <div className="relative" ref={regionRef}>
+                    <input
+                      type="text"
+                      placeholder={region || "Все регионы"}
+                      value={regionOpen ? regionSearch : (region || "")}
+                      onFocus={() => { setRegionOpen(true); setRegionSearch(""); }}
+                      onChange={(e) => setRegionSearch(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border text-sm outline-none transition-colors"
+                      style={{
+                        borderColor: region ? "#F4632A" : "#E4E4E7",
+                        color: region && !regionOpen ? "#F4632A" : "#1C1C1E",
+                        fontWeight: region && !regionOpen ? 500 : 400,
+                      }}
+                    />
+                    {regionOpen && (
+                      <div className="absolute z-10 top-full mt-1 w-full bg-white border border-[#E4E4E7] rounded-xl shadow-lg overflow-hidden">
+                        <button
+                          type="button"
+                          onMouseDown={() => { setRegion(""); setRegionOpen(false); setRegionSearch(""); }}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-[#F5F4F1] transition-colors"
+                          style={region === "" ? { color: "#F4632A", fontWeight: 500 } : { color: "#71717A" }}>
+                          Все регионы
+                        </button>
+                        {regions
+                          .filter((r) => r.toLowerCase().includes(regionSearch.toLowerCase()))
+                          .map((r) => (
+                            <button
+                              key={r}
+                              type="button"
+                              onMouseDown={() => { setRegion(r); setRegionOpen(false); setRegionSearch(""); }}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-[#F5F4F1] transition-colors"
+                              style={region === r ? { color: "#F4632A", fontWeight: 500 } : { color: "#1C1C1E" }}>
+                              {r}
+                            </button>
+                          ))
+                        }
+                        {regions.filter((r) => r.toLowerCase().includes(regionSearch.toLowerCase())).length === 0 && (
+                          <p className="px-3 py-2 text-sm text-[#A1A1AA]">Ничего не найдено</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 {/* Near me — mobile */}
                 <div>
@@ -781,15 +797,6 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
             {activeTab === "events" && showEventFilters && (
               <div className="lg:hidden bg-white rounded-2xl p-4 border border-[#E4E4E7] mb-4 space-y-4">
                 <div>
-                  <div className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-2">Сортировка</div>
-                  <select value={eventSortBy} onChange={(e) => setEventSortBy(e.target.value as "date_asc" | "date_desc")}
-                    className="w-full px-3 py-2 rounded-xl border border-[#E4E4E7] bg-white text-sm outline-none transition-colors appearance-none cursor-pointer"
-                    style={selectStyle}>
-                    <option value="date_asc">По дате (ближайшие сначала)</option>
-                    <option value="date_desc">По дате (дальние сначала)</option>
-                  </select>
-                </div>
-                <div>
                   <div className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-2">Дата начала</div>
                   <div className="flex gap-2">
                     <input type="date" value={eventStartFrom} onChange={(e) => setEventStartFrom(e.target.value)}
@@ -831,8 +838,16 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
                 </div>
               ) : (
                 <>
-                  <div className="text-sm text-[#71717A] mb-4">
-                    {filtered.length === 0 ? "Маршруты не найдены" : `${filtered.length} маршрут${filtered.length === 1 ? "" : filtered.length < 5 ? "а" : "ов"}`}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="text-sm text-[#71717A]">
+                      {filtered.length === 0 ? "Маршруты не найдены" : `${filtered.length} маршрут${filtered.length === 1 ? "" : filtered.length < 5 ? "а" : "ов"}`}
+                    </div>
+                    <select value={sortBy} onChange={(e) => setSortBy(e.target.value as "newest" | "oldest")}
+                      className="text-xs text-[#71717A] border border-[#E4E4E7] rounded-lg px-2.5 py-1.5 bg-white outline-none focus:border-[#F4632A] cursor-pointer appearance-none transition-colors"
+                      style={selectStyle}>
+                      <option value="newest">Сначала новые</option>
+                      <option value="oldest">Сначала старые</option>
+                    </select>
                   </div>
                   {filtered.length > 0 ? (
                     <>
@@ -880,8 +895,16 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
                 </div>
               ) : (
                 <>
-                  <div className="text-sm text-[#71717A] mb-4">
-                    {filteredEvents.length === 0 ? "Мероприятия не найдены" : `${filteredEvents.length} мероприяти${filteredEvents.length === 1 ? "е" : filteredEvents.length < 5 ? "я" : "й"}`}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="text-sm text-[#71717A]">
+                      {filteredEvents.length === 0 ? "Мероприятия не найдены" : `${filteredEvents.length} мероприяти${filteredEvents.length === 1 ? "е" : filteredEvents.length < 5 ? "я" : "й"}`}
+                    </div>
+                    <select value={eventSortBy} onChange={(e) => setEventSortBy(e.target.value as "date_asc" | "date_desc")}
+                      className="text-xs text-[#71717A] border border-[#E4E4E7] rounded-lg px-2.5 py-1.5 bg-white outline-none focus:border-[#7C5CFC] cursor-pointer appearance-none transition-colors"
+                      style={selectStyle}>
+                      <option value="date_asc">Ближайшие</option>
+                      <option value="date_desc">Дальние сначала</option>
+                    </select>
                   </div>
                   {filteredEvents.length > 0 ? (
                     <>
