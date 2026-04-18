@@ -49,6 +49,32 @@ export interface RouteResult {
   tags: string[];
 }
 
+// ─── Geolocation: nearest region ─────────────────────────────────────────────
+
+/** Approximate center coordinates for each DB region. */
+const REGION_CENTERS: [string, number, number][] = [
+  ["Санкт-Петербург",       59.95,  30.32],
+  ["Ленинградская область", 60.07,  30.58],
+  ["Карелия",               62.50,  32.50],
+  ["Москва",                55.75,  37.62],
+  ["Подмосковье",           55.75,  37.20],
+  ["Краснодарский край",    45.04,  38.98],
+  ["Крым",                  45.30,  34.00],
+  ["Алтай",                 52.00,  85.00],
+  ["Байкал",                53.00, 107.00],
+  ["Урал",                  56.50,  60.00],
+];
+
+function closestRegion(lat: number, lng: number): string {
+  let best = REGION_CENTERS[0][0];
+  let bestDist = Infinity;
+  for (const [name, rlat, rlng] of REGION_CENTERS) {
+    const d = Math.hypot(lat - rlat, lng - rlng);
+    if (d < bestDist) { bestDist = d; best = name; }
+  }
+  return best;
+}
+
 // ─── Distance helper ──────────────────────────────────────────────────────────
 
 /** Parses distance from any common phrasing. Returns true if something was found. */
@@ -286,6 +312,8 @@ async function searchRoutes(filters: RouteFilters): Promise<RouteResult[]> {
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const query: string = typeof body.query === "string" ? body.query.trim() : "";
+  const lat: number | undefined = typeof body.lat === "number" ? body.lat : undefined;
+  const lng: number | undefined = typeof body.lng === "number" ? body.lng : undefined;
 
   if (!query) {
     return NextResponse.json({ error: "query required" }, { status: 400 });
@@ -297,6 +325,12 @@ export async function POST(req: NextRequest) {
   ]);
 
   const filters = mergeFilters(aiFilters, regexFilters);
+
+  // If coordinates provided and no region extracted from text — use nearest region
+  if (lat !== undefined && lng !== undefined && !filters.region) {
+    filters.region = closestRegion(lat, lng);
+  }
+
   const routes = await searchRoutes(filters);
 
   return NextResponse.json({ routes, filters });
