@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/context/AuthContext";
 import { ROUTE_TYPES, DIFFICULTIES as BASE_DIFFICULTIES, SURFACES } from "@/constants/routes";
 import { dbToRoute, dbToEvent } from "@/lib/transforms";
+import { ROUTE_LIST_SELECT, EVENT_LIST_SELECT, PAGE_SIZE } from "@/lib/queries";
 
 type LocationScope = "all" | "city" | "out";
 const LOCATION_SCOPES: { value: LocationScope; label: string }[] = [
@@ -62,6 +63,9 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
   const [sortBy, setSortBy] = useState<"newest" | "oldest">("newest");
   const [routes, setRoutes] = useState<Route[]>(initialRoutes);
   const [routesLoading, setRoutesLoading] = useState(initialRoutes.length === 0);
+  const [routesOffset, setRoutesOffset] = useState(initialRoutes.length);
+  const [hasMoreRoutes, setHasMoreRoutes] = useState(initialRoutes.length >= PAGE_SIZE);
+  const [loadingMoreRoutes, setLoadingMoreRoutes] = useState(false);
 
   // ── Near-me filter ────────────────────────────────────────────────────────
   const [nearMeActive, setNearMeActive] = useState(false);
@@ -74,6 +78,9 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
   const [events, setEvents] = useState<CycleEvent[]>(initialEvents);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsLoaded, setEventsLoaded] = useState(initialEvents.length > 0);
+  const [eventsOffset, setEventsOffset] = useState(initialEvents.length);
+  const [hasMoreEvents, setHasMoreEvents] = useState(initialEvents.length >= PAGE_SIZE);
+  const [loadingMoreEvents, setLoadingMoreEvents] = useState(false);
   const [eventSearch, setEventSearch] = useState("");
   const [eventSortBy, setEventSortBy] = useState<"date_asc" | "date_desc">("date_asc");
   const [eventStartFrom, setEventStartFrom] = useState("");
@@ -116,10 +123,16 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
     if (initialRoutes.length > 0) return;
     supabase
       .from("routes")
-      .select("*, author:profiles!author_id(*), route_images(url), route_comments(id, text, likes_count, created_at, author:profiles!author_id(name))")
+      .select(ROUTE_LIST_SELECT)
       .order("created_at", { ascending: false })
+      .limit(PAGE_SIZE)
       .then(({ data, error }) => {
-        if (!error && data) setRoutes(data.map(dbToRoute));
+        if (!error && data) {
+          const mapped = data.map(dbToRoute);
+          setRoutes(mapped);
+          setRoutesOffset(mapped.length);
+          setHasMoreRoutes(mapped.length >= PAGE_SIZE);
+        }
         setRoutesLoading(false);
       });
   }, []);
@@ -130,10 +143,16 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
     setEventsLoading(true);
     supabase
       .from("events")
-      .select("*, organizer:profiles!organizer_id(*), route:routes(*), event_days(*), event_participants(user_id, profile:profiles!user_id(*))")
+      .select(EVENT_LIST_SELECT)
       .order("start_date", { ascending: true })
+      .limit(PAGE_SIZE)
       .then(({ data, error }) => {
-        if (!error && data) setEvents(data.map(dbToEvent));
+        if (!error && data) {
+          const mapped = data.map(dbToEvent);
+          setEvents(mapped);
+          setEventsOffset(mapped.length);
+          setHasMoreEvents(mapped.length >= PAGE_SIZE);
+        }
         setEventsLoading(false);
         setEventsLoaded(true);
       });
@@ -177,6 +196,40 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
     setNearMeRadius(radius);
     if (nearMeActive) activateNearMe(radius);
   }, [nearMeActive, activateNearMe]);
+
+  // ── Load more routes ──────────────────────────────────────────────────────
+  const loadMoreRoutes = useCallback(async () => {
+    setLoadingMoreRoutes(true);
+    const { data, error } = await supabase
+      .from("routes")
+      .select(ROUTE_LIST_SELECT)
+      .order("created_at", { ascending: false })
+      .range(routesOffset, routesOffset + PAGE_SIZE - 1);
+    if (!error && data) {
+      const mapped = data.map(dbToRoute);
+      setRoutes((prev) => [...prev, ...mapped]);
+      setRoutesOffset((prev) => prev + mapped.length);
+      setHasMoreRoutes(mapped.length >= PAGE_SIZE);
+    }
+    setLoadingMoreRoutes(false);
+  }, [routesOffset]);
+
+  // ── Load more events ──────────────────────────────────────────────────────
+  const loadMoreEvents = useCallback(async () => {
+    setLoadingMoreEvents(true);
+    const { data, error } = await supabase
+      .from("events")
+      .select(EVENT_LIST_SELECT)
+      .order("start_date", { ascending: true })
+      .range(eventsOffset, eventsOffset + PAGE_SIZE - 1);
+    if (!error && data) {
+      const mapped = data.map(dbToEvent);
+      setEvents((prev) => [...prev, ...mapped]);
+      setEventsOffset((prev) => prev + mapped.length);
+      setHasMoreEvents(mapped.length >= PAGE_SIZE);
+    }
+    setLoadingMoreEvents(false);
+  }, [eventsOffset]);
 
   // ── Routes filtering / sorting ────────────────────────────────────────────
   const toggleType = (type: RouteType) =>
@@ -781,9 +834,25 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
                     {filtered.length === 0 ? "Маршруты не найдены" : `${filtered.length} маршрут${filtered.length === 1 ? "" : filtered.length < 5 ? "а" : "ов"}`}
                   </div>
                   {filtered.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {filtered.map((route) => <RouteCard key={route.id} route={route} />)}
-                    </div>
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {filtered.map((route) => <RouteCard key={route.id} route={route} />)}
+                      </div>
+                      {hasMoreRoutes && !hasActiveRouteFilters && (
+                        <div className="mt-6 flex justify-center">
+                          <button
+                            onClick={loadMoreRoutes}
+                            disabled={loadingMoreRoutes}
+                            className="flex items-center gap-2 px-6 py-3 rounded-xl border border-[#E4E4E7] bg-white text-sm font-medium text-[#1C1C1E] hover:border-[#F4632A] hover:text-[#F4632A] transition-colors disabled:opacity-50"
+                            style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}
+                          >
+                            {loadingMoreRoutes
+                              ? <><Loader2 size={15} className="animate-spin" /> Загружаю...</>
+                              : "Загрузить ещё"}
+                          </button>
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <div className="text-center py-16 text-[#71717A]">
                       <div className="text-4xl mb-3">🗺️</div>
@@ -814,9 +883,25 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
                     {filteredEvents.length === 0 ? "Мероприятия не найдены" : `${filteredEvents.length} мероприяти${filteredEvents.length === 1 ? "е" : filteredEvents.length < 5 ? "я" : "й"}`}
                   </div>
                   {filteredEvents.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
-                      {filteredEvents.map((ev) => <EventCard key={ev.id} event={ev} />)}
-                    </div>
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
+                        {filteredEvents.map((ev) => <EventCard key={ev.id} event={ev} />)}
+                      </div>
+                      {hasMoreEvents && !hasActiveEventFilters && (
+                        <div className="mt-6 flex justify-center">
+                          <button
+                            onClick={loadMoreEvents}
+                            disabled={loadingMoreEvents}
+                            className="flex items-center gap-2 px-6 py-3 rounded-xl border border-[#E4E4E7] bg-white text-sm font-medium text-[#1C1C1E] hover:border-[#7C5CFC] transition-colors disabled:opacity-50"
+                            style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}
+                          >
+                            {loadingMoreEvents
+                              ? <><Loader2 size={15} className="animate-spin" /> Загружаю...</>
+                              : "Загрузить ещё"}
+                          </button>
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <div className="text-center py-16 text-[#71717A]">
                       <div className="text-4xl mb-3">🚴</div>

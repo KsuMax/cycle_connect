@@ -2,6 +2,7 @@ import { createServerSupabase } from "@/lib/supabase-server";
 import { dbToRoute, dbToEvent } from "@/lib/transforms";
 import type { Route, CycleEvent } from "@/types";
 import { RoutesPageClient } from "./RoutesPageClient";
+import { ROUTE_LIST_SELECT, EVENT_LIST_SELECT, PAGE_SIZE } from "@/lib/queries";
 
 export default async function RoutesPage({
   searchParams,
@@ -19,14 +20,16 @@ export default async function RoutesPage({
   if (tab === "routes") {
     const { data } = await supabase
       .from("routes")
-      .select("*, author:profiles!author_id(*), route_images(url), route_comments(id, text, likes_count, created_at, author:profiles!author_id(name))")
-      .order("created_at", { ascending: false });
+      .select(ROUTE_LIST_SELECT)
+      .order("created_at", { ascending: false })
+      .limit(PAGE_SIZE);
     if (data) initialRoutes = data.map(dbToRoute);
   } else {
     const { data } = await supabase
       .from("events")
-      .select("*, organizer:profiles!organizer_id(*), route:routes(*), event_days(*), event_participants(user_id, profile:profiles!user_id(*))")
-      .order("start_date", { ascending: true });
+      .select(EVENT_LIST_SELECT)
+      .order("start_date", { ascending: true })
+      .limit(PAGE_SIZE);
     if (data) initialEvents = data.map(dbToEvent);
   }
 
