@@ -11,7 +11,7 @@ import { ExitPointsEditor, type ExitPointDraft } from "@/components/routes/ExitP
 import { DayEditor } from "@/components/events/DayEditor";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase, proxyImageUrl } from "@/lib/supabase";
-import { parseGpxFile, toWktPoint, toWktLinestring } from "@/lib/gpx";
+import { parseGpxFile, computeGpxStats, toWktPoint, toWktLinestring } from "@/lib/gpx";
 import { ROUTE_TYPES, DIFFICULTIES, SURFACES, BIKE_TYPES } from "@/constants/routes";
 import type { RouteType, Difficulty, Surface, BikeType, ExitPointsStatus } from "@/types";
 import Link from "next/link";
@@ -142,6 +142,22 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
   const handleNewImages = (previews: string[], files: File[]) => {
     setNewImagePreviews(previews);
     setNewImageFiles(files);
+  };
+
+  const handleGpxChange = async (f: File | null) => {
+    setGpxFile(f);
+    if (f) {
+      setGpxCleared(false);
+      try {
+        const { trackpoints } = await parseGpxFile(f);
+        const stats = computeGpxStats(trackpoints);
+        if (stats.distanceKm > 0) setDistance(String(stats.distanceKm));
+        if (stats.elevationM > 0) setElevation(String(stats.elevationM));
+        if (stats.durationMin > 0) setDuration(String(stats.durationMin));
+      } catch {
+        // Non-critical — fields stay as-is
+      }
+    }
   };
 
   const buildEmbedUrl = (url: string) => {
@@ -421,7 +437,7 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
             <p className="text-xs text-[#71717A] mb-3">Экспортируй из MapMagic — участники смогут скачать свежий трек</p>
             <GpxUpload
               currentName={gpxFile?.name ?? (existingGpxPath && !gpxCleared ? "route.gpx" : null)}
-              onChange={(f) => { setGpxFile(f); if (f) setGpxCleared(false); }}
+              onChange={handleGpxChange}
               onClear={() => setGpxCleared(true)}
             />
           </div>

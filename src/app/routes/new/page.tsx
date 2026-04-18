@@ -13,7 +13,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useToast } from "@/lib/context/ToastContext";
 import { useAchievements } from "@/lib/context/AchievementsContext";
 import { supabase } from "@/lib/supabase";
-import { parseGpxFile, toWktPoint, toWktLinestring } from "@/lib/gpx";
+import { parseGpxFile, computeGpxStats, toWktPoint, toWktLinestring } from "@/lib/gpx";
 import { ROUTE_TYPES, DIFFICULTIES, SURFACES, BIKE_TYPES } from "@/constants/routes";
 import type { RouteType, Difficulty, Surface, BikeType, ExitPointsStatus } from "@/types";
 import Link from "next/link";
@@ -78,6 +78,20 @@ export default function NewRoutePage() {
   const handleImages = (previews: string[], files: File[]) => {
     setImagePreviews(previews);
     setImageFiles(files);
+  };
+
+  const handleGpxChange = async (file: File | null) => {
+    setGpxFile(file);
+    if (!file) return;
+    try {
+      const { trackpoints } = await parseGpxFile(file);
+      const stats = computeGpxStats(trackpoints);
+      if (stats.distanceKm > 0) setDistance(String(stats.distanceKm));
+      if (stats.elevationM > 0) setElevation(String(stats.elevationM));
+      if (stats.durationMin > 0) setDuration(String(stats.durationMin));
+    } catch {
+      // Non-critical — fields stay empty
+    }
   };
 
   const canSubmit = title.trim() && routeTypes.length > 0 && !submitting;
@@ -343,7 +357,7 @@ export default function NewRoutePage() {
           <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
             <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">GPX-файл</label>
             <p className="text-xs text-[#71717A] mb-3">Экспортируй из MapMagic и загрузи — пользователи смогут скачать его одной кнопкой</p>
-            <GpxUpload currentName={gpxFile?.name ?? null} onChange={setGpxFile} />
+            <GpxUpload currentName={gpxFile?.name ?? null} onChange={handleGpxChange} />
           </div>
 
           {/* Exit points */}
