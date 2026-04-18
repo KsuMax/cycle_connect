@@ -32,9 +32,10 @@ function pickGradient(id: string): string {
 interface EventCardProps {
   event: CycleEvent;
   compact?: boolean;
+  priority?: boolean;
 }
 
-export function EventCard({ event }: EventCardProps) {
+export function EventCard({ event, priority = false }: EventCardProps) {
   const { user } = useAuth();
   const { isLiked, toggleLike } = useEventLikes();
   const { requireAuth } = useAuthModal();
@@ -102,9 +103,11 @@ export function EventCard({ event }: EventCardProps) {
           {hasCover && (
             <>
               <img
-                src={proxyImageUrl(event.cover_url) ?? event.cover_url!}
+                src={proxyImageUrl(event.cover_url, { width: 800 }) ?? event.cover_url!}
                 alt={event.title}
                 className="absolute inset-0 w-full h-full object-cover"
+                loading={priority ? "eager" : "lazy"}
+                fetchPriority={priority ? "high" : "auto"}
               />
               {/* Gradient overlay for text readability */}
               <div
