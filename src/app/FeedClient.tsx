@@ -67,7 +67,7 @@ export function FeedClient({ initialRoutes, initialEvents }: Props) {
                   <Link href="/routes?tab=events" className="text-sm font-medium hover:underline" style={{ color: "#F4632A" }}>Все →</Link>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
-                  {visibleEvents.map((event) => <EventCard key={event.id} event={event} />)}
+                  {visibleEvents.map((event, i) => <EventCard key={event.id} event={event} priority={i === 0} />)}
                 </div>
               </section>
             )}
@@ -100,7 +100,7 @@ export function FeedClient({ initialRoutes, initialEvents }: Props) {
                   <Link href="/routes" className="text-sm font-medium hover:underline" style={{ color: "#F4632A" }}>Все →</Link>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {initialRoutes.map((route) => <RouteCard key={route.id} route={route} />)}
+                  {initialRoutes.map((route, i) => <RouteCard key={route.id} route={route} priority={i === 0 && visibleEvents.length === 0} />)}
                 </div>
               </section>
             )}

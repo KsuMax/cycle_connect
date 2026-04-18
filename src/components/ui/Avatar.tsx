@@ -36,7 +36,7 @@ export function Avatar({ user, size = "md", className, sticker }: AvatarProps) {
       title={user.name}
     >
       {user.avatar_url
-        ? <img src={proxyImageUrl(user.avatar_url) ?? user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+        ? <img src={proxyImageUrl(user.avatar_url, { width: 96, height: 96 }) ?? user.avatar_url} alt={user.name} className="w-full h-full object-cover" loading="lazy" />
         : user.initials
       }
     </div>

@@ -31,9 +31,10 @@ const ROUTE_TYPE_COLORS: Record<RouteType, { bg: string; text: string }> = {
 interface RouteCardProps {
   route: Route;
   compact?: boolean;
+  priority?: boolean;
 }
 
-export function RouteCard({ route, compact = false }: RouteCardProps) {
+export function RouteCard({ route, compact = false, priority = false }: RouteCardProps) {
   const { isLiked, toggleLike } = useLikes();
   const { user } = useAuth();
   const { getRouteEventStatus } = useEventRides();
@@ -62,7 +63,13 @@ export function RouteCard({ route, compact = false }: RouteCardProps) {
         {/* Cover or placeholder */}
         <div className="relative overflow-hidden" style={{ height: compact ? 140 : 180 }}>
           {route.cover_url ? (
-            <img src={proxyImageUrl(route.cover_url) ?? route.cover_url} alt={route.title} className="w-full h-full object-cover" />
+            <img
+              src={proxyImageUrl(route.cover_url, { width: 800 }) ?? route.cover_url}
+              alt={route.title}
+              className="w-full h-full object-cover"
+              loading={priority ? "eager" : "lazy"}
+              fetchPriority={priority ? "high" : "auto"}
+            />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-[#E6FAF9] to-[#D1FAF7]">
               <svg className="absolute inset-0 w-full h-full" viewBox="0 0 400 180" preserveAspectRatio="none">
