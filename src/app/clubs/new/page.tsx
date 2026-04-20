@@ -123,7 +123,7 @@ export default function NewClubPage() {
                 Адрес клуба *
               </label>
               <div className="flex items-center gap-1">
-                <span className="text-sm text-[#A1A1AA]">cycle-connect.ru/clubs/</span>
+                <span className="text-sm text-[#A1A1AA]">cycleconnect.cc/clubs/</span>
                 <input
                   type="text"
                   value={slug}
