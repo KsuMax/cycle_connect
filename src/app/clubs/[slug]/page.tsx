@@ -13,7 +13,7 @@ import { dbToClub, dbToClubMember, dbToRoute, dbToEvent } from "@/lib/transforms
 import type { Club, ClubMember, Route, CycleEvent } from "@/types";
 import {
   ArrowLeft, Users, MapPin, Lock, Globe, UserPlus, UserMinus,
-  Clock, Map, Calendar, CheckCircle, Shield,
+  Clock, Map, Calendar, CheckCircle, Shield, Settings,
 } from "lucide-react";
 
 type Tab = "feed" | "routes" | "members";
@@ -240,6 +240,15 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
                       <CheckCircle size={13} />
                       Владелец
                     </span>
+                  )}
+                  {isAdmin && (
+                    <Link
+                      href={`/clubs/${club.slug}/edit`}
+                      className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-xl border border-[#E4E4E7] text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors"
+                    >
+                      <Settings size={14} />
+                      Изменить
+                    </Link>
                   )}
                 </div>
               )}
