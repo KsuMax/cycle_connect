@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { proxyImageUrl } from "@/lib/supabase";
 import type { User } from "@/types";
@@ -16,6 +17,9 @@ const SIZE_CLASSES = {
   md: "w-9 h-9 text-sm",
   lg: "w-12 h-12 text-base",
 };
+
+// Pixel sizes for next/image (must match SIZE_CLASSES tailwind values)
+const SIZE_PX = { sm: 28, md: 36, lg: 48 };
 
 // Sticker badge size scales with avatar size
 const STICKER_SIZES = {
@@ -36,7 +40,13 @@ export function Avatar({ user, size = "md", className, sticker }: AvatarProps) {
       title={user.name}
     >
       {user.avatar_url
-        ? <img src={proxyImageUrl(user.avatar_url) ?? user.avatar_url} alt={user.name} className="w-full h-full object-cover" loading="lazy" />
+        ? <Image
+            src={proxyImageUrl(user.avatar_url) ?? user.avatar_url}
+            alt={user.name}
+            width={SIZE_PX[size]}
+            height={SIZE_PX[size]}
+            className="w-full h-full object-cover"
+          />
         : user.initials
       }
     </div>

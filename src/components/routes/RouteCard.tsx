@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bike, Mountain, Clock, Heart, ChevronRight } from "lucide-react";
@@ -63,12 +64,13 @@ export function RouteCard({ route, compact = false, priority = false }: RouteCar
         {/* Cover or placeholder */}
         <div className="relative overflow-hidden" style={{ height: compact ? 140 : 180 }}>
           {route.cover_url ? (
-            <img
+            <Image
               src={proxyImageUrl(route.cover_url) ?? route.cover_url}
               alt={route.title}
-              className="w-full h-full object-cover"
-              loading={priority ? "eager" : "lazy"}
-              fetchPriority={priority ? "high" : "auto"}
+              fill
+              className="object-cover"
+              sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+              priority={priority}
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-[#E6FAF9] to-[#D1FAF7]">

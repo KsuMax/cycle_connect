@@ -2,8 +2,10 @@
 
 import { useState, useRef, useEffect, FormEvent } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Sparkles, X, ArrowUp, MapPin, Mountain, LocateFixed } from "lucide-react";
 import type { RouteResult } from "@/app/api/ai-search/route";
+import { proxyImageUrl } from "@/lib/supabase";
 
 const SUGGESTIONS = [
   "Маршруты рядом со мной",
@@ -290,7 +292,7 @@ export function AiSearchWidget() {
                   className="flex items-start gap-3 rounded-2xl border border-[#E4E4E7] p-4 hover:border-[#7C5CFC]/40 hover:bg-[#FAFAFF] transition-colors group"
                 >
                   {r.cover_url ? (
-                    <img src={r.cover_url} alt="" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
+                    <Image src={proxyImageUrl(r.cover_url) ?? r.cover_url} alt="" width={56} height={56} className="rounded-xl object-cover flex-shrink-0" />
                   ) : (
                     <div className="w-14 h-14 rounded-xl bg-[#F5F4F1] flex items-center justify-center flex-shrink-0">
                       <MapPin size={20} className="text-[#A1A1AA]" />

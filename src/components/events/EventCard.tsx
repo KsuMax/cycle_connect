@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState, useEffect } from "react";
 import { Calendar, Bike, Heart, ChevronRight } from "lucide-react";
 import { AvatarGroup } from "@/components/ui/Avatar";
@@ -102,12 +103,13 @@ export function EventCard({ event, priority = false }: EventCardProps) {
           {/* Cover photo */}
           {hasCover && (
             <>
-              <img
+              <Image
                 src={proxyImageUrl(event.cover_url) ?? event.cover_url!}
                 alt={event.title}
-                className="absolute inset-0 w-full h-full object-cover"
-                loading={priority ? "eager" : "lazy"}
-                fetchPriority={priority ? "high" : "auto"}
+                fill
+                className="object-cover"
+                sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                priority={priority}
               />
               {/* Gradient overlay for text readability */}
               <div

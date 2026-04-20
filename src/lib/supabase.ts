@@ -8,7 +8,7 @@ const isBrowser = typeof window !== "undefined";
 // Cookie keys are derived from supabaseUrl, so we must always pass the real URL to
 // createBrowserClient — otherwise the middleware (which also uses supabaseUrl) won't
 // find the session cookie and will redirect authenticated users to /auth/login.
-// Requests are still routed through the Vercel proxy via a custom fetch.
+// Requests are still routed through the proxy via a custom fetch.
 export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey, {
   global: {
     fetch: (input, init) => {
@@ -25,19 +25,24 @@ export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey, {
 });
 
 /**
- * Rewrite a Supabase storage URL to go through our proxy when in the browser.
+ * Rewrite a Supabase storage URL to always go through our proxy.
  * DB stores absolute URLs like "https://xxx.supabase.co/storage/v1/object/public/..."
- * In Russia these are blocked, so we rewrite them to "/api/supabase/storage/..."
+ * In Russia these are blocked. We always rewrite to "/api/supabase/storage/..."
+ * so that server-rendered HTML and client HTML produce the same URL (no hydration mismatch),
+ * and next/image can optimise them without needing remotePatterns for supabase.co.
  */
 export function proxyImageUrl(url: string | null | undefined): string | null | undefined {
-  if (!url || !isBrowser) return url;
+  if (!url) return url;
   try {
     const parsed = new URL(url);
     if (parsed.hostname.endsWith(".supabase.co") || parsed.hostname.endsWith(".supabase.in")) {
-      return `/api/supabase${parsed.pathname}${parsed.search}`;
+      // Strip query string (Supabase ?t= cache-buster) — our proxy sets
+      // Cache-Control: public, max-age=604800 so it is not needed, and
+      // next/image does not allow query strings in relative src paths.
+      return `/api/supabase${parsed.pathname}`;
     }
   } catch {
-    // not a valid URL, return as-is
+    // not a valid URL (e.g. already a relative path), return as-is
   }
   return url;
 }

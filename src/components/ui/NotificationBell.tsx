@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 import { Bell } from "lucide-react";
 import Link from "next/link";
 import { useNotifications } from "@/lib/context/NotificationsContext";
@@ -112,7 +113,7 @@ export function NotificationBell() {
                       style={{ backgroundColor: "#7C5CFC" }}
                     >
                       {actor?.avatar_url ? (
-                        <img src={proxyImageUrl(actor.avatar_url) ?? actor.avatar_url} alt="" className="w-full h-full object-cover" />
+                        <Image src={proxyImageUrl(actor.avatar_url) ?? actor.avatar_url} alt="" width={32} height={32} className="w-full h-full object-cover" />
                       ) : (
                         (actor?.name ?? "?")[0].toUpperCase()
                       )}

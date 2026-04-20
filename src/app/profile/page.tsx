@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { RouteCard } from "@/components/routes/RouteCard";
@@ -233,7 +234,7 @@ export default function ProfilePage() {
                 style={{ backgroundColor: "#7C5CFC" }}
                 onClick={() => avatarUrl && setShowAvatarLightbox(true)}>
                 {avatarUrl
-                  ? <img src={proxyImageUrl(avatarUrl) ?? avatarUrl} alt="Аватар" className="w-full h-full object-cover" />
+                  ? <Image src={proxyImageUrl(avatarUrl) ?? avatarUrl} alt="Аватар" width={64} height={64} className="w-full h-full object-cover" />
                   : initials
                 }
               </div>

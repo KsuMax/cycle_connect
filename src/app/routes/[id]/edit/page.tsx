@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, use, useEffect } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { MapPin, Link as LinkIcon, ChevronRight, AlertCircle, ChevronLeft } from "lucide-react";
@@ -504,7 +505,7 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
               <label className="block text-sm font-semibold text-[#1C1C1E] mb-3">Текущие фотографии</label>
               <div className="flex flex-wrap gap-2">
                 {existingImages.map((img) => (
-                  <img key={img.url} src={proxyImageUrl(img.url) ?? img.url} alt="" className="w-24 h-24 object-cover rounded-xl border border-[#E4E4E7]" />
+                  <Image key={img.url} src={proxyImageUrl(img.url) ?? img.url} alt="" width={96} height={96} className="object-cover rounded-xl border border-[#E4E4E7]" />
                 ))}
               </div>
             </div>
