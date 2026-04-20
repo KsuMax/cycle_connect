@@ -60,12 +60,16 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
       supabase.from("events").select(EVENT_LIST_SELECT).eq("club_id", c.id).order("created_at", { ascending: false }),
     ]);
 
-    setMembers((membersRes.data ?? []).map(dbToClubMember));
-    setRoutes((routesRes.data ?? []).map(dbToRoute));
-    setEvents((eventsRes.data ?? []).map(dbToEvent));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const membersRaw = (membersRes.data ?? []) as any[];
+    setMembers(membersRaw.map(dbToClubMember));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setRoutes(((routesRes.data ?? []) as any[]).map(dbToRoute));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setEvents(((eventsRes.data ?? []) as any[]).map(dbToEvent));
 
     if (user) {
-      const mine = (membersRes.data ?? []).find(
+      const mine = membersRaw.find(
         (m: { user_id: string }) => m.user_id === user.id,
       );
       setMyMembership(mine ? dbToClubMember(mine) : null);
@@ -79,7 +83,8 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
           .eq("status", "pending")
           .maybeSingle();
         if (pendingRow) {
-          setMyMembership(dbToClubMember({ ...pendingRow, profile: null }));
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setMyMembership(dbToClubMember({ ...(pendingRow as any), profile: null }));
         }
       }
     }
