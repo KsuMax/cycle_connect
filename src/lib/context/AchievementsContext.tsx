@@ -59,7 +59,20 @@ interface AchievementsContextValue {
   setShowcaseIds: (ids: string[]) => Promise<void>;
 }
 
-const AchievementsContext = createContext<AchievementsContextValue | null>(null);
+const DEFAULT_VALUE: AchievementsContextValue = {
+  achievements: [],
+  earnedIds: new Set(),
+  earnedMap: new Map(),
+  loaded: false,
+  checkAndAward: async () => {},
+  newlyEarned: [],
+  dismissNewlyEarned: () => {},
+  fetchUserAchievements: async () => ({}),
+  showcaseIds: [],
+  setShowcaseIds: async () => {},
+};
+
+const AchievementsContext = createContext<AchievementsContextValue>(DEFAULT_VALUE);
 
 export function AchievementsProvider({ children }: { children: ReactNode }) {
   const { user, profile } = useAuth();
@@ -70,39 +83,27 @@ export function AchievementsProvider({ children }: { children: ReactNode }) {
   const [newlyEarned, setNewlyEarned] = useState<NewlyEarnedItem[]>([]);
   const [showcaseIds, setShowcaseIdsState] = useState<string[]>([]);
 
-  // Load catalog + user's earned achievements + showcase
+  // Load catalog + user's earned achievements.
+  // Provider is only mounted when user is confirmed (see UserFeatures in layout),
+  // so user is guaranteed to be non-null here — no wasted guest fetch.
   useEffect(() => {
+    if (!user) return;
     setLoaded(false);
 
-    supabase
-      .from("achievements")
-      .select("*")
-      .order("sort_order")
-      .then(({ data }) => {
-        if (data) setAchievements(data as DbAchievement[]);
-      });
-
-    if (user) {
-      supabase
-        .from("user_achievements")
+    // Fetch achievement catalog and user's earned records in parallel
+    Promise.all([
+      supabase.from("achievements").select("*").order("sort_order"),
+      supabase.from("user_achievements")
         .select("achievement_id, earned_at, level")
-        .eq("user_id", user.id)
-        .then(({ data }) => {
-          if (data) {
-            const ids = new Set(data.map((d) => d.achievement_id));
-            const map = new Map(
-              data.map((d) => [d.achievement_id, { earned_at: d.earned_at, level: d.level ?? 1 }]),
-            );
-            setEarnedIds(ids);
-            setEarnedMap(map);
-          }
-          setLoaded(true);
-        });
-    } else {
-      setEarnedIds(new Set());
-      setEarnedMap(new Map());
+        .eq("user_id", user.id),
+    ]).then(([{ data: catalog }, { data: earned }]) => {
+      if (catalog) setAchievements(catalog as DbAchievement[]);
+      if (earned) {
+        setEarnedIds(new Set(earned.map((d) => d.achievement_id)));
+        setEarnedMap(new Map(earned.map((d) => [d.achievement_id, { earned_at: d.earned_at, level: d.level ?? 1 }])));
+      }
       setLoaded(true);
-    }
+    });
   }, [user]);
 
   // Load showcase from profile
@@ -454,7 +455,5 @@ export function AchievementsProvider({ children }: { children: ReactNode }) {
 }
 
 export function useAchievements() {
-  const ctx = useContext(AchievementsContext);
-  if (!ctx) throw new Error("useAchievements must be used within AchievementsProvider");
-  return ctx;
+  return useContext(AchievementsContext);
 }

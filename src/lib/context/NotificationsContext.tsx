@@ -14,7 +14,16 @@ interface NotificationsContextValue {
   refresh: () => Promise<void>;
 }
 
-const NotificationsContext = createContext<NotificationsContextValue | null>(null);
+const DEFAULT_VALUE: NotificationsContextValue = {
+  notifications: [],
+  unreadCount: 0,
+  loaded: false,
+  markAsRead: async () => {},
+  markAllRead: async () => {},
+  refresh: async () => {},
+};
+
+const NotificationsContext = createContext<NotificationsContextValue>(DEFAULT_VALUE);
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -108,7 +117,5 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 }
 
 export function useNotifications() {
-  const ctx = useContext(NotificationsContext);
-  if (!ctx) throw new Error("useNotifications must be used within NotificationsProvider");
-  return ctx;
+  return useContext(NotificationsContext);
 }
