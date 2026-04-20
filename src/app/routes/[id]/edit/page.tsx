@@ -8,7 +8,7 @@ import { ImageUpload } from "@/components/routes/ImageUpload";
 import { CoverUpload } from "@/components/routes/CoverUpload";
 import { GpxUpload } from "@/components/routes/GpxUpload";
 import { ExitPointsEditor, type ExitPointDraft } from "@/components/routes/ExitPointsEditor";
-import { DayEditor } from "@/components/events/DayEditor";
+import { DayEditor } from "@/components/events/DayEditorLazy";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase, proxyImageUrl } from "@/lib/supabase";
 import { parseGpxFile, computeGpxStats, toWktPoint, toWktLinestring } from "@/lib/gpx";
