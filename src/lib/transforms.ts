@@ -5,8 +5,8 @@
  * instead of defining their own local copies.
  */
 
-import type { DbProfile, DbRoute, DbEvent } from "@/lib/supabase";
-import type { Route, RouteTopComment, CycleEvent, User, RouteType, ExitPoint } from "@/types";
+import type { DbProfile, DbRoute, DbEvent, DbClub, DbClubMember } from "@/lib/supabase";
+import type { Route, RouteTopComment, CycleEvent, User, RouteType, ExitPoint, Club, ClubMember } from "@/types";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
@@ -97,6 +97,33 @@ function pickTopComment(
   });
   const top = sorted[0];
   return { text: top.text, author_name: top.author?.name ?? "Участник" };
+}
+
+export function dbToClub(c: DbClub): Club {
+  return {
+    id: c.id,
+    slug: c.slug,
+    name: c.name,
+    description: c.description ?? null,
+    city: c.city ?? null,
+    avatar_url: c.avatar_url ?? null,
+    cover_url: c.cover_url ?? null,
+    visibility: c.visibility,
+    owner_id: c.owner_id,
+    members_count: c.members_count,
+    created_at: c.created_at,
+  };
+}
+
+export function dbToClubMember(m: DbClubMember): ClubMember {
+  return {
+    club_id: m.club_id,
+    user_id: m.user_id,
+    role: m.role,
+    status: m.status,
+    joined_at: m.joined_at,
+    profile: m.profile ? dbToUser(m.profile) : undefined,
+  };
 }
 
 const EMPTY_ROUTE: Route = {

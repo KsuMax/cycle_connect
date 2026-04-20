@@ -140,6 +140,7 @@ export interface DbRoute {
   exit_points_status: "has" | "none" | "unknown";
   likes_count: number;
   riders_today: number;
+  club_id?: string | null;
   created_at: string;
   // joined
   author?: DbProfile;
@@ -175,6 +176,7 @@ export interface DbEvent {
   cover_url: string | null;
   gpx_path: string | null;
   gpx_updated_at: string | null;
+  club_id?: string | null;
   created_at: string;
   // joined
   organizer?: DbProfile;
@@ -237,4 +239,29 @@ export interface DbNotification {
   read: boolean;
   created_at: string;
   actor?: DbProfile;
+}
+
+export interface DbClub {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  city: string | null;
+  avatar_url: string | null;
+  cover_url: string | null;
+  visibility: "open" | "request" | "closed";
+  owner_id: string;
+  members_count: number;
+  created_at: string;
+  // joined
+  members?: DbClubMember[];
+}
+
+export interface DbClubMember {
+  club_id: string;
+  user_id: string;
+  role: "owner" | "admin" | "captain" | "member";
+  status: "active" | "pending";
+  joined_at: string;
+  profile?: DbProfile | null;
 }

@@ -105,3 +105,30 @@ export interface FeedItem {
   event?: CycleEvent;
   created_at: string;
 }
+
+export type ClubVisibility = "open" | "request" | "closed";
+export type ClubRole = "owner" | "admin" | "captain" | "member";
+export type ClubMemberStatus = "active" | "pending";
+
+export interface Club {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string | null;
+  city?: string | null;
+  avatar_url?: string | null;
+  cover_url?: string | null;
+  visibility: ClubVisibility;
+  owner_id: string;
+  members_count: number;
+  created_at: string;
+}
+
+export interface ClubMember {
+  club_id: string;
+  user_id: string;
+  role: ClubRole;
+  status: ClubMemberStatus;
+  joined_at: string;
+  profile?: User;
+}

@@ -414,7 +414,7 @@ export default function ProfilePage() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-sm font-semibold text-[#1C1C1E] group-hover:text-[#0BBFB5] transition-colors">Клубы</div>
-              <div className="text-[11px] text-[#A1A1AA]">Скоро</div>
+              <div className="text-[11px] text-[#A1A1AA]">Велосообщества</div>
             </div>
             <ChevronRight size={14} className="text-[#A1A1AA] shrink-0" />
           </Link>

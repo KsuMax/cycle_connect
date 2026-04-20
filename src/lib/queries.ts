@@ -32,3 +32,13 @@ export const EVENT_LIST_SELECT = [
 ].join(", ");
 
 export const PAGE_SIZE = 20;
+
+/** Use for club list and club detail pages. */
+export const CLUB_LIST_SELECT =
+  "id, slug, name, description, city, avatar_url, cover_url, visibility, owner_id, members_count, created_at";
+
+/** Member rows joined with minimal profile fields. */
+export const CLUB_MEMBERS_SELECT = [
+  "club_id, user_id, role, status, joined_at",
+  "profile:profiles!user_id(id, name, avatar_url, km_total, routes_count, events_count)",
+].join(", ");
