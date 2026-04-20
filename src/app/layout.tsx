@@ -11,7 +11,9 @@ import { EventRidesProvider } from "@/lib/context/EventRidesContext";
 import { IntentsProvider } from "@/lib/context/IntentsContext";
 import { AchievementsProvider } from "@/lib/context/AchievementsContext";
 import { NotificationsProvider } from "@/lib/context/NotificationsContext";
+import { NavigationProvider } from "@/lib/context/NavigationContext";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { TopProgressBar } from "@/components/layout/TopProgressBar";
 import { AuthModalWrapper } from "@/components/ui/AuthModalWrapper";
 import { AchievementModal } from "@/components/ui/AchievementModal";
 import { AiSearchWidget } from "@/components/ui/AiSearchWidget";
@@ -29,34 +31,37 @@ export default function RootLayout({
   return (
     <html lang="ru" className="h-full">
       <body className="min-h-full flex flex-col">
-        <AuthProvider>
-          <ToastProvider>
-            <AuthModalWrapper>
-              <AchievementsProvider>
-                <NotificationsProvider>
-                  <LikesProvider>
-                  <EventLikesProvider>
-                    <FavoritesProvider>
-                      <RidesProvider>
-                        <FollowProvider>
-                          <EventRidesProvider>
-                            <IntentsProvider>
-                              {children}
-                              <AiSearchWidget />
-                              <BottomNav />
-                              <AchievementModal />
-                            </IntentsProvider>
-                          </EventRidesProvider>
-                        </FollowProvider>
-                      </RidesProvider>
-                    </FavoritesProvider>
-                  </EventLikesProvider>
-                </LikesProvider>
-                </NotificationsProvider>
-              </AchievementsProvider>
-            </AuthModalWrapper>
-          </ToastProvider>
-        </AuthProvider>
+        <NavigationProvider>
+          <AuthProvider>
+            <ToastProvider>
+              <AuthModalWrapper>
+                <AchievementsProvider>
+                  <NotificationsProvider>
+                    <LikesProvider>
+                    <EventLikesProvider>
+                      <FavoritesProvider>
+                        <RidesProvider>
+                          <FollowProvider>
+                            <EventRidesProvider>
+                              <IntentsProvider>
+                                <TopProgressBar />
+                                {children}
+                                <AiSearchWidget />
+                                <BottomNav />
+                                <AchievementModal />
+                              </IntentsProvider>
+                            </EventRidesProvider>
+                          </FollowProvider>
+                        </RidesProvider>
+                      </FavoritesProvider>
+                    </EventLikesProvider>
+                  </LikesProvider>
+                  </NotificationsProvider>
+                </AchievementsProvider>
+              </AuthModalWrapper>
+            </ToastProvider>
+          </AuthProvider>
+        </NavigationProvider>
       </body>
     </html>
   );

@@ -1,26 +1,40 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Newspaper, Map, Plus, Calendar, User } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/context/AuthContext";
+import { useNavigation } from "@/lib/context/NavigationContext";
 
 export function BottomNav() {
   const pathname = usePathname();
-  const router = useRouter();
   const { user } = useAuth();
+  const { navigate, pendingHref } = useNavigation();
   const [showCreate, setShowCreate] = useState(false);
 
   const handleCreateRoute = () => {
     setShowCreate(false);
-    router.push("/routes/new");
+    navigate("/routes/new");
   };
 
   const handleCreateEvent = () => {
     setShowCreate(false);
-    router.push("/events/new");
+    navigate("/events/new");
+  };
+
+  const isActive = (href: string, exact = false) => {
+    if (pendingHref === href) return true;
+    if (exact) return pathname === href;
+    return pathname.startsWith(href);
+  };
+
+  const isPending = (href: string) => pendingHref === href;
+
+  const handleClick = (href: string) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (pathname === href) return;
+    navigate(href);
   };
 
   return (
@@ -60,27 +74,31 @@ export function BottomNav() {
         }}
       >
         <div className="flex items-center justify-around h-16 px-1">
-          <Link
+          <a
             href="/"
+            onClick={handleClick("/")}
             className={cn(
-              "flex flex-col items-center gap-0.5 min-w-[56px] min-h-[44px] justify-center rounded-xl",
-              pathname === "/" ? "text-[#F4632A]" : "text-[#71717A]"
+              "flex flex-col items-center gap-0.5 min-w-[56px] min-h-[44px] justify-center rounded-xl transition-opacity",
+              isActive("/", true) ? "text-[#F4632A]" : "text-[#71717A]",
+              isPending("/") && "opacity-70"
             )}
           >
-            <Newspaper size={20} strokeWidth={pathname === "/" ? 2.5 : 2} />
+            <Newspaper size={20} strokeWidth={isActive("/", true) ? 2.5 : 2} />
             <span className="text-[10px] font-medium">Лента</span>
-          </Link>
+          </a>
 
-          <Link
+          <a
             href="/routes"
+            onClick={handleClick("/routes")}
             className={cn(
-              "flex flex-col items-center gap-0.5 min-w-[56px] min-h-[44px] justify-center rounded-xl",
-              pathname.startsWith("/routes") ? "text-[#F4632A]" : "text-[#71717A]"
+              "flex flex-col items-center gap-0.5 min-w-[56px] min-h-[44px] justify-center rounded-xl transition-opacity",
+              isActive("/routes") ? "text-[#F4632A]" : "text-[#71717A]",
+              isPending("/routes") && "opacity-70"
             )}
           >
-            <Map size={20} strokeWidth={pathname.startsWith("/routes") ? 2.5 : 2} />
+            <Map size={20} strokeWidth={isActive("/routes") ? 2.5 : 2} />
             <span className="text-[10px] font-medium">Маршруты</span>
-          </Link>
+          </a>
 
           <button
             onClick={() => setShowCreate(!showCreate)}
@@ -91,27 +109,31 @@ export function BottomNav() {
             <Plus size={24} strokeWidth={2.5} />
           </button>
 
-          <Link
+          <a
             href="/routes?tab=events"
+            onClick={handleClick("/routes?tab=events")}
             className={cn(
-              "flex flex-col items-center gap-0.5 min-w-[56px] min-h-[44px] justify-center rounded-xl",
-              pathname.startsWith("/events") ? "text-[#F4632A]" : "text-[#71717A]"
+              "flex flex-col items-center gap-0.5 min-w-[56px] min-h-[44px] justify-center rounded-xl transition-opacity",
+              pathname.startsWith("/events") || pendingHref === "/routes?tab=events" ? "text-[#F4632A]" : "text-[#71717A]",
+              isPending("/routes?tab=events") && "opacity-70"
             )}
           >
             <Calendar size={20} strokeWidth={pathname.startsWith("/events") ? 2.5 : 2} />
             <span className="text-[10px] font-medium">Поездки</span>
-          </Link>
+          </a>
 
-          <Link
+          <a
             href={user ? "/profile" : "/auth/login"}
+            onClick={handleClick(user ? "/profile" : "/auth/login")}
             className={cn(
-              "flex flex-col items-center gap-0.5 min-w-[56px] min-h-[44px] justify-center rounded-xl",
-              pathname === "/profile" ? "text-[#F4632A]" : "text-[#71717A]"
+              "flex flex-col items-center gap-0.5 min-w-[56px] min-h-[44px] justify-center rounded-xl transition-opacity",
+              isActive("/profile", true) ? "text-[#F4632A]" : "text-[#71717A]",
+              (isPending("/profile") || isPending("/auth/login")) && "opacity-70"
             )}
           >
-            <User size={20} strokeWidth={pathname === "/profile" ? 2.5 : 2} />
+            <User size={20} strokeWidth={isActive("/profile", true) ? 2.5 : 2} />
             <span className="text-[10px] font-medium">{user ? "Профиль" : "Войти"}</span>
-          </Link>
+          </a>
         </div>
       </nav>
 

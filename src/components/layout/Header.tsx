@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Map, Newspaper, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/context/AuthContext";
+import { useNavigation } from "@/lib/context/NavigationContext";
 import { proxyImageUrl } from "@/lib/supabase";
 import { NotificationBell } from "@/components/ui/NotificationBell";
 
@@ -17,11 +17,18 @@ export function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, profile, signOut } = useAuth();
+  const { navigate, pendingHref } = useNavigation();
 
   const handleSignOut = async () => {
     await signOut();
     router.push("/");
     router.refresh();
+  };
+
+  const handleClick = (href: string) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (pathname === href) return;
+    navigate(href);
   };
 
   const initials = profile?.name
@@ -32,25 +39,37 @@ export function Header() {
     <header className="sticky top-0 z-50 bg-white border-b border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
         {/* Logo */}
-        <Link href="/" className="shrink-0 select-none">
+        <a
+          href="/"
+          onClick={handleClick("/")}
+          className="shrink-0 select-none"
+        >
           <span className="text-[1.35rem] font-extrabold tracking-tight">
             <span style={{ color: "#1C1C1E" }}>Cycle</span><span style={{ color: "#F4632A" }}>Connect</span>
           </span>
-        </Link>
+        </a>
 
         {/* Navigation */}
         <nav className="flex items-center gap-1">
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-            const isActive = href === "/" ? pathname === "/" : pathname.startsWith(href) && href !== "/";
+            const isActive = href === "/"
+              ? pathname === "/" || pendingHref === "/"
+              : (pathname.startsWith(href) && href !== "/") || pendingHref === href;
+            const isPending = pendingHref === href;
             return (
-              <Link key={href} href={href}
+              <a
+                key={href}
+                href={href}
+                onClick={handleClick(href)}
                 className={cn(
                   "flex items-center gap-1.5 px-3 min-h-[44px] rounded-lg text-sm font-medium transition-colors",
-                  isActive ? "text-[#F4632A] bg-[#FFF0EB]" : "text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1]"
-                )}>
+                  isActive ? "text-[#F4632A] bg-[#FFF0EB]" : "text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1]",
+                  isPending && "opacity-70"
+                )}
+              >
                 <Icon size={16} strokeWidth={isActive ? 2.5 : 2} />
                 <span>{label}</span>
-              </Link>
+              </a>
             );
           })}
         </nav>
@@ -60,11 +79,15 @@ export function Header() {
           {user ? (
             <>
               <NotificationBell />
-              <Link href="/profile"
+              <a
+                href="/profile"
+                onClick={handleClick("/profile")}
                 className={cn(
                   "flex items-center gap-2 px-3 min-h-[44px] rounded-lg text-sm font-medium transition-colors",
-                  pathname === "/profile" ? "text-[#F4632A] bg-[#FFF0EB]" : "text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1]"
-                )}>
+                  pathname === "/profile" || pendingHref === "/profile" ? "text-[#F4632A] bg-[#FFF0EB]" : "text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1]",
+                  pendingHref === "/profile" && "opacity-70"
+                )}
+              >
                 <div className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center text-xs font-bold text-white shrink-0"
                   style={{ backgroundColor: "#7C5CFC" }}>
                   {profile?.avatar_url
@@ -73,7 +96,7 @@ export function Header() {
                   }
                 </div>
                 <span>{profile?.name ?? "Профиль"}</span>
-              </Link>
+              </a>
               <button onClick={handleSignOut}
                 className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-[#A1A1AA] hover:text-[#71717A] hover:bg-[#F5F4F1] transition-colors"
                 title="Выйти">
@@ -82,16 +105,22 @@ export function Header() {
             </>
           ) : (
             <>
-              <Link href="/auth/login"
+              <a
+                href="/auth/login"
+                onClick={handleClick("/auth/login")}
                 className="text-sm font-medium px-4 min-h-[44px] flex items-center rounded-lg transition-colors"
-                style={{ color: "#71717A" }}>
+                style={{ color: "#71717A" }}
+              >
                 Войти
-              </Link>
-              <Link href="/auth/register"
+              </a>
+              <a
+                href="/auth/register"
+                onClick={handleClick("/auth/register")}
                 className="text-sm font-medium px-4 min-h-[44px] flex items-center rounded-lg transition-colors text-white"
-                style={{ backgroundColor: "#1C1C1E" }}>
+                style={{ backgroundColor: "#1C1C1E" }}
+              >
                 Регистрация
-              </Link>
+              </a>
             </>
           )}
         </div>
