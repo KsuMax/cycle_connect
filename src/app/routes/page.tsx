@@ -26,9 +26,11 @@ export default async function RoutesPage({
       .limit(PAGE_SIZE);
     if (data) initialRoutes = (data as unknown as DbRoute[]).map(dbToRoute);
   } else {
+    const today = new Date().toISOString().split("T")[0];
     const { data } = await supabase
       .from("events")
       .select(EVENT_LIST_SELECT)
+      .or(`end_date.gte.${today},and(end_date.is.null,start_date.gte.${today})`)
       .order("start_date", { ascending: true })
       .limit(PAGE_SIZE);
     if (data) initialEvents = (data as unknown as DbEvent[]).map(dbToEvent);

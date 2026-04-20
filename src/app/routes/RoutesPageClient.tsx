@@ -142,9 +142,11 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
   useEffect(() => {
     if (activeTab !== "events" || eventsLoaded) return;
     setEventsLoading(true);
+    const today = new Date().toISOString().split("T")[0];
     supabase
       .from("events")
       .select(EVENT_LIST_SELECT)
+      .or(`end_date.gte.${today},and(end_date.is.null,start_date.gte.${today})`)
       .order("start_date", { ascending: true })
       .limit(PAGE_SIZE)
       .then(({ data, error }) => {
@@ -218,9 +220,11 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
   // ── Load more events ──────────────────────────────────────────────────────
   const loadMoreEvents = useCallback(async () => {
     setLoadingMoreEvents(true);
+    const today = new Date().toISOString().split("T")[0];
     const { data, error } = await supabase
       .from("events")
       .select(EVENT_LIST_SELECT)
+      .or(`end_date.gte.${today},and(end_date.is.null,start_date.gte.${today})`)
       .order("start_date", { ascending: true })
       .range(eventsOffset, eventsOffset + PAGE_SIZE - 1);
     if (!error && data) {

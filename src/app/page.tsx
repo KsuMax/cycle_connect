@@ -17,6 +17,7 @@ export default async function FeedPage() {
     supabase
       .from("events")
       .select(EVENT_LIST_SELECT)
+      .or(`end_date.gte.${new Date().toISOString().split("T")[0]},and(end_date.is.null,start_date.gte.${new Date().toISOString().split("T")[0]})`)
       .order("created_at", { ascending: false })
       .limit(2),
   ]);
