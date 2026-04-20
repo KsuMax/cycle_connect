@@ -200,9 +200,9 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
                 )}
               </div>
 
-              {/* Action button */}
+              {/* Action buttons */}
               {user && (
-                <div>
+                <div className="flex items-center gap-2 flex-wrap">
                   {!myMembership && (
                     <button
                       onClick={handleJoin}
@@ -215,7 +215,7 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
                     </button>
                   )}
                   {myMembership?.status === "pending" && (
-                    <div className="flex items-center gap-2">
+                    <>
                       <span className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl" style={{ backgroundColor: "#FFF9E6", color: "#B45309" }}>
                         <Clock size={13} />
                         Заявка на рассмотрении
@@ -223,9 +223,15 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
                       <button onClick={handleLeave} disabled={joining} className="text-xs text-[#71717A] hover:text-red-500 transition-colors px-2 py-1.5">
                         Отменить
                       </button>
-                    </div>
+                    </>
                   )}
-                  {myMembership?.status === "active" && myMembership.role !== "owner" && (
+                  {myMembership?.status === "active" && myMembership.role === "owner" && (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl" style={{ backgroundColor: "#E8FAF9", color: "#0BBFB5" }}>
+                      <CheckCircle size={13} />
+                      Владелец
+                    </span>
+                  )}
+                  {myMembership?.status === "active" && !["owner"].includes(myMembership.role) && (
                     <button
                       onClick={handleLeave}
                       disabled={joining}
@@ -234,12 +240,6 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
                       <UserMinus size={15} />
                       Выйти
                     </button>
-                  )}
-                  {myMembership?.status === "active" && myMembership.role === "owner" && (
-                    <span className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl" style={{ backgroundColor: "#E8FAF9", color: "#0BBFB5" }}>
-                      <CheckCircle size={13} />
-                      Владелец
-                    </span>
                   )}
                   {isAdmin && (
                     <Link
