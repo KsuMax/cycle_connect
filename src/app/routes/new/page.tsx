@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/Header";
-import { MapPin, Link as LinkIcon, ChevronRight, AlertCircle } from "lucide-react";
+import { MapPin, Link as LinkIcon, ChevronRight, AlertCircle, Shield } from "lucide-react";
 import { ImageUpload } from "@/components/routes/ImageUpload";
 import { CoverUpload } from "@/components/routes/CoverUpload";
 import { GpxUpload } from "@/components/routes/GpxUpload";
@@ -18,8 +18,11 @@ import { ROUTE_TYPES, DIFFICULTIES, SURFACES, BIKE_TYPES } from "@/constants/rou
 import type { RouteType, Difficulty, Surface, BikeType, ExitPointsStatus } from "@/types";
 import Link from "next/link";
 
+interface CaptainClub { id: string; name: string }
+
 export default function NewRoutePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, profile } = useAuth();
   const { showToast } = useToast();
   const { checkAndAward } = useAchievements();
@@ -43,6 +46,8 @@ export default function NewRoutePage() {
   const [gpxFile, setGpxFile] = useState<File | null>(null);
   const [exitStatus, setExitStatus] = useState<ExitPointsStatus>("unknown");
   const [exitPoints, setExitPoints] = useState<ExitPointDraft[]>([]);
+  const [clubId, setClubId] = useState<string | null>(null);
+  const [captainClubs, setCaptainClubs] = useState<CaptainClub[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [attempted, setAttempted] = useState(false);
@@ -56,6 +61,28 @@ export default function NewRoutePage() {
         if (data) setRegions(data.map((r) => r.name));
       });
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("club_members")
+      .select("club_id, role, club:clubs!club_id(id, name)")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .in("role", ["owner", "admin", "captain"])
+      .then(({ data }) => {
+        if (!data) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const clubs = (data as any[])
+          .map((m) => m.club)
+          .filter(Boolean) as CaptainClub[];
+        setCaptainClubs(clubs);
+        const preselect = searchParams.get("club");
+        if (preselect && clubs.some((c) => c.id === preselect)) {
+          setClubId(preselect);
+        }
+      });
+  }, [user, searchParams]);
 
   const toggleType = (type: RouteType) => {
     setRouteTypes((prev) =>
@@ -132,6 +159,7 @@ export default function NewRoutePage() {
         tags: [],
         mapmagic_url: mapUrl || null,
         mapmagic_embed: buildEmbedUrl(mapUrl),
+        club_id: clubId || null,
         exit_points_status: exitStatus,
         likes_count: 0,
         riders_today: 0,
@@ -271,6 +299,42 @@ export default function NewRoutePage() {
               <p className="text-xs text-red-500 mt-1.5">Введи название маршрута</p>
             )}
           </div>
+
+          {/* Club selector — shown only to captains+ */}
+          {captainClubs.length > 0 && (
+            <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+              <label className="block text-sm font-semibold text-[#1C1C1E] mb-1 flex items-center gap-2">
+                <Shield size={15} style={{ color: "#0BBFB5" }} />
+                Опубликовать от клуба
+              </label>
+              <p className="text-xs text-[#71717A] mb-3">Маршрут появится в ленте клуба и будет виден его участникам</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setClubId(null)}
+                  className="px-4 py-2 rounded-xl text-sm font-medium transition-colors border"
+                  style={!clubId
+                    ? { backgroundColor: "#1C1C1E", color: "white", borderColor: "#1C1C1E" }
+                    : { backgroundColor: "white", color: "#71717A", borderColor: "#E4E4E7" }}
+                >
+                  От себя
+                </button>
+                {captainClubs.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setClubId(c.id)}
+                    className="px-4 py-2 rounded-xl text-sm font-medium transition-colors border"
+                    style={clubId === c.id
+                      ? { backgroundColor: "#0BBFB5", color: "white", borderColor: "#0BBFB5" }
+                      : { backgroundColor: "white", color: "#71717A", borderColor: "#E4E4E7" }}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Route type */}
           <div className={`bg-white rounded-2xl p-5 border ${attempted && routeTypes.length === 0 ? "border-red-300" : "border-[#E4E4E7]"}`} style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
