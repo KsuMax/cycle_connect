@@ -13,10 +13,10 @@ import { dbToClub, dbToClubMember, dbToRoute, dbToEvent } from "@/lib/transforms
 import type { Club, ClubMember, Route, CycleEvent } from "@/types";
 import {
   ArrowLeft, Users, MapPin, Lock, Globe, UserPlus, UserMinus,
-  Clock, Map, Calendar, CheckCircle, Shield, Settings,
+  Clock, Map, Calendar, CheckCircle, Shield, Settings, Check, X,
 } from "lucide-react";
 
-type Tab = "feed" | "routes" | "members";
+type Tab = "feed" | "routes" | "members" | "requests";
 
 export default function ClubPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
@@ -25,6 +25,7 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
   const [club, setClub] = useState<Club | null>(null);
   const [myMembership, setMyMembership] = useState<ClubMember | null>(null);
   const [members, setMembers] = useState<ClubMember[]>([]);
+  const [pendingMembers, setPendingMembers] = useState<ClubMember[]>([]);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [events, setEvents] = useState<CycleEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,17 +69,17 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     setEvents(((eventsRes.data ?? []) as any[]).map(dbToEvent));
 
+    let resolvedMembership: ClubMember | null = null;
+
     if (user) {
       // Try to find current user in the already-fetched members list (active only).
       const mine = membersRaw.find(
         (m: { user_id: string }) => m.user_id === user.id,
       );
       if (mine) {
-        setMyMembership(dbToClubMember(mine));
+        resolvedMembership = dbToClubMember(mine);
       } else {
-        // Fallback: direct query for current user's membership without the
-        // complex profile join (handles both active and pending statuses, and
-        // avoids issues if the join query above returned null due to FK ambiguity).
+        // Fallback: direct query without the complex profile join.
         const { data: myRow } = await supabase
           .from("club_members")
           .select("club_id, user_id, role, status, joined_at")
@@ -86,7 +87,24 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
           .eq("user_id", user.id)
           .maybeSingle();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setMyMembership(myRow ? dbToClubMember({ ...(myRow as any), profile: null }) : null);
+        resolvedMembership = myRow ? dbToClubMember({ ...(myRow as any), profile: null }) : null;
+      }
+      setMyMembership(resolvedMembership);
+
+      // Load pending requests — only for admins
+      const isAdminResolved =
+        resolvedMembership?.role === "owner" || resolvedMembership?.role === "admin";
+      if (isAdminResolved) {
+        const { data: pendingRaw } = await supabase
+          .from("club_members")
+          .select(CLUB_MEMBERS_SELECT)
+          .eq("club_id", c.id)
+          .eq("status", "pending")
+          .order("joined_at", { ascending: true });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setPendingMembers(((pendingRaw ?? []) as any[]).map(dbToClubMember));
+      } else {
+        setPendingMembers([]);
       }
     }
 
@@ -110,6 +128,36 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
     setClub((prev) => prev ? { ...prev, members_count: Math.max(0, prev.members_count - 1) } : prev);
     setMembers((prev) => prev.filter((m) => m.user_id !== user.id));
     setJoining(false);
+  }
+
+  async function handleApprove(userId: string) {
+    if (!club) return;
+    await supabase
+      .from("club_members")
+      .update({ status: "active" })
+      .eq("club_id", club.id)
+      .eq("user_id", userId);
+    setPendingMembers((prev) => prev.filter((m) => m.user_id !== userId));
+    setClub((prev) => prev ? { ...prev, members_count: prev.members_count + 1 } : prev);
+    // Refresh members list to show the newly approved member
+    const { data } = await supabase
+      .from("club_members")
+      .select(CLUB_MEMBERS_SELECT)
+      .eq("club_id", club.id)
+      .eq("status", "active")
+      .order("joined_at", { ascending: true });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (data) setMembers(((data) as any[]).map(dbToClubMember));
+  }
+
+  async function handleReject(userId: string) {
+    if (!club) return;
+    await supabase
+      .from("club_members")
+      .delete()
+      .eq("club_id", club.id)
+      .eq("user_id", userId);
+    setPendingMembers((prev) => prev.filter((m) => m.user_id !== userId));
   }
 
   const isAdmin = myMembership?.role === "owner" || myMembership?.role === "admin";
@@ -316,9 +364,12 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
         <div className="flex gap-1 bg-white rounded-2xl p-1.5 border border-[#E4E4E7] mb-6" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
           {(
             [
-              { id: "feed",    label: "Лента",      icon: <Calendar size={15} />, count: feedItems.length },
-              { id: "routes",  label: "Маршруты",   icon: <Map size={15} />,      count: routes.length },
-              { id: "members", label: "Участники",  icon: <Users size={15} />,    count: members.length },
+              { id: "feed",     label: "Лента",     icon: <Calendar size={15} />, count: feedItems.length },
+              { id: "routes",   label: "Маршруты",  icon: <Map size={15} />,      count: routes.length },
+              { id: "members",  label: "Участники", icon: <Users size={15} />,    count: members.length },
+              ...(isAdmin && pendingMembers.length > 0
+                ? [{ id: "requests" as const, label: "Заявки", icon: <Clock size={15} />, count: pendingMembers.length }]
+                : []),
             ] as const
           ).map((tab) => (
             <button
@@ -339,6 +390,8 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
                   style={
                     activeTab === tab.id
                       ? { backgroundColor: "rgba(255,255,255,0.2)", color: "white" }
+                      : tab.id === "requests"
+                      ? { backgroundColor: "#FFF0EB", color: "#F4632A" }
                       : { backgroundColor: "#F5F4F1", color: "#71717A" }
                   }
                 >
@@ -400,6 +453,26 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
               <div className="space-y-2">
                 {members.map((m) => (
                   <MemberRow key={m.user_id} member={m} />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Requests tab — admin only */}
+        {activeTab === "requests" && isAdmin && (
+          <section>
+            {pendingMembers.length === 0 ? (
+              <EmptyState icon={<CheckCircle size={28} />} title="Новых заявок нет" text="" />
+            ) : (
+              <div className="space-y-2">
+                {pendingMembers.map((m) => (
+                  <PendingMemberRow
+                    key={m.user_id}
+                    member={m}
+                    onApprove={() => handleApprove(m.user_id)}
+                    onReject={() => handleReject(m.user_id)}
+                  />
                 ))}
               </div>
             )}
@@ -468,6 +541,73 @@ function MemberRow({ member }: { member: ClubMember }) {
         )}
       </div>
     </Link>
+  );
+}
+
+function PendingMemberRow({
+  member,
+  onApprove,
+  onReject,
+}: {
+  member: ClubMember;
+  onApprove: () => void;
+  onReject: () => void;
+}) {
+  const p = member.profile;
+  const name = p?.name ?? "Участник";
+  const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+
+  return (
+    <div
+      className="flex items-center gap-3 bg-white rounded-2xl p-4 border border-[#E4E4E7]"
+      style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}
+    >
+      <div
+        className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center text-sm font-bold text-white shrink-0"
+        style={{ backgroundColor: "#7C5CFC" }}
+      >
+        {p?.avatar_url ? (
+          <Image
+            src={proxyImageUrl(p.avatar_url) ?? p.avatar_url}
+            alt={name}
+            width={40}
+            height={40}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          initials
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <Link href={`/users/${member.user_id}`} className="text-sm font-medium text-[#1C1C1E] hover:underline truncate block">
+          {name}
+        </Link>
+        {p && (
+          <div className="text-xs text-[#A1A1AA] mt-0.5">
+            {Math.round(p.km_total).toLocaleString()} км · {p.routes_count} маршрутов
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          onClick={onReject}
+          className="w-9 h-9 flex items-center justify-center rounded-xl border border-[#E4E4E7] text-[#71717A] hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors"
+          title="Отклонить"
+        >
+          <X size={16} />
+        </button>
+        <button
+          onClick={onApprove}
+          className="w-9 h-9 flex items-center justify-center rounded-xl text-white transition-colors"
+          style={{ backgroundColor: "#0BBFB5" }}
+          title="Принять"
+        >
+          <Check size={16} />
+        </button>
+      </div>
+    </div>
   );
 }
 
