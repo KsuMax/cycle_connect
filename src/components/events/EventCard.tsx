@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect } from "react";
-import { Calendar, Bike, Heart, ChevronRight } from "lucide-react";
+import { Calendar, Bike, Heart, ChevronRight, Shield } from "lucide-react";
 import { AvatarGroup } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { formatDate } from "@/lib/utils";
@@ -129,10 +129,21 @@ export function EventCard({ event, priority = false }: EventCardProps) {
           )}
 
           <div className="relative p-5">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <Badge className="bg-white/30 text-white border-0 text-xs font-semibold backdrop-blur-sm">
                 📅 {isMultiDay ? `${event.days.length} дня · поход` : "Поездка"}
               </Badge>
+              {event.club && (
+                <Link
+                  href={`/clubs/${event.club.slug}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-md transition-opacity hover:opacity-80"
+                  style={{ backgroundColor: "rgba(11,191,181,0.25)", color: "white" }}
+                >
+                  <Shield size={10} />
+                  {event.club.name}
+                </Link>
+              )}
             </div>
             <h3 className="text-white font-bold text-lg leading-tight group-hover:opacity-90 transition-opacity drop-shadow-sm">
               {event.title}

@@ -20,6 +20,7 @@ export const ROUTE_LIST_SELECT = [
   `author:profiles!author_id(${PROFILE_FIELDS})`,
   "route_images(url)",
   "route_comments(id, text, likes_count, created_at, author:profiles!author_id(name))",
+  "club:clubs!club_id(id, slug, name)",
 ].join(", ");
 
 /** Use for event list pages (routes/page.tsx events tab, load-more). */
@@ -29,6 +30,7 @@ export const EVENT_LIST_SELECT = [
   `organizer:profiles!organizer_id(${PROFILE_FIELDS})`,
   "event_days(day_number, date, title, distance_km, start_point, end_point, description)",
   `event_participants(user_id, profile:profiles!user_id(id, name, avatar_url, km_total, routes_count, events_count))`,
+  "club:clubs!club_id(id, slug, name)",
 ].join(", ");
 
 export const PAGE_SIZE = 20;

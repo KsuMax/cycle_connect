@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bike, Mountain, Clock, Heart, ChevronRight } from "lucide-react";
+import { Bike, Mountain, Clock, Heart, ChevronRight, Shield } from "lucide-react";
 import { DifficultyBadge, Badge } from "@/components/ui/Badge";
 import { AvatarGroup } from "@/components/ui/Avatar";
 import { cn } from "@/lib/utils";
@@ -108,10 +108,21 @@ export function RouteCard({ route, compact = false, priority = false }: RouteCar
 
         {/* Content */}
         <div className="p-4">
-          <div className="flex items-center gap-1.5 mb-2">
+          <div className="flex items-center gap-1.5 mb-2 flex-wrap">
             <span className="text-xs font-semibold px-2 py-0.5 rounded-md" style={{ backgroundColor: "#FFF0EB", color: "#F4632A" }}>
               🗺 Маршрут
             </span>
+            {route.club && (
+              <Link
+                href={`/clubs/${route.club.slug}`}
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-md transition-opacity hover:opacity-80"
+                style={{ backgroundColor: "#E8FAF9", color: "#0BBFB5" }}
+              >
+                <Shield size={10} />
+                {route.club.name}
+              </Link>
+            )}
           </div>
           <h3 className="font-semibold text-[#1C1C1E] text-base leading-snug mb-2 line-clamp-2 group-hover:text-[#F4632A] transition-colors">
             {route.title}

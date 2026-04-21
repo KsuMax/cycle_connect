@@ -6,7 +6,7 @@
  */
 
 import type { DbProfile, DbRoute, DbEvent, DbClub, DbClubMember } from "@/lib/supabase";
-import type { Route, RouteTopComment, CycleEvent, User, RouteType, ExitPoint, Club, ClubMember } from "@/types";
+import type { Route, RouteTopComment, CycleEvent, User, RouteType, ExitPoint, Club, ClubMember, ClubRef } from "@/types";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
@@ -84,6 +84,8 @@ export function dbToRoute(r: DbRoute): Route {
       })),
     top_comment: pickTopComment(r.route_comments),
     created_at: r.created_at,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    club: (r as any).club ?? null,
   };
 }
 
@@ -173,5 +175,7 @@ export function dbToEvent(e: DbEvent): CycleEvent {
     cover_url: e.cover_url ?? null,
     likes: e.likes_count,
     created_at: e.created_at,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    club: (e as any).club ?? null,
   };
 }

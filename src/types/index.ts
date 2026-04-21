@@ -61,6 +61,7 @@ export interface Route {
   exit_points?: ExitPoint[];
   top_comment?: RouteTopComment | null;
   created_at: string;
+  club?: ClubRef | null;
 }
 
 export interface EventDay {
@@ -89,6 +90,7 @@ export interface CycleEvent {
   is_private?: boolean;
   cover_url?: string | null;
   created_at: string;
+  club?: ClubRef | null;
 }
 
 export interface Comment {
@@ -104,6 +106,12 @@ export interface FeedItem {
   route?: Route;
   event?: CycleEvent;
   created_at: string;
+}
+
+export interface ClubRef {
+  id: string;
+  slug: string;
+  name: string;
 }
 
 export type ClubVisibility = "open" | "request" | "closed";
