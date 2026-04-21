@@ -68,6 +68,7 @@ export default function ProfilePage() {
 
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
+  const [clubsCount, setClubsCount] = useState(0);
   const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
   const [showShowcasePicker, setShowShowcasePicker] = useState(false);
 
@@ -165,6 +166,17 @@ export default function ProfilePage() {
       .select("following_id", { count: "exact", head: true })
       .eq("follower_id", user.id)
       .then(({ count }) => setFollowingCount(count ?? 0));
+  }, [user]);
+
+  // Load clubs count
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("club_members")
+      .select("club_id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .then(({ count }) => setClubsCount(count ?? 0));
   }, [user]);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -310,11 +322,12 @@ export default function ProfilePage() {
               </div>
               <div className="flex gap-6 mt-4 flex-wrap">
                 {[
-                  { value: Math.round(ridesKm).toLocaleString(), label: "км всего", color: "#F4632A", href: null },
-                  { value: myRoutes.length, label: "маршрутов", color: "#7C5CFC", href: null },
+                  { value: Math.round(ridesKm).toLocaleString(), label: "км всего",    color: "#F4632A", href: null },
+                  { value: myRoutes.length,                       label: "маршрутов",  color: "#7C5CFC", href: null },
                   { value: loadingRides ? "..." : ridesData.length, label: "поездок", color: "#0BBFB5", href: null },
-                  { value: followersCount, label: "подписчиков", color: "#A1A1AA", href: user ? `/users/${user.id}/followers` : null },
-                  { value: followingCount, label: "подписок",    color: "#A1A1AA", href: user ? `/users/${user.id}/following` : null },
+                  { value: clubsCount,                            label: "клубов",     color: "#0BBFB5", href: "/clubs" },
+                  { value: followersCount, label: "подписчиков",  color: "#A1A1AA",   href: user ? `/users/${user.id}/followers` : null },
+                  { value: followingCount, label: "подписок",     color: "#A1A1AA",   href: user ? `/users/${user.id}/following` : null },
                 ].map(({ value, label, color, href }) => (
                   href ? (
                     <Link key={label} href={href} className="text-center group">
@@ -414,7 +427,9 @@ export default function ProfilePage() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-sm font-semibold text-[#1C1C1E] group-hover:text-[#0BBFB5] transition-colors">Клубы</div>
-              <div className="text-[11px] text-[#A1A1AA]">Велосообщества</div>
+              <div className="text-[11px] text-[#A1A1AA]">
+                {clubsCount > 0 ? `Ты в ${clubsCount} ${clubsCount === 1 ? "клубе" : clubsCount < 5 ? "клубах" : "клубах"}` : "Велосообщества"}
+              </div>
             </div>
             <ChevronRight size={14} className="text-[#A1A1AA] shrink-0" />
           </Link>
