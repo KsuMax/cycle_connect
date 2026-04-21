@@ -69,23 +69,24 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
     setEvents(((eventsRes.data ?? []) as any[]).map(dbToEvent));
 
     if (user) {
+      // Try to find current user in the already-fetched members list (active only).
       const mine = membersRaw.find(
         (m: { user_id: string }) => m.user_id === user.id,
       );
-      setMyMembership(mine ? dbToClubMember(mine) : null);
-
-      if (!mine) {
-        const { data: pendingRow } = await supabase
+      if (mine) {
+        setMyMembership(dbToClubMember(mine));
+      } else {
+        // Fallback: direct query for current user's membership without the
+        // complex profile join (handles both active and pending statuses, and
+        // avoids issues if the join query above returned null due to FK ambiguity).
+        const { data: myRow } = await supabase
           .from("club_members")
           .select("club_id, user_id, role, status, joined_at")
           .eq("club_id", c.id)
           .eq("user_id", user.id)
-          .eq("status", "pending")
           .maybeSingle();
-        if (pendingRow) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          setMyMembership(dbToClubMember({ ...(pendingRow as any), profile: null }));
-        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setMyMembership(myRow ? dbToClubMember({ ...(myRow as any), profile: null }) : null);
       }
     }
 
