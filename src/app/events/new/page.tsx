@@ -12,8 +12,10 @@ import { supabase } from "@/lib/supabase";
 import { MOCK_ROUTES } from "@/lib/data/mock";
 import { CoverUpload } from "@/components/routes/CoverUpload";
 import { GpxUpload } from "@/components/routes/GpxUpload";
-import { Plus, Trash2, ChevronLeft, Calendar, Bike, AlertCircle } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, Calendar, Bike, AlertCircle, Shield } from "lucide-react";
 import Link from "next/link";
+
+interface CaptainClub { id: string; name: string }
 
 interface DayForm {
   id: string;
@@ -57,6 +59,8 @@ function CreateEventForm() {
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [gpxFile, setGpxFile] = useState<File | null>(null);
+  const [clubId, setClubId] = useState<string | null>(null);
+  const [captainClubs, setCaptainClubs] = useState<CaptainClub[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [attempted, setAttempted] = useState(false);
@@ -80,6 +84,27 @@ function CreateEventForm() {
     }
     loadRoutes();
   }, []);
+
+  // Load clubs where user is owner/admin/captain (for the club selector)
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("club_members")
+      .select("club_id, role, club:clubs!club_id(id, name)")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .in("role", ["owner", "admin", "captain"])
+      .then(({ data }) => {
+        if (!data) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const clubs = (data as any[]).map((m) => m.club).filter(Boolean) as CaptainClub[];
+        setCaptainClubs(clubs);
+        const preselect = searchParams.get("club");
+        if (preselect && clubs.some((c) => c.id === preselect)) {
+          setClubId(preselect);
+        }
+      });
+  }, [user, searchParams]);
 
   const selectedRoute = routes.find((r) => r.id === routeId);
 
@@ -109,6 +134,7 @@ function CreateEventForm() {
         max_participants: parseInt(maxParticipants) || null,
         is_private: isPrivate,
         likes_count: 0,
+        club_id: clubId || null,
       })
       .select()
       .single();
@@ -219,6 +245,42 @@ function CreateEventForm() {
               label="мероприятия"
             />
           </div>
+
+          {/* Club selector — shown only to captains+ */}
+          {captainClubs.length > 0 && (
+            <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+              <label className="block text-sm font-semibold text-[#1C1C1E] mb-1 flex items-center gap-2">
+                <Shield size={15} style={{ color: "#0BBFB5" }} />
+                Опубликовать от клуба
+              </label>
+              <p className="text-xs text-[#71717A] mb-3">Мероприятие появится в ленте клуба и будет видно его участникам</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setClubId(null)}
+                  className="px-4 py-2 rounded-xl text-sm font-medium transition-colors border"
+                  style={!clubId
+                    ? { backgroundColor: "#1C1C1E", color: "white", borderColor: "#1C1C1E" }
+                    : { backgroundColor: "white", color: "#71717A", borderColor: "#E4E4E7" }}
+                >
+                  От себя
+                </button>
+                {captainClubs.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setClubId(c.id)}
+                    className="px-4 py-2 rounded-xl text-sm font-medium transition-colors border"
+                    style={clubId === c.id
+                      ? { backgroundColor: "#0BBFB5", color: "white", borderColor: "#0BBFB5" }
+                      : { backgroundColor: "white", color: "#71717A", borderColor: "#E4E4E7" }}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Basic info */}
           <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
