@@ -35,6 +35,11 @@ function formatNotification(n: DbNotification) {
     return `🚴 ${actorName} хочет присоединиться к поездке «${routeTitle}»${date ? ` ${formatDate(date)}` : ""}`;
   }
 
+  if (n.type === "club_event" && data) {
+    const eventTitle = (data.event_title as string) ?? "мероприятие";
+    return `📅 ${actorName} создал мероприятие «${eventTitle}» в вашем клубе`;
+  }
+
   return `${actorName} — новое уведомление`;
 }
 
@@ -99,10 +104,13 @@ export function NotificationBell() {
                 const actor = n.actor as DbProfile | undefined;
                 const data = n.data as Record<string, unknown> | null;
                 const actorId = data?.actor_id ?? actor?.id ?? n.actor_id;
+                const href = n.type === "club_event" && data?.event_id
+                  ? `/events/${data.event_id as string}`
+                  : actorId ? `/users/${actorId}` : "#";
                 return (
                   <Link
                     key={n.id}
-                    href={actorId ? `/users/${actorId}` : "#"}
+                    href={href}
                     onClick={() => setOpen(false)}
                     className="flex items-start gap-3 px-4 py-3 hover:bg-[#F5F4F1] transition-colors border-b border-[#F5F4F1] last:border-0"
                     style={{ backgroundColor: n.read ? undefined : "#FFFBF5" }}
