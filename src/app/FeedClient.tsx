@@ -1,11 +1,13 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { EventCard } from "@/components/events/EventCard";
-import { Bike, TrendingUp, Calendar } from "lucide-react";
+import { Bike, TrendingUp, Calendar, Users, Plus, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/lib/context/AuthContext";
+import { supabase } from "@/lib/supabase";
 import type { Route, CycleEvent } from "@/types";
 
 interface Props {
@@ -15,6 +17,27 @@ interface Props {
 
 export function FeedClient({ initialRoutes, initialEvents }: Props) {
   const { user } = useAuth();
+  // null = ещё грузим, true = есть клуб, false = нет клуба
+  const [hasClub, setHasClub] = useState<boolean | null>(null);
+  const [hasOwnEvents, setHasOwnEvents] = useState(false);
+
+  useEffect(() => {
+    if (!user) { setHasClub(false); return; }
+    Promise.all([
+      supabase
+        .from("club_members")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("status", "active"),
+      supabase
+        .from("events")
+        .select("id", { count: "exact", head: true })
+        .eq("organizer_id", user.id),
+    ]).then(([clubRes, eventsRes]) => {
+      setHasClub((clubRes.count ?? 0) > 0);
+      setHasOwnEvents((eventsRes.count ?? 0) > 0);
+    });
+  }, [user]);
 
   const visibleEvents = initialEvents.filter(ev =>
     !ev.is_private || (user != null && ev.participants.some(p => p.id === user.id))
@@ -86,6 +109,40 @@ export function FeedClient({ initialRoutes, initialEvents }: Props) {
               </Link>
             </div>
 
+            {/* Club discovery CTA — показываем только если у пользователя нет клуба */}
+            {hasClub === false && (
+              <div className="rounded-2xl border border-[#E4E4E7] bg-white p-5 flex items-start gap-4"
+                style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+                <div className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{ backgroundColor: "#F0EDFF" }}>
+                  <Users size={20} style={{ color: "#7C5CFC" }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm text-[#1C1C1E] mb-0.5">
+                    {user ? "Ты ещё не в клубе" : "Присоединяйся к сообществу"}
+                  </p>
+                  <p className="text-xs text-[#71717A] mb-3">
+                    {user
+                      ? "Клубы — место для регулярных поездок с командой, общей лентой и маршрутами"
+                      : "Велоклубы объединяют тех, кто катается регулярно. Найди своих или создай клуб"}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Link href="/clubs"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                      style={{ backgroundColor: "#7C5CFC", color: "white" }}>
+                      <ArrowRight size={13} /> Найти клуб
+                    </Link>
+                    {(user && hasOwnEvents) && (
+                      <Link href="/clubs/new"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#E4E4E7] text-[#71717A] hover:border-[#7C5CFC] hover:text-[#7C5CFC] transition-colors">
+                        <Plus size={13} /> Создать клуб
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Popular routes */}
             {initialRoutes.length > 0 && (
               <section>
@@ -131,6 +188,31 @@ export function FeedClient({ initialRoutes, initialEvents }: Props) {
                 Создать мероприятие
               </Link>
             </div>
+
+            {/* Club CTA в сайдбаре */}
+            {hasClub === false && (
+              <div className="rounded-2xl border border-[#E4E4E7] bg-white p-4"
+                style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <Users size={16} style={{ color: "#7C5CFC" }} />
+                  <h3 className="font-semibold text-sm text-[#1C1C1E]">Велоклубы</h3>
+                </div>
+                <p className="text-xs text-[#71717A] mb-3">
+                  Регулярные поездки с командой, общие маршруты и лента событий клуба
+                </p>
+                <Link href="/clubs"
+                  className="block text-center font-semibold text-xs px-4 py-2 rounded-xl transition-colors mb-2"
+                  style={{ backgroundColor: "#F0EDFF", color: "#7C5CFC" }}>
+                  Найти клуб
+                </Link>
+                {user && hasOwnEvents && (
+                  <Link href="/clubs/new"
+                    className="block text-center font-semibold text-xs px-4 py-2 rounded-xl border border-[#E4E4E7] text-[#71717A] hover:border-[#7C5CFC] hover:text-[#7C5CFC] transition-colors">
+                    Создать свой клуб
+                  </Link>
+                )}
+              </div>
+            )}
           </aside>
         </div>
       </main>
