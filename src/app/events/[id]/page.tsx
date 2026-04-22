@@ -414,7 +414,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold text-[#1C1C1E] flex items-center gap-2">
                   <Users size={18} style={{ color: "#0BBFB5" }} />
-                  Участники ({event.participants.length}{event.max_participants ? `/${event.max_participants}` : ""})
+                  Участники
+                  <span className="text-sm font-normal text-[#71717A]">
+                    {event.participants.length}{event.max_participants ? `/${event.max_participants}` : ""}
+                  </span>
                 </h2>
                 {isAdmin && (
                   <button
@@ -425,42 +428,74 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   </button>
                 )}
               </div>
-              <div className="flex flex-wrap gap-3">
-                {event.participants.map((p) => {
-                  // Show the contact button only to viewers who are part of the
-                  // event (organizer, admin, or fellow participant) — don't leak
-                  // TG / e-mail to random passers-by.
-                  const viewerIsInsider =
-                    !!user && (
-                      user.id === event.organizer.id ||
-                      isAdmin ||
-                      event.participants.some((x) => x.id === user.id)
-                    );
-                  const showContact = viewerIsInsider && user?.id !== p.id;
-                  return (
-                    <div key={p.id} className="flex items-center gap-2">
-                      <Link href={`/users/${p.id}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                        <Avatar user={p} size="sm" />
-                        <span className="text-sm text-[#1C1C1E]">{p.name}</span>
-                      </Link>
-                      {showContact && <ContactButton user={p} />}
+
+              {/* Capacity bar */}
+              {event.max_participants && (() => {
+                const filled = event.participants.length;
+                const max = event.max_participants!;
+                const pct = Math.min((filled / max) * 100, 100);
+                const free = max - filled;
+                const isFull = filled >= max;
+                const isNearFull = !isFull && pct >= 80;
+                return (
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs text-[#71717A]">Заполненность</span>
+                      {isFull ? (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#FEF2F2", color: "#EF4444" }}>
+                          Мест нет
+                        </span>
+                      ) : isNearFull ? (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#FFF7ED", color: "#F4632A" }}>
+                          Осталось {free} {free === 1 ? "место" : free < 5 ? "места" : "мест"}
+                        </span>
+                      ) : (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#F0FDF4", color: "#22C55E" }}>
+                          {free} {free === 1 ? "место свободно" : free < 5 ? "места свободно" : "мест свободно"}
+                        </span>
+                      )}
                     </div>
-                  );
-                })}
-                {event.participants.length === 0 && (
-                  <p className="text-sm text-[#A1A1AA]">Пока никто не записался</p>
-                )}
-              </div>
-              {event.max_participants && event.participants.length > 0 && (
-                <div className="mt-4">
-                  <div className="flex justify-between text-xs text-[#71717A] mb-1">
-                    <span>Мест занято</span>
-                    <span>{event.participants.length}/{event.max_participants}</span>
+                    <div className="h-2 rounded-full bg-[#F5F4F1] overflow-hidden">
+                      <div className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${pct}%`,
+                          background: isFull
+                            ? "#EF4444"
+                            : isNearFull
+                              ? "linear-gradient(90deg, #F4632A, #FBBF24)"
+                              : "linear-gradient(90deg, #0BBFB5, #7C5CFC)",
+                        }} />
+                    </div>
                   </div>
-                  <div className="h-2 rounded-full bg-[#F5F4F1] overflow-hidden">
-                    <div className="h-full rounded-full transition-all"
-                      style={{ width: `${(event.participants.length / event.max_participants) * 100}%`, background: "linear-gradient(90deg, #0BBFB5, #7C5CFC)" }} />
-                  </div>
+                );
+              })()}
+
+              {/* Participant list */}
+              {event.participants.length === 0 ? (
+                <p className="text-sm text-[#A1A1AA]">Пока никто не записался</p>
+              ) : (
+                <div className="space-y-0.5">
+                  {event.participants.map((p) => {
+                    // Show the contact button only to viewers who are part of the
+                    // event (organizer, admin, or fellow participant) — don't leak
+                    // TG / e-mail to random passers-by.
+                    const viewerIsInsider =
+                      !!user && (
+                        user.id === event.organizer.id ||
+                        isAdmin ||
+                        event.participants.some((x) => x.id === user.id)
+                      );
+                    const showContact = viewerIsInsider && user?.id !== p.id;
+                    return (
+                      <div key={p.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#F5F4F1] transition-colors">
+                        <Link href={`/users/${p.id}`} className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity">
+                          <Avatar user={p} size="sm" />
+                          <span className="text-sm text-[#1C1C1E] truncate">{p.name}</span>
+                        </Link>
+                        {showContact && <ContactButton user={p} />}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -531,9 +566,15 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               )}
 
               <div className="mb-3">
-                <Button variant={going ? "outline" : "secondary"} size="lg" className="w-full" onClick={handleGoingToggle}>
-                  {going ? "✓ Ты едешь!" : "Я поеду →"}
-                </Button>
+                {event.max_participants && event.participants.length >= event.max_participants && !going ? (
+                  <div className="w-full py-3 px-4 rounded-xl text-center text-sm font-semibold" style={{ backgroundColor: "#FEF2F2", color: "#EF4444" }}>
+                    Мест нет — все заняты
+                  </div>
+                ) : (
+                  <Button variant={going ? "outline" : "secondary"} size="lg" className="w-full" onClick={handleGoingToggle}>
+                    {going ? "✓ Ты едешь!" : "Я поеду →"}
+                  </Button>
+                )}
               </div>
 
               {event.route && (
