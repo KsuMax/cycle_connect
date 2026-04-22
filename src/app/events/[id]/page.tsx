@@ -14,7 +14,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useEventLikes } from "@/lib/context/EventLikesContext";
 import {
   ChevronLeft, Calendar, Bike, Heart,
-  Share2, Users, MapPin, ExternalLink, Flag, ChevronRight, Pencil, Lock, Trash2, UserPlus, Search, X, Download,
+  Share2, Users, MapPin, ExternalLink, Flag, ChevronRight, Pencil, Lock, Trash2, UserPlus, Search, X, Download, RefreshCw,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { useAuthModal } from "@/components/ui/AuthModal";
@@ -273,6 +273,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const totalKm = event.days.reduce((sum, d) => sum + (d.distance_km ?? 0), 0);
   const isMultiDay = event.days.length > 1;
   const isOrganizer = user?.id === event.organizer_id;
+  const isPastEvent = event.start_date ? new Date(event.start_date) < new Date() : false;
 
   return (
     <div className="min-h-screen bg-[#F5F4F1]">
@@ -283,7 +284,14 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             <ChevronLeft size={16} /> Лента
           </Link>
           {isOrganizer && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {isPastEvent && (
+                <Link href={`/events/new?copy=${event.id}`}
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-white px-3 py-1.5 rounded-lg transition-colors"
+                  style={{ backgroundColor: "#0BBFB5" }}>
+                  <RefreshCw size={13} /> Повторить поездку
+                </Link>
+              )}
               <Link href={`/events/${event.id}/edit`}
                 className="inline-flex items-center gap-1.5 text-sm text-[#71717A] hover:text-[#1C1C1E] border border-[#E4E4E7] px-3 py-1.5 rounded-lg hover:bg-[#F5F4F1] transition-colors">
                 <Pencil size={14} /> Редактировать

@@ -48,6 +48,7 @@ function CreateEventForm() {
   const { showToast } = useToast();
   const { checkAndAward } = useAchievements();
   const preselectedRouteId = searchParams.get("route") ?? "";
+  const copyFromId = searchParams.get("copy") ?? null;
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -65,6 +66,7 @@ function CreateEventForm() {
   const [error, setError] = useState("");
   const [attempted, setAttempted] = useState(false);
   const [routes, setRoutes] = useState<RouteOption[]>([]);
+  const [copySourceTitle, setCopySourceTitle] = useState<string | null>(null);
 
   // Load available routes (Supabase first, fallback to mock)
   useEffect(() => {
@@ -105,6 +107,55 @@ function CreateEventForm() {
         }
       });
   }, [user, searchParams]);
+
+  // Pre-fill form from an existing event (recurrence / copy)
+  useEffect(() => {
+    if (!copyFromId) return;
+    supabase
+      .from("events")
+      .select("title, description, route_id, max_participants, is_private, club_id, cover_url, event_days(*)")
+      .eq("id", copyFromId)
+      .single()
+      .then(({ data }) => {
+        if (!data) return;
+        setCopySourceTitle(data.title);
+        setTitle(data.title);
+        setDescription(data.description ?? "");
+        setRouteId(data.route_id ?? "");
+        setMaxParticipants(data.max_participants ? String(data.max_participants) : "");
+        setIsPrivate(data.is_private ?? false);
+        if (data.club_id) setClubId(data.club_id);
+        if (data.cover_url) setCoverPreview(data.cover_url);
+
+        // Shift each day date forward by 7 days
+        const shiftDate = (iso: string | null) => {
+          if (!iso) return "";
+          const d = new Date(iso);
+          d.setDate(d.getDate() + 7);
+          return d.toISOString().slice(0, 10);
+        };
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sourceDays = ((data.event_days ?? []) as any[])
+          .sort((a, b) => a.day_number - b.day_number);
+
+        if (sourceDays.length > 0) {
+          setStartDate(shiftDate(sourceDays[0].date));
+          setDays(sourceDays.map((d, i) => ({
+            id: crypto.randomUUID(),
+            title: d.title ?? `День ${i + 1}`,
+            date: shiftDate(d.date),
+            distance_km: String(d.distance_km ?? ""),
+            start_point: d.start_point ?? "",
+            end_point: d.end_point ?? "",
+            surface_note: d.surface_note ?? "",
+            description: d.description ?? "",
+          })));
+        } else {
+          setStartDate("");
+        }
+      });
+  }, [copyFromId]);
 
   const selectedRoute = routes.find((r) => r.id === routeId);
 
@@ -226,9 +277,21 @@ function CreateEventForm() {
         </Link>
 
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-[#1C1C1E] mb-1">Новое мероприятие</h1>
-          <p className="text-[#71717A] text-sm">Организуй поездку и пригласи участников</p>
+          <h1 className="text-2xl font-bold text-[#1C1C1E] mb-1">
+            {copySourceTitle ? "Повторить поездку" : "Новое мероприятие"}
+          </h1>
+          <p className="text-[#71717A] text-sm">
+            {copySourceTitle
+              ? `Копия «${copySourceTitle}» — даты сдвинуты на +7 дней. Измени что нужно и сохрани.`
+              : "Организуй поездку и пригласи участников"}
+          </p>
         </div>
+
+        {copySourceTitle && (
+          <div className="flex items-center gap-2 text-sm px-4 py-3 rounded-xl mb-2" style={{ backgroundColor: "#E8FAF9", color: "#0BBFB5" }}>
+            🔄 Все поля скопированы из оригинала. Даты сдвинуты на +7 дней.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {error && (

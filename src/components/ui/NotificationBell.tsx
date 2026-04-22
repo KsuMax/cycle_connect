@@ -40,6 +40,12 @@ function formatNotification(n: DbNotification) {
     return `📅 ${actorName} создал мероприятие «${eventTitle}» в вашем клубе`;
   }
 
+  if (n.type === "event_reminder" && data) {
+    const eventTitle = (data.event_title as string) ?? "поездка";
+    const date = data.start_date as string | undefined;
+    return `🔔 Завтра поездка «${eventTitle}»${date ? ` (${formatDate(date)})` : ""}`;
+  }
+
   return `${actorName} — новое уведомление`;
 }
 
@@ -104,9 +110,10 @@ export function NotificationBell() {
                 const actor = n.actor as DbProfile | undefined;
                 const data = n.data as Record<string, unknown> | null;
                 const actorId = data?.actor_id ?? actor?.id ?? n.actor_id;
-                const href = n.type === "club_event" && data?.event_id
-                  ? `/events/${data.event_id as string}`
-                  : actorId ? `/users/${actorId}` : "#";
+                const href =
+                  (n.type === "club_event" || n.type === "event_reminder") && data?.event_id
+                    ? `/events/${data.event_id as string}`
+                    : actorId ? `/users/${actorId}` : "#";
                 return (
                   <Link
                     key={n.id}
