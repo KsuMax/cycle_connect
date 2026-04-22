@@ -10,7 +10,9 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { CoverUpload } from "@/components/routes/CoverUpload";
 import { GpxUpload } from "@/components/routes/GpxUpload";
-import { Plus, Trash2, ChevronLeft, Calendar, Bike, AlertCircle, Lock } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, Calendar, Bike, AlertCircle, Lock, Shield, X } from "lucide-react";
+
+interface CaptainClub { id: string; name: string }
 
 interface DayForm {
   id: string;
@@ -54,6 +56,8 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   const [existingGpxPath, setExistingGpxPath] = useState<string | null>(null);
   const [gpxFile, setGpxFile] = useState<File | null>(null);
   const [gpxCleared, setGpxCleared] = useState(false);
+  const [clubId, setClubId] = useState<string | null>(null);
+  const [captainClubs, setCaptainClubs] = useState<CaptainClub[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -87,6 +91,22 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         setIsPrivate(ev.is_private ?? false);
         setCoverPreview(ev.cover_url ?? null);
         setExistingGpxPath(ev.gpx_path ?? null);
+        setClubId((ev as { club_id?: string | null }).club_id ?? null);
+
+        // Load clubs where user is owner/admin/captain
+        const { data: authData } = await supabase.auth.getUser();
+        if (authData?.user) {
+          const { data: memberships } = await supabase
+            .from("club_members")
+            .select("club:clubs!club_id(id, name)")
+            .eq("user_id", authData.user.id)
+            .eq("status", "active")
+            .in("role", ["owner", "admin", "captain"]);
+          if (memberships) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            setCaptainClubs((memberships as any[]).map((m) => m.club).filter(Boolean) as CaptainClub[]);
+          }
+        }
 
         const loadedDays: DayForm[] = (ev.event_days ?? [])
           .sort((a: { day_number: number }, b: { day_number: number }) => a.day_number - b.day_number)
@@ -140,6 +160,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         end_date: endDate,
         max_participants: parseInt(maxParticipants) || null,
         is_private: isPrivate,
+        club_id: clubId,
       })
       .eq("id", id);
 
@@ -409,6 +430,39 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
               ))}
             </div>
           </div>
+
+          {/* Club association */}
+          {captainClubs.length > 0 && (
+            <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+              <div className="flex items-center gap-2 mb-1">
+                <Shield size={15} className="text-[#7C5CFC]" />
+                <h2 className="font-semibold text-[#1C1C1E]">Клуб</h2>
+              </div>
+              <p className="text-xs text-[#71717A] mb-3">Привяжи поездку к клубу — она появится в ленте клуба</p>
+              <div className="flex flex-wrap gap-2">
+                {captainClubs.map((club) => {
+                  const active = clubId === club.id;
+                  return (
+                    <button
+                      key={club.id}
+                      type="button"
+                      onClick={() => setClubId(active ? null : club.id)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium border transition-colors"
+                      style={active
+                        ? { backgroundColor: "#7C5CFC", color: "white", borderColor: "#7C5CFC" }
+                        : { backgroundColor: "white", color: "#71717A", borderColor: "#E4E4E7" }}>
+                      <Shield size={13} />
+                      {club.name}
+                      {active && <X size={13} />}
+                    </button>
+                  );
+                })}
+              </div>
+              {clubId && (
+                <p className="text-xs text-[#7C5CFC] mt-2">✓ Поездка будет отображаться в ленте клуба</p>
+              )}
+            </div>
+          )}
 
           <div className="flex gap-3 pt-2">
             <Button type="submit" variant="secondary" size="lg" loading={submitting} className="flex-1">
