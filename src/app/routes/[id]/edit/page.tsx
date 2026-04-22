@@ -4,7 +4,7 @@ import { useState, use, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
-import { MapPin, Link as LinkIcon, ChevronRight, AlertCircle, ChevronLeft } from "lucide-react";
+import { MapPin, Link as LinkIcon, ChevronRight, AlertCircle, ChevronLeft, Shield, X } from "lucide-react";
 import { ImageUpload } from "@/components/routes/ImageUpload";
 import { CoverUpload } from "@/components/routes/CoverUpload";
 import { GpxUpload } from "@/components/routes/GpxUpload";
@@ -16,6 +16,8 @@ import { parseGpxFile, computeGpxStats, toWktPoint, toWktLinestring } from "@/li
 import { ROUTE_TYPES, DIFFICULTIES, SURFACES, BIKE_TYPES } from "@/constants/routes";
 import type { RouteType, Difficulty, Surface, BikeType, ExitPointsStatus } from "@/types";
 import Link from "next/link";
+
+interface CaptainClub { id: string; name: string }
 
 export default function EditRoutePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -48,6 +50,8 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
   const [gpxCleared, setGpxCleared] = useState(false);
   const [exitStatus, setExitStatus] = useState<ExitPointsStatus>("unknown");
   const [exitPoints, setExitPoints] = useState<ExitPointDraft[]>([]);
+  const [clubId, setClubId] = useState<string | null>(null);
+  const [captainClubs, setCaptainClubs] = useState<CaptainClub[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -66,7 +70,7 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
     async function load() {
       const { data, error: fetchError } = await supabase
         .from("routes")
-        .select("*, route_images(url, storage_path), route_exit_points(*)")
+        .select("*, club_id, route_images(url, storage_path), route_exit_points(*)")
         .eq("id", id)
         .single();
 
@@ -117,6 +121,20 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
             note: p.note ?? "",
           }))
       );
+      setClubId((data as { club_id?: string | null }).club_id ?? null);
+
+      // Load clubs where user is owner/admin/captain
+      const { data: memberships } = await supabase
+        .from("club_members")
+        .select("club:clubs!club_id(id, name)")
+        .eq("user_id", user!.id)
+        .eq("status", "active")
+        .in("role", ["owner", "admin", "captain"]);
+      if (memberships) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setCaptainClubs((memberships as any[]).map((m) => m.club).filter(Boolean) as CaptainClub[]);
+      }
+
       setLoading(false);
     }
     load();
@@ -196,6 +214,7 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
         mapmagic_url: mapUrl || null,
         mapmagic_embed: buildEmbedUrl(mapUrl),
         exit_points_status: exitStatus,
+        club_id: clubId,
       })
       .eq("id", id);
 
@@ -528,6 +547,41 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
               onChange={(html) => setDescription(html)}
             />
           </div>
+
+          {/* Club publication */}
+          {captainClubs.length > 0 && (
+            <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+              <div className="flex items-center gap-2 mb-1">
+                <Shield size={15} className="text-[#7C5CFC]" />
+                <label className="text-sm font-semibold text-[#1C1C1E]">Опубликовать от клуба</label>
+              </div>
+              <p className="text-xs text-[#71717A] mb-3">Маршрут появится в разделе маршрутов клуба</p>
+              <div className="flex flex-wrap gap-2">
+                {captainClubs.map((club) => {
+                  const active = clubId === club.id;
+                  return (
+                    <button
+                      key={club.id}
+                      type="button"
+                      onClick={() => setClubId(active ? null : club.id)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium border transition-colors"
+                      style={active
+                        ? { backgroundColor: "#7C5CFC", color: "white", borderColor: "#7C5CFC" }
+                        : { backgroundColor: "white", color: "#71717A", borderColor: "#E4E4E7" }}>
+                      <Shield size={13} />
+                      {club.name}
+                      {active && <X size={13} />}
+                    </button>
+                  );
+                })}
+              </div>
+              {clubId && (
+                <p className="text-xs text-[#7C5CFC] mt-2">
+                  ✓ Маршрут будет опубликован от имени клуба
+                </p>
+              )}
+            </div>
+          )}
 
           <button type="submit" disabled={!canSubmit}
             className="w-full py-3.5 rounded-2xl text-sm font-semibold flex items-center justify-center gap-2 transition-opacity"
