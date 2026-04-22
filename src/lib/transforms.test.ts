@@ -38,6 +38,8 @@ const route: DbRoute = {
   exit_points_status: "unknown",
   likes_count: 42,
   riders_today: 3,
+  start_point: null,
+  route_line: null,
   created_at: "2024-03-15T10:00:00Z",
   author: profile,
   route_images: [{ url: "https://example.com/img1.jpg" }, { url: "https://example.com/img2.jpg" }],
