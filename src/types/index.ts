@@ -62,6 +62,7 @@ export interface Route {
   top_comment?: RouteTopComment | null;
   created_at: string;
   club?: ClubRef | null;
+  is_club_featured?: boolean;
 }
 
 export interface EventDay {

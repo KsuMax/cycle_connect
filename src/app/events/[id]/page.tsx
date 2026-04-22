@@ -43,6 +43,8 @@ interface EventData {
   /** Event-level GPX URL. Takes precedence over `route.gpx_url` on the detail page. */
   gpx_url: string | null;
   gpx_updated_at: string | null;
+  report_text: string | null;
+  report_published_at: string | null;
 }
 
 function dbToEventData(data: DbEvent): EventData {
@@ -82,6 +84,10 @@ function dbToEventData(data: DbEvent): EventData {
     participants,
     gpx_url: gpxPathToUrl(data.gpx_path, "event-gpx"),
     gpx_updated_at: data.gpx_updated_at ?? null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    report_text: (data as any).report_text ?? null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    report_published_at: (data as any).report_published_at ?? null,
   };
 }
 
@@ -102,6 +108,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [shareCopied, setShareCopied] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Ride report
+  const [editingReport, setEditingReport] = useState(false);
+  const [reportDraft, setReportDraft] = useState("");
+  const [savingReport, setSavingReport] = useState(false);
 
   // Admin: force-add participant
   const [showAddParticipant, setShowAddParticipant] = useState(false);
@@ -177,6 +188,24 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     await supabase.from("profiles").update({ events_count: Math.max(0, (profile?.events_count ?? 1) - 1) }).eq("id", user.id);
     showToast("Мероприятие удалено", "info");
     router.push("/");
+  };
+
+  const handleSaveReport = async () => {
+    if (!event || !user) return;
+    setSavingReport(true);
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from("events")
+      .update({ report_text: reportDraft, report_published_at: now })
+      .eq("id", event.id);
+    if (error) {
+      showToast("Не удалось сохранить отчёт", "error");
+    } else {
+      setEvent((prev) => prev ? { ...prev, report_text: reportDraft, report_published_at: now } : prev);
+      setEditingReport(false);
+      showToast("Отчёт опубликован!", "success");
+    }
+    setSavingReport(false);
   };
 
   const handleSearchUsers = async (q: string) => {
@@ -361,6 +390,90 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   dangerouslySetInnerHTML={{ __html: sanitizeHtml(event.description) }} />
               </div>
             )}
+
+            {/* Ride Report */}
+            {(() => {
+              const isPast = event.start_date ? new Date(event.start_date) < new Date() : false;
+              const hasReport = !!event.report_published_at;
+              if (!isPast && !hasReport) return null;
+
+              // Organizer editing mode
+              if (isOrganizer && editingReport) {
+                return (
+                  <div className="bg-white rounded-2xl p-6 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+                    <h2 className="font-semibold text-[#1C1C1E] mb-3 flex items-center gap-2">
+                      📝 Отчёт о поездке
+                    </h2>
+                    <textarea
+                      value={reportDraft}
+                      onChange={(e) => setReportDraft(e.target.value)}
+                      placeholder="Как прошла поездка? Расскажите участникам и всем интересующимся — что понравилось, что было сложно, какие места запомнились..."
+                      rows={6}
+                      className="w-full text-sm text-[#1C1C1E] border border-[#E4E4E7] rounded-xl px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-[#0BBFB5]/30 focus:border-[#0BBFB5] transition-all"
+                    />
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={handleSaveReport}
+                        disabled={savingReport || !reportDraft.trim()}
+                        className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-colors"
+                        style={{ backgroundColor: "#0BBFB5" }}>
+                        {savingReport ? "Сохраняем..." : "Опубликовать"}
+                      </button>
+                      <button
+                        onClick={() => setEditingReport(false)}
+                        className="px-4 py-2.5 rounded-xl text-sm font-medium text-[#71717A] border border-[#E4E4E7] hover:bg-[#F5F4F1] transition-colors">
+                        Отмена
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
+              // Published report — visible to all
+              if (hasReport) {
+                return (
+                  <div className="bg-white rounded-2xl p-6 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="font-semibold text-[#1C1C1E] flex items-center gap-2">
+                        📝 Отчёт о поездке
+                      </h2>
+                      {isOrganizer && (
+                        <button
+                          onClick={() => { setReportDraft(event.report_text ?? ""); setEditingReport(true); }}
+                          className="text-xs text-[#71717A] hover:text-[#1C1C1E] border border-[#E4E4E7] px-2.5 py-1 rounded-lg hover:bg-[#F5F4F1] transition-colors flex items-center gap-1">
+                          <Pencil size={11} /> Редактировать
+                        </button>
+                      )}
+                    </div>
+                    <div className="prose prose-sm max-w-none text-[#71717A] leading-relaxed whitespace-pre-wrap">
+                      {event.report_text}
+                    </div>
+                    <div className="text-[11px] text-[#A1A1AA] mt-3">
+                      Опубликовано {formatDate(event.report_published_at!)}
+                    </div>
+                  </div>
+                );
+              }
+
+              // Past event, no report yet — show prompt to organizer only
+              if (isOrganizer) {
+                return (
+                  <div className="bg-white rounded-2xl p-6 border border-[#E4E4E7] border-dashed text-center" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+                    <div className="text-2xl mb-2">📝</div>
+                    <div className="text-sm font-medium text-[#1C1C1E] mb-1">Напишите отчёт о поездке</div>
+                    <div className="text-xs text-[#A1A1AA] mb-4">Расскажите участникам, как всё прошло</div>
+                    <button
+                      onClick={() => { setReportDraft(""); setEditingReport(true); }}
+                      className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl text-white"
+                      style={{ backgroundColor: "#0BBFB5" }}>
+                      Написать отчёт
+                    </button>
+                  </div>
+                );
+              }
+
+              return null;
+            })()}
 
             {/* Days */}
             {event.days.length > 0 && (

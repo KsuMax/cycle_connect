@@ -141,6 +141,7 @@ export interface DbRoute {
   likes_count: number;
   riders_today: number;
   club_id?: string | null;
+  is_club_featured?: boolean;
   created_at: string;
   // joined
   author?: DbProfile;
@@ -177,6 +178,8 @@ export interface DbEvent {
   gpx_path: string | null;
   gpx_updated_at: string | null;
   club_id?: string | null;
+  report_text?: string | null;
+  report_published_at?: string | null;
   created_at: string;
   // joined
   organizer?: DbProfile;

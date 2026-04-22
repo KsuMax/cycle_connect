@@ -40,7 +40,8 @@
       "Bash(/Users/ksumax/Documents/Projects/cycle_connect/node_modules/.bin/tsc --noEmit --project /Users/ksumax/Documents/Projects/cycle_connect/tsconfig.json)",
       "Bash(find /Users/ksumax/Documents/Projects/cycle_connect/node_modules/lucide-react/dist -name *.js)",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:d[k] for k in [''''main'''',''''module'''',''''exports''''] if k in d}, indent=2\\)\\)\")",
-      "Bash(grep -E \"^d|\\\\.json$|\\\\.ts$|\\\\.tsx$\")"
+      "Bash(grep -E \"^d|\\\\.json$|\\\\.ts$|\\\\.tsx$\")",
+      "Bash(find /Users/ksumax/Documents/Projects/cycle_connect/.claude/worktrees/sweet-burnell-073def/supabase/migrations -name \"*.sql\" -exec grep -l \"create table.*events[^_]\" {} \\\\;)"
     ]
   }
 }

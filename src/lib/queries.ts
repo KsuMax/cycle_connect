@@ -16,7 +16,7 @@ export const ROUTE_LIST_SELECT = [
   "distance_km, elevation_m, duration_min, difficulty",
   "surface, bike_types, route_types, tags",
   "mapmagic_url, mapmagic_embed, cover_url, gpx_path, gpx_updated_at",
-  "exit_points_status, likes_count, riders_today, created_at",
+  "exit_points_status, likes_count, riders_today, is_club_featured, created_at",
   `author:profiles!author_id(${PROFILE_FIELDS})`,
   "route_images(url)",
   "route_comments(id, text, likes_count, created_at, author:profiles!author_id(name))",

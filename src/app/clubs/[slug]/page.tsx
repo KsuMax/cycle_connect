@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import React, { useState, useEffect, use } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
@@ -13,10 +13,10 @@ import { dbToClub, dbToClubMember, dbToRoute, dbToEvent } from "@/lib/transforms
 import type { Club, ClubMember, Route, CycleEvent } from "@/types";
 import {
   ArrowLeft, Users, MapPin, Lock, Globe, UserPlus, UserMinus,
-  Clock, Map, Calendar, CheckCircle, Shield, Settings, Check, X,
+  Clock, Map, Calendar, CheckCircle, Shield, Settings, Check, X, Trophy, Pin, PinOff,
 } from "lucide-react";
 
-type Tab = "feed" | "routes" | "members" | "requests";
+type Tab = "feed" | "routes" | "members" | "leaderboard" | "requests";
 
 export default function ClubPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
@@ -158,6 +158,19 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
       .eq("club_id", club.id)
       .eq("user_id", userId);
     setPendingMembers((prev) => prev.filter((m) => m.user_id !== userId));
+  }
+
+  async function handleToggleFeatured(routeId: string, current: boolean) {
+    // Optimistic update
+    setRoutes((prev) => prev.map((r) => r.id === routeId ? { ...r, is_club_featured: !current } : r));
+    const { error } = await supabase
+      .from("routes")
+      .update({ is_club_featured: !current })
+      .eq("id", routeId);
+    if (error) {
+      // Rollback on failure
+      setRoutes((prev) => prev.map((r) => r.id === routeId ? { ...r, is_club_featured: current } : r));
+    }
   }
 
   const isAdmin = myMembership?.role === "owner" || myMembership?.role === "admin";
@@ -364,9 +377,10 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
         <div className="flex gap-1 bg-white rounded-2xl p-1.5 border border-[#E4E4E7] mb-6" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
           {(
             [
-              { id: "feed",     label: "Лента",     icon: <Calendar size={15} />, count: feedItems.length },
-              { id: "routes",   label: "Маршруты",  icon: <Map size={15} />,      count: routes.length },
-              { id: "members",  label: "Участники", icon: <Users size={15} />,    count: members.length },
+              { id: "feed",        label: "Лента",     icon: <Calendar size={15} />, count: feedItems.length },
+              { id: "routes",      label: "Маршруты",  icon: <Map size={15} />,      count: routes.length },
+              { id: "members",     label: "Участники", icon: <Users size={15} />,    count: members.length },
+              { id: "leaderboard", label: "Рейтинг",   icon: <Trophy size={15} />,   count: 0 },
               ...(isAdmin && pendingMembers.length > 0
                 ? [{ id: "requests" as const, label: "Заявки", icon: <Clock size={15} />, count: pendingMembers.length }]
                 : []),
@@ -435,11 +449,36 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
                 text="Капитаны клуба добавят маршруты, которые вы проверили вместе"
               />
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {routes.map((r) => (
-                  <RouteCard key={r.id} route={r} />
-                ))}
-              </div>
+              <>
+                {isAdmin && (
+                  <p className="text-xs text-[#A1A1AA] mb-3 flex items-center gap-1">
+                    <Pin size={11} /> Закрепите официальные маршруты клуба — они появятся первыми
+                  </p>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {[...routes]
+                    .sort((a, b) => (b.is_club_featured ? 1 : 0) - (a.is_club_featured ? 1 : 0))
+                    .map((r) => (
+                      <div key={r.id} className="relative group">
+                        {r.is_club_featured && (
+                          <div className="absolute top-3 left-3 z-10 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#0BBFB5", color: "white" }}>
+                            <Pin size={9} /> Официальный
+                          </div>
+                        )}
+                        <RouteCard route={r} />
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleToggleFeatured(r.id, !!r.is_club_featured)}
+                            title={r.is_club_featured ? "Открепить маршрут" : "Закрепить как официальный"}
+                            className="absolute top-3 right-3 z-10 w-7 h-7 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            style={{ backgroundColor: r.is_club_featured ? "#F5F4F1" : "#0BBFB5", color: r.is_club_featured ? "#71717A" : "white" }}>
+                            {r.is_club_featured ? <PinOff size={12} /> : <Pin size={12} />}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              </>
             )}
           </section>
         )}
@@ -454,6 +493,25 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
                 {members.map((m) => (
                   <MemberRow key={m.user_id} member={m} />
                 ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Leaderboard tab */}
+        {activeTab === "leaderboard" && (
+          <section>
+            {members.filter((m) => m.profile).length === 0 ? (
+              <EmptyState icon={<Trophy size={28} />} title="Нет данных" text="Участники ещё не добавили поездки" />
+            ) : (
+              <div className="space-y-2">
+                {[...members]
+                  .filter((m) => m.profile)
+                  .sort((a, b) => (b.profile?.km_total ?? 0) - (a.profile?.km_total ?? 0))
+                  .slice(0, 20)
+                  .map((m, idx) => (
+                    <LeaderboardRow key={m.user_id} member={m} rank={idx + 1} />
+                  ))}
               </div>
             )}
           </section>
@@ -608,6 +666,65 @@ function PendingMemberRow({
         </button>
       </div>
     </div>
+  );
+}
+
+function LeaderboardRow({ member, rank }: { member: ClubMember; rank: number }) {
+  const p = member.profile;
+  const name = p?.name ?? "Участник";
+  const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+
+  const medal = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : null;
+
+  return (
+    <Link
+      href={`/users/${member.user_id}`}
+      className="flex items-center gap-3 bg-white rounded-2xl p-4 border border-[#E4E4E7] hover:border-[#0BBFB5]/40 transition-colors"
+      style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}
+    >
+      {/* Rank */}
+      <div className="w-8 text-center shrink-0">
+        {medal ? (
+          <span className="text-xl">{medal}</span>
+        ) : (
+          <span className="text-sm font-bold text-[#A1A1AA]">#{rank}</span>
+        )}
+      </div>
+
+      {/* Avatar */}
+      <div
+        className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center text-sm font-bold text-white shrink-0"
+        style={{ backgroundColor: "#7C5CFC" }}
+      >
+        {p?.avatar_url ? (
+          <Image
+            src={proxyImageUrl(p.avatar_url) ?? p.avatar_url}
+            alt={name}
+            width={40}
+            height={40}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          initials
+        )}
+      </div>
+
+      {/* Name + stats */}
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium text-[#1C1C1E] truncate">{name}</div>
+        <div className="text-xs text-[#A1A1AA] mt-0.5">
+          {Math.round(p?.km_total ?? 0).toLocaleString()} км · {p?.events_count ?? 0} поездок
+        </div>
+      </div>
+
+      {/* Total km badge */}
+      <div className="shrink-0 text-right">
+        <div className="text-sm font-bold" style={{ color: "#0BBFB5" }}>
+          {Math.round(p?.km_total ?? 0).toLocaleString()} км
+        </div>
+        <div className="text-[10px] text-[#A1A1AA]">{p?.routes_count ?? 0} маршрутов</div>
+      </div>
+    </Link>
   );
 }
 

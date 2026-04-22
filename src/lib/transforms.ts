@@ -86,6 +86,7 @@ export function dbToRoute(r: DbRoute): Route {
     created_at: r.created_at,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     club: (r as any).club ?? null,
+    is_club_featured: r.is_club_featured ?? false,
   };
 }
 
