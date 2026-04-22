@@ -255,6 +255,7 @@ export interface DbClub {
   visibility: "open" | "request" | "closed";
   owner_id: string;
   members_count: number;
+  telegram_channel?: string | null;
   created_at: string;
   // joined
   members?: DbClubMember[];

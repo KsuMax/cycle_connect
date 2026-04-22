@@ -114,6 +114,7 @@ export function dbToClub(c: DbClub): Club {
     visibility: c.visibility,
     owner_id: c.owner_id,
     members_count: c.members_count,
+    telegram_channel: c.telegram_channel ?? null,
     created_at: c.created_at,
   };
 }

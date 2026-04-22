@@ -48,10 +48,41 @@ Deno.serve(async (req: Request) => {
   const { data: { user }, error: authErr } = await adminDb.auth.getUser(jwt);
   if (authErr || !user) return json({ error: "unauthorized" }, 401);
 
-  let body: { mode?: string; intentId?: string; joinerId?: string };
+  let body: { mode?: string; intentId?: string; joinerId?: string; eventId?: string };
   try { body = await req.json(); } catch { return json({ error: "invalid json" }, 400); }
 
-  const { mode = "broadcast", intentId, joinerId } = body;
+  const { mode = "broadcast", intentId, joinerId, eventId } = body;
+
+  // ── MODE: club_event — post announcement to club's Telegram channel ────────
+  if (mode === "club_event") {
+    if (!eventId) return json({ error: "eventId required" }, 400);
+
+    const { data: event } = await adminDb
+      .from("events")
+      .select("id, title, start_date, description, club_id, organizer:profiles!organizer_id(name), club:clubs!club_id(name, telegram_channel)")
+      .eq("id", eventId)
+      .single();
+
+    if (!event) return json({ error: "event not found" }, 404);
+
+    const club = event.club as { name?: string; telegram_channel?: string | null } | null;
+    const channel = club?.telegram_channel?.trim();
+    if (!channel) return json({ sent: 0, skipped: 1, reason: "no telegram_channel" });
+
+    const organizer = event.organizer as { name?: string } | null;
+    const eventUrl = `${SITE_URL}/events/${eventId}`;
+    const dateStr = event.start_date ? formatDate(event.start_date as string) : "";
+
+    const text =
+      `📅 <b>${escapeHtml(event.title as string)}</b>\n` +
+      (dateStr ? `🗓 ${dateStr}\n` : "") +
+      `👤 Организатор: ${escapeHtml(organizer?.name ?? "Участник")}\n` +
+      `\n<a href="${eventUrl}">Записаться на поездку →</a>`;
+
+    const ok = await sendTg(channel as unknown as number, text);
+    return json({ sent: ok ? 1 : 0, skipped: ok ? 0 : 1 });
+  }
+
   if (!intentId) return json({ error: "intentId required" }, 400);
 
   // Load intent + route
@@ -132,6 +163,10 @@ Deno.serve(async (req: Request) => {
 
   return json({ sent, skipped });
 });
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {

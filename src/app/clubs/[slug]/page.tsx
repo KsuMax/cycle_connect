@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, use } from "react";
+import React, { useState, useEffect, use, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
@@ -10,10 +10,11 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { supabase, proxyImageUrl } from "@/lib/supabase";
 import { CLUB_LIST_SELECT, CLUB_MEMBERS_SELECT, ROUTE_LIST_SELECT, EVENT_LIST_SELECT } from "@/lib/queries";
 import { dbToClub, dbToClubMember, dbToRoute, dbToEvent } from "@/lib/transforms";
-import type { Club, ClubMember, Route, CycleEvent } from "@/types";
+import type { Club, ClubMember, Route, CycleEvent, ClubPoll, ClubPollOption } from "@/types";
 import {
   ArrowLeft, Users, MapPin, Lock, Globe, UserPlus, UserMinus,
   Clock, Map, Calendar, CheckCircle, Shield, Settings, Check, X, Trophy, Pin, PinOff,
+  Vote, Plus, Trash2,
 } from "lucide-react";
 
 type Tab = "feed" | "routes" | "members" | "leaderboard" | "requests";
@@ -32,6 +33,19 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
   const [notFound, setNotFound] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("feed");
   const [joining, setJoining] = useState(false);
+
+  // Poll state
+  const [activePoll, setActivePoll] = useState<ClubPoll | null>(null);
+  const [pollVoteCounts, setPollVoteCounts] = useState<Record<string, number>>({});
+  const [myVote, setMyVote] = useState<string | null>(null);
+  const [voting, setVoting] = useState(false);
+  const [showPollModal, setShowPollModal] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState("За какой маршрут едем дальше?");
+  const [pollOptions, setPollOptions] = useState<{ id: string; label: string; route_id: string | null }[]>([
+    { id: crypto.randomUUID(), label: "", route_id: null },
+    { id: crypto.randomUUID(), label: "", route_id: null },
+  ]);
+  const [creatingPoll, setCreatingPoll] = useState(false);
 
   useEffect(() => {
     loadClub();
@@ -108,6 +122,52 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
       }
     }
 
+    // Load active poll (closed_at IS NULL)
+    const { data: pollData } = await supabase
+      .from("club_polls")
+      .select("*")
+      .eq("club_id", c.id)
+      .is("closed_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (pollData) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const poll = pollData as any;
+      setActivePoll({
+        id: poll.id,
+        club_id: poll.club_id,
+        question: poll.question,
+        options: poll.options as ClubPollOption[],
+        created_by: poll.created_by,
+        created_at: poll.created_at,
+        closed_at: poll.closed_at,
+      });
+      // Load vote counts
+      const { data: votes } = await supabase
+        .from("club_poll_votes")
+        .select("option_id")
+        .eq("poll_id", poll.id);
+      const counts: Record<string, number> = {};
+      for (const v of votes ?? []) counts[v.option_id] = (counts[v.option_id] ?? 0) + 1;
+      setPollVoteCounts(counts);
+      // Check if logged-in user already voted
+      if (user) {
+        const { data: myVoteRow } = await supabase
+          .from("club_poll_votes")
+          .select("option_id")
+          .eq("poll_id", poll.id)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        setMyVote(myVoteRow?.option_id ?? null);
+      }
+    } else {
+      setActivePoll(null);
+      setPollVoteCounts({});
+      setMyVote(null);
+    }
+
     setLoading(false);
   }
 
@@ -172,6 +232,56 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
       setRoutes((prev) => prev.map((r) => r.id === routeId ? { ...r, is_club_featured: current } : r));
     }
   }
+
+  const handleVote = useCallback(async (optionId: string) => {
+    if (!user || !activePoll || voting) return;
+    setVoting(true);
+    if (myVote) {
+      // Change vote: delete old, insert new
+      await supabase.from("club_poll_votes").delete().eq("poll_id", activePoll.id).eq("user_id", user.id);
+      setPollVoteCounts((prev) => ({ ...prev, [myVote]: Math.max(0, (prev[myVote] ?? 1) - 1) }));
+    }
+    await supabase.from("club_poll_votes").insert({ poll_id: activePoll.id, user_id: user.id, option_id: optionId });
+    setPollVoteCounts((prev) => ({ ...prev, [optionId]: (prev[optionId] ?? 0) + 1 }));
+    setMyVote(optionId);
+    setVoting(false);
+  }, [user, activePoll, myVote, voting]);
+
+  const handleClosePoll = useCallback(async () => {
+    if (!activePoll) return;
+    await supabase.from("club_polls").update({ closed_at: new Date().toISOString() }).eq("id", activePoll.id);
+    setActivePoll(null);
+    setPollVoteCounts({});
+    setMyVote(null);
+  }, [activePoll]);
+
+  const handleCreatePoll = useCallback(async () => {
+    if (!club || !user || creatingPoll) return;
+    const validOptions = pollOptions.filter((o) => o.label.trim());
+    if (validOptions.length < 2) return;
+    setCreatingPoll(true);
+    const { data: newPoll } = await supabase
+      .from("club_polls")
+      .insert({
+        club_id: club.id,
+        question: pollQuestion.trim() || "За какой маршрут едем дальше?",
+        options: validOptions.map((o) => ({ id: o.id, label: o.label.trim(), route_id: o.route_id })),
+        created_by: user.id,
+      })
+      .select()
+      .single();
+    if (newPoll) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const p = newPoll as any;
+      setActivePoll({ id: p.id, club_id: p.club_id, question: p.question, options: p.options, created_by: p.created_by, created_at: p.created_at, closed_at: null });
+      setPollVoteCounts({});
+      setMyVote(null);
+    }
+    setShowPollModal(false);
+    setPollQuestion("За какой маршрут едем дальше?");
+    setPollOptions([{ id: crypto.randomUUID(), label: "", route_id: null }, { id: crypto.randomUUID(), label: "", route_id: null }]);
+    setCreatingPoll(false);
+  }, [club, user, pollQuestion, pollOptions, creatingPoll]);
 
   const isAdmin = myMembership?.role === "owner" || myMembership?.role === "admin";
   const isCaptain = isAdmin || myMembership?.role === "captain";
@@ -419,6 +529,75 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
         {/* Feed tab */}
         {activeTab === "feed" && (
           <section>
+            {/* Active poll card */}
+            {activePoll && myMembership?.status === "active" && (
+              <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7] mb-4" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#E8FAF9" }}>
+                      <Vote size={14} style={{ color: "#0BBFB5" }} />
+                    </div>
+                    <span className="text-sm font-semibold text-[#1C1C1E]">{activePoll.question}</span>
+                  </div>
+                  {isAdmin && (
+                    <button onClick={handleClosePoll} className="text-xs text-[#A1A1AA] hover:text-[#EF4444] transition-colors" title="Завершить голосование">
+                      Завершить
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {activePoll.options.map((opt) => {
+                    const voteCount = pollVoteCounts[opt.id] ?? 0;
+                    const totalVotes = Object.values(pollVoteCounts).reduce((s, v) => s + v, 0);
+                    const pct = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
+                    const isMyVote = myVote === opt.id;
+                    const isLeading = totalVotes > 0 && voteCount === Math.max(...Object.values(pollVoteCounts));
+                    return (
+                      <button
+                        key={opt.id}
+                        onClick={() => handleVote(opt.id)}
+                        disabled={voting}
+                        className="w-full text-left rounded-xl border overflow-hidden transition-colors disabled:cursor-wait"
+                        style={{ borderColor: isMyVote ? "#0BBFB5" : "#E4E4E7" }}
+                      >
+                        <div className="relative px-3 py-2.5">
+                          {/* Progress bar */}
+                          {myVote && (
+                            <div className="absolute inset-0 rounded-xl transition-all" style={{ width: `${pct}%`, background: isMyVote ? "rgba(11,191,181,0.12)" : "rgba(0,0,0,0.04)" }} />
+                          )}
+                          <div className="relative flex items-center justify-between gap-2">
+                            <span className="text-sm text-[#1C1C1E] flex items-center gap-1.5">
+                              {isMyVote && <Check size={13} style={{ color: "#0BBFB5" }} />}
+                              {opt.label}
+                            </span>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {myVote && (
+                                <span className="text-xs font-semibold" style={{ color: isLeading ? "#0BBFB5" : "#A1A1AA" }}>{pct}%</span>
+                              )}
+                              <span className="text-xs text-[#A1A1AA]">{voteCount}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="text-xs text-[#A1A1AA] mt-2 text-right">
+                  {Object.values(pollVoteCounts).reduce((s, v) => s + v, 0)} {(() => { const n = Object.values(pollVoteCounts).reduce((s, v) => s + v, 0); return n === 1 ? "голос" : n < 5 ? "голоса" : "голосов"; })()}
+                </div>
+              </div>
+            )}
+
+            {/* Admin: create poll button (only when no active poll) */}
+            {isAdmin && !activePoll && (
+              <button
+                onClick={() => setShowPollModal(true)}
+                className="w-full mb-4 flex items-center justify-center gap-2 py-3 rounded-2xl border border-dashed border-[#E4E4E7] text-sm text-[#A1A1AA] hover:text-[#0BBFB5] hover:border-[#0BBFB5] transition-colors"
+              >
+                <Vote size={15} /> Запустить голосование за маршрут
+              </button>
+            )}
+
             {feedItems.length === 0 ? (
               <EmptyState
                 icon={<Calendar size={28} />}
@@ -537,6 +716,81 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
           </section>
         )}
       </main>
+
+      {/* Poll creation modal */}
+      {showPollModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-[#1C1C1E] flex items-center gap-2">
+                <Vote size={18} style={{ color: "#0BBFB5" }} /> Голосование
+              </h2>
+              <button onClick={() => setShowPollModal(false)} className="text-[#A1A1AA] hover:text-[#1C1C1E]">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Question */}
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-2">Вопрос</label>
+              <input
+                type="text"
+                value={pollQuestion}
+                onChange={(e) => setPollQuestion(e.target.value)}
+                maxLength={120}
+                className="w-full text-sm text-[#1C1C1E] border border-[#E4E4E7] rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#0BBFB5]/30 focus:border-[#0BBFB5] transition-all"
+                placeholder="За какой маршрут едем дальше?"
+              />
+            </div>
+
+            {/* Options */}
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-2">Варианты ответа</label>
+              <div className="space-y-2">
+                {pollOptions.map((opt, i) => (
+                  <div key={opt.id} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={opt.label}
+                      onChange={(e) => setPollOptions((prev) => prev.map((o) => o.id === opt.id ? { ...o, label: e.target.value } : o))}
+                      maxLength={80}
+                      placeholder={`Вариант ${i + 1}`}
+                      className="flex-1 text-sm text-[#1C1C1E] border border-[#E4E4E7] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0BBFB5]/30 focus:border-[#0BBFB5] transition-all"
+                    />
+                    {pollOptions.length > 2 && (
+                      <button onClick={() => setPollOptions((prev) => prev.filter((o) => o.id !== opt.id))} className="text-[#A1A1AA] hover:text-[#EF4444] transition-colors">
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {pollOptions.length < 5 && (
+                <button
+                  onClick={() => setPollOptions((prev) => [...prev, { id: crypto.randomUUID(), label: "", route_id: null }])}
+                  className="mt-2 text-xs text-[#0BBFB5] hover:underline flex items-center gap-1"
+                >
+                  <Plus size={12} /> Добавить вариант
+                </button>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <button onClick={() => setShowPollModal(false)} className="flex-1 py-2.5 rounded-xl text-sm font-medium text-[#71717A] border border-[#E4E4E7] hover:bg-[#F5F4F1] transition-colors">
+                Отмена
+              </button>
+              <button
+                onClick={handleCreatePoll}
+                disabled={creatingPoll || pollOptions.filter((o) => o.label.trim()).length < 2}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-colors"
+                style={{ backgroundColor: "#0BBFB5" }}
+              >
+                {creatingPoll ? "Создаём..." : "Запустить"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

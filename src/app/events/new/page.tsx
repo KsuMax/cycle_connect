@@ -245,6 +245,15 @@ function CreateEventForm() {
       .update({ events_count: (profile?.events_count ?? 0) + 1 })
       .eq("id", user.id);
 
+    // 5. Post TG announcement if club has a linked channel (best-effort)
+    if (clubId) {
+      try {
+        await supabase.functions.invoke("tg-notify", {
+          body: { mode: "club_event", eventId: eventData.id },
+        });
+      } catch { /* ignore — don't block navigation on TG failure */ }
+    }
+
     showToast("Мероприятие опубликовано!", "success");
     checkAndAward("event_created", {});
     router.push(`/events/${eventData.id}`);

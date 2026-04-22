@@ -30,6 +30,7 @@ export default function EditClubPage({ params }: { params: Promise<{ slug: strin
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [coverUploading, setCoverUploading] = useState(false);
+  const [telegramChannel, setTelegramChannel] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,6 +76,7 @@ export default function EditClubPage({ params }: { params: Promise<{ slug: strin
     setVisibility(c.visibility);
     setAvatarUrl(c.avatar_url ?? null);
     setCoverUrl(c.cover_url ?? null);
+    setTelegramChannel(c.telegram_channel ?? "");
     setLoading(false);
   }
 
@@ -127,6 +129,7 @@ export default function EditClubPage({ params }: { params: Promise<{ slug: strin
         visibility,
         avatar_url: avatarUrl || null,
         cover_url: coverUrl || null,
+        telegram_channel: telegramChannel.trim() || null,
       })
       .eq("id", club.id);
 
@@ -345,6 +348,30 @@ export default function EditClubPage({ params }: { params: Promise<{ slug: strin
                   </label>
                 ))}
               </div>
+            </div>
+          </div>
+
+          {/* Telegram channel */}
+          <div
+            className="bg-white rounded-2xl border border-[#E4E4E7] overflow-hidden"
+            style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}
+          >
+            <div className="px-5 py-4">
+              <label className="block text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-2">
+                Telegram-канал / группа
+              </label>
+              <input
+                type="text"
+                value={telegramChannel}
+                onChange={(e) => setTelegramChannel(e.target.value)}
+                placeholder="@myclub_cycling"
+                maxLength={100}
+                className="w-full text-sm text-[#1C1C1E] placeholder-[#A1A1AA] focus:outline-none"
+              />
+              <p className="text-xs text-[#A1A1AA] mt-2 leading-relaxed">
+                Новые события клуба будут автоматически анонсироваться в этом канале или группе.
+                Добавь бота <b>@CycleConnectBot</b> как администратора и укажи <b>@username</b> сюда.
+              </p>
             </div>
           </div>
 

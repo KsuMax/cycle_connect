@@ -130,7 +130,24 @@ export interface Club {
   visibility: ClubVisibility;
   owner_id: string;
   members_count: number;
+  telegram_channel?: string | null;
   created_at: string;
+}
+
+export interface ClubPollOption {
+  id: string;
+  label: string;
+  route_id?: string | null;
+}
+
+export interface ClubPoll {
+  id: string;
+  club_id: string;
+  question: string;
+  options: ClubPollOption[];
+  created_by: string;
+  created_at: string;
+  closed_at: string | null;
 }
 
 export interface ClubMember {

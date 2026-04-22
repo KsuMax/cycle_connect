@@ -37,7 +37,7 @@ export const PAGE_SIZE = 20;
 
 /** Use for club list and club detail pages. */
 export const CLUB_LIST_SELECT =
-  "id, slug, name, description, city, avatar_url, cover_url, visibility, owner_id, members_count, created_at";
+  "id, slug, name, description, city, avatar_url, cover_url, visibility, owner_id, members_count, telegram_channel, created_at";
 
 /** Member rows joined with minimal profile fields. */
 export const CLUB_MEMBERS_SELECT = [
