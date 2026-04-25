@@ -15,6 +15,8 @@ import { TopProgressBar } from "@/components/layout/TopProgressBar";
 import { UserFeatures } from "@/components/layout/UserFeatures";
 import { AuthModalWrapper } from "@/components/ui/AuthModalWrapper";
 import { AiSearchWidget } from "@/components/ui/AiSearchWidget";
+import { AchievementsProvider } from "@/lib/context/AchievementsContext";
+import { NotificationsProvider } from "@/lib/context/NotificationsContext";
 
 export const metadata: Metadata = {
   title: "CycleConnect — велосипедное сообщество",
@@ -40,14 +42,15 @@ export default function RootLayout({
                       <FollowProvider>
                         <EventRidesProvider>
                           <IntentsProvider>
-                            <TopProgressBar />
-                            {children}
-                            <AiSearchWidget />
-                            <BottomNav />
-                            {/* Notifications + Achievements mount only after auth
-                                resolves with a logged-in user — no guest fetches,
-                                no double-fetch null→user cycle */}
-                            <UserFeatures />
+                            <AchievementsProvider>
+                              <NotificationsProvider>
+                                <TopProgressBar />
+                                {children}
+                                <AiSearchWidget />
+                                <BottomNav />
+                                <UserFeatures />
+                              </NotificationsProvider>
+                            </AchievementsProvider>
                           </IntentsProvider>
                         </EventRidesProvider>
                       </FollowProvider>

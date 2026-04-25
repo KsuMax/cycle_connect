@@ -14,8 +14,6 @@
  */
 
 import { useAuth } from "@/lib/context/AuthContext";
-import { AchievementsProvider } from "@/lib/context/AchievementsContext";
-import { NotificationsProvider } from "@/lib/context/NotificationsContext";
 import { AchievementModal } from "@/components/ui/AchievementModal";
 
 export function UserFeatures() {
@@ -23,11 +21,5 @@ export function UserFeatures() {
 
   if (loading || !user) return null;
 
-  return (
-    <AchievementsProvider>
-      <NotificationsProvider>
-        <AchievementModal />
-      </NotificationsProvider>
-    </AchievementsProvider>
-  );
+  return <AchievementModal />;
 }
