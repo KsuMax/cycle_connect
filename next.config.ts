@@ -14,7 +14,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
-      "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co",
+      "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://api.cycleconnect.cc wss://api.cycleconnect.cc",
       "frame-src 'self' https://mapmagic.app https://*.mapmagic.app",
       "object-src 'none'",
       "base-uri 'self'",
@@ -32,6 +32,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "*.supabase.co" },
       { protocol: "https", hostname: "*.supabase.in" },
+      { protocol: "https", hostname: "api.cycleconnect.cc" },
     ],
   },
   transpilePackages: [
@@ -98,6 +99,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  output: "standalone",
   experimental: {
     optimizePackageImports: [],
   },
