@@ -82,10 +82,17 @@ const nextConfig: NextConfig = {
         source: "/api/supabase/rest/:path*",
         destination: `${supabaseUrl}/rest/:path*`,
       },
-      // Proxy Supabase Auth
+      // Proxy Supabase Auth — used by the JS client via /api/supabase/auth/*
       {
         source: "/api/supabase/auth/:path*",
         destination: `${supabaseUrl}/auth/:path*`,
+      },
+      // Supabase email links (password reset, magic link, etc.) point to
+      // /auth/v1/verify on the site domain — proxy them to Supabase so the
+      // token verification succeeds before Supabase redirects to redirect_to.
+      {
+        source: "/auth/v1/:path*",
+        destination: `${supabaseUrl}/auth/v1/:path*`,
       },
       // Proxy Supabase Storage
       {
