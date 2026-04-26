@@ -74,6 +74,8 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
   const [nearMeIds, setNearMeIds] = useState<Set<string> | null>(null);
   const [nearMeLoading, setNearMeLoading] = useState(false);
   const [nearMeError, setNearMeError] = useState<string | null>(null);
+  // Non-critical notice (e.g. approximate IP location used as fallback)
+  const [nearMeNotice, setNearMeNotice] = useState<string | null>(null);
 
   // ── Events state ──────────────────────────────────────────────────────────
   const [events, setEvents] = useState<CycleEvent[]>(initialEvents);
@@ -162,14 +164,42 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
   }, [activeTab, eventsLoaded]);
 
   // ── Near-me: request location + call RPC ─────────────────────────────────
+  /**
+   * Try browser geolocation first; if it fails with POSITION_UNAVAILABLE or TIMEOUT
+   * (Google location service is often blocked in Russia), fall back to server-side IP geo.
+   */
+  const resolveCoords = useCallback(async (): Promise<{ lat: number; lng: number; approximate?: boolean }> => {
+    const fromBrowser = (): Promise<{ lat: number; lng: number }> =>
+      new Promise((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          reject,
+          { timeout: 10000 },
+        )
+      );
+
+    try {
+      return await fromBrowser();
+    } catch (err) {
+      // Re-throw if user explicitly denied permission — no point in IP fallback
+      if (err instanceof GeolocationPositionError && err.code === GeolocationPositionError.PERMISSION_DENIED) {
+        throw err;
+      }
+      // POSITION_UNAVAILABLE or TIMEOUT → try IP-based fallback
+      const res = await fetch("/api/geo-ip");
+      if (!res.ok) throw err;
+      const data = await res.json() as { lat: number; lng: number; error?: string };
+      if (data.error) throw err;
+      return { lat: data.lat, lng: data.lng, approximate: true };
+    }
+  }, []);
+
   const activateNearMe = useCallback(async (radius: number) => {
     setNearMeLoading(true);
     setNearMeError(null);
+    setNearMeNotice(null);
     try {
-      const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
-      );
-      const { latitude: lat, longitude: lng } = pos.coords;
+      const { lat, lng, approximate } = await resolveCoords();
       const { data, error } = await supabase.rpc("routes_near_location", {
         lat,
         lng,
@@ -178,21 +208,27 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
       if (error) throw error;
       setNearMeIds(new Set((data as { id: string }[]).map((r) => r.id)));
       setNearMeActive(true);
+      if (approximate) {
+        setNearMeNotice("Точное местоположение недоступно — используется приблизительное по IP");
+      }
     } catch (err) {
       const msg = err instanceof GeolocationPositionError
-        ? err.code === 1 ? "Доступ к геолокации запрещён" : "Не удалось определить местоположение"
+        ? err.code === GeolocationPositionError.PERMISSION_DENIED
+          ? "Доступ к геолокации запрещён"
+          : "Не удалось определить местоположение"
         : "Ошибка поиска маршрутов";
       setNearMeError(msg);
       setNearMeActive(false);
     } finally {
       setNearMeLoading(false);
     }
-  }, []);
+  }, [resolveCoords]);
 
   const deactivateNearMe = useCallback(() => {
     setNearMeActive(false);
     setNearMeIds(null);
     setNearMeError(null);
+    setNearMeNotice(null);
   }, []);
 
   const handleNearMeRadiusChange = useCallback((radius: number) => {
@@ -471,6 +507,9 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
                   {nearMeError && (
                     <p className="mt-1.5 text-xs text-red-500">{nearMeError}</p>
                   )}
+                  {nearMeNotice && (
+                    <p className="mt-1.5 text-xs text-amber-600">{nearMeNotice}</p>
+                  )}
                 </div>
 
                 <div className="mb-5">
@@ -725,6 +764,7 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
                     </div>
                   )}
                   {nearMeError && <p className="mt-1.5 text-xs text-red-500">{nearMeError}</p>}
+                  {nearMeNotice && <p className="mt-1.5 text-xs text-amber-600">{nearMeNotice}</p>}
                 </div>
                 <div>
                   <div className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-2">Где</div>

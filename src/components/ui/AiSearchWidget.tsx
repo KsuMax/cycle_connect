@@ -31,8 +31,8 @@ function needsLocation(q: string): boolean {
   return /рядом|поблизости|около меня|возле меня|недалеко от меня|near me/i.test(q);
 }
 
-/** Ask for geolocation — returns coords or throws. */
-function requestCoords(): Promise<{ lat: number; lng: number }> {
+/** Ask for geolocation via browser API — returns coords or throws GeolocationPositionError. */
+function requestCoordsFromBrowser(): Promise<{ lat: number; lng: number }> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error("not_supported"));
@@ -44,6 +44,33 @@ function requestCoords(): Promise<{ lat: number; lng: number }> {
       { timeout: 10_000, maximumAge: 60_000 },
     );
   });
+}
+
+/**
+ * Request coordinates with IP-based fallback.
+ * Browser geolocation is tried first; if it fails with POSITION_UNAVAILABLE or TIMEOUT
+ * (common in Russia where Google's location service is blocked), we fall back to
+ * server-side IP geolocation.
+ * Returns `approximate: true` when IP fallback was used.
+ */
+async function requestCoords(): Promise<{ lat: number; lng: number; approximate?: boolean }> {
+  try {
+    const coords = await requestCoordsFromBrowser();
+    return coords;
+  } catch (err) {
+    // Only fall back on POSITION_UNAVAILABLE (2) or TIMEOUT (3).
+    // PERMISSION_DENIED (1) means the user explicitly refused — respect that.
+    const isPermanentDenial =
+      err instanceof GeolocationPositionError && err.code === GeolocationPositionError.PERMISSION_DENIED;
+    if (isPermanentDenial) throw err;
+
+    // Try IP-based fallback
+    const res = await fetch("/api/geo-ip");
+    if (!res.ok) throw err; // re-throw original geo error so the caller can show the right message
+    const data = await res.json() as { lat: number; lng: number; error?: string };
+    if (data.error) throw err;
+    return { lat: data.lat, lng: data.lng, approximate: true };
+  }
 }
 
 export function AiSearchWidget() {
@@ -84,11 +111,15 @@ export function AiSearchWidget() {
 
     let lat: number | undefined;
     let lng: number | undefined;
+    let approxLocation = false;
 
     if (needsLocation(trimmed)) {
       setLocating(true);
       try {
-        ({ lat, lng } = await requestCoords());
+        const coords = await requestCoords();
+        lat = coords.lat;
+        lng = coords.lng;
+        approxLocation = coords.approximate ?? false;
       } catch (err) {
         const isPermission = err instanceof GeolocationPositionError && err.code === 1;
         setError(
