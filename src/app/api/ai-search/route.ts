@@ -12,14 +12,20 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
+
+export const dynamic = "force-dynamic";
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY ?? "";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://cycleconnect.cc";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -271,7 +277,7 @@ async function searchRoutes(filters: RouteFilters): Promise<RouteResult[]> {
   const hasDistanceTarget = filters.distance_target != null;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let q: any = supabase
+  let q: any = getSupabase()
     .from("routes")
     .select("id, title, distance_km, elevation_m, duration_min, difficulty, region, cover_url, tags")
     // Fetch more when we need to re-rank by distance closeness
@@ -310,6 +316,18 @@ async function searchRoutes(filters: RouteFilters): Promise<RouteResult[]> {
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  // Auth check — only authenticated users can use AI search
+  const cookieStore = await cookies();
+  const authClient = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } },
+  );
+  const { data: { user } } = await authClient.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
   const body = await req.json().catch(() => ({}));
   const query: string = typeof body.query === "string" ? body.query.trim() : "";
   const lat: number | undefined = typeof body.lat === "number" ? body.lat : undefined;

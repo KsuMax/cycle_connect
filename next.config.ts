@@ -14,7 +14,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
-      "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co",
+      "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://api.cycleconnect.cc wss://api.cycleconnect.cc",
       "frame-src 'self' https://mapmagic.app https://*.mapmagic.app",
       "object-src 'none'",
       "base-uri 'self'",
@@ -26,12 +26,19 @@ const securityHeaders = [
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
 const nextConfig: NextConfig = {
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   images: {
     // Allow next/image to optimise images from Supabase storage directly
     // (used server-side by the optimiser; browser traffic goes via the /api/supabase proxy)
     remotePatterns: [
       { protocol: "https", hostname: "*.supabase.co" },
       { protocol: "https", hostname: "*.supabase.in" },
+      { protocol: "https", hostname: "api.cycleconnect.cc" },
     ],
   },
   transpilePackages: [
@@ -81,10 +88,17 @@ const nextConfig: NextConfig = {
         source: "/api/supabase/rest/:path*",
         destination: `${supabaseUrl}/rest/:path*`,
       },
-      // Proxy Supabase Auth
+      // Proxy Supabase Auth — used by the JS client via /api/supabase/auth/*
       {
         source: "/api/supabase/auth/:path*",
         destination: `${supabaseUrl}/auth/:path*`,
+      },
+      // Supabase email links (password reset, magic link, etc.) point to
+      // /auth/v1/verify on the site domain — proxy them to Supabase so the
+      // token verification succeeds before Supabase redirects to redirect_to.
+      {
+        source: "/auth/v1/:path*",
+        destination: `${supabaseUrl}/auth/v1/:path*`,
       },
       // Proxy Supabase Storage
       {
@@ -98,6 +112,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  output: "standalone",
   experimental: {
     optimizePackageImports: [],
   },

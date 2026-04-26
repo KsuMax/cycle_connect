@@ -1,0 +1,33 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1
+        with:
+          command_timeout: 20m
+          host: 77.222.35.42
+          port: 2222
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/cycleconnect
+            git pull origin main
+            docker build -t cycleconnect:latest .
+            docker stop cycleconnect-app 2>/dev/null || true
+            docker rm cycleconnect-app 2>/dev/null || true
+            docker run -d \
+              --name cycleconnect-app \
+              --restart unless-stopped \
+              -p 127.0.0.1:4000:4000 \
+              --env-file /opt/cycleconnect/.env.production \
+              cycleconnect:latest
+            echo "✅ Deployed"
