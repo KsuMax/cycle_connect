@@ -11,6 +11,7 @@ import { GpxUpload } from "@/components/routes/GpxUpload";
 import { ExitPointsEditor, type ExitPointDraft } from "@/components/routes/ExitPointsEditor";
 import { DayEditor } from "@/components/events/DayEditorLazy";
 import { useAuth } from "@/lib/context/AuthContext";
+import { useToast } from "@/lib/context/ToastContext";
 import { supabase, proxyImageUrl } from "@/lib/supabase";
 import { parseGpxFile, computeGpxStats, toWktPoint, toWktLinestring } from "@/lib/gpx";
 import { ROUTE_TYPES, DIFFICULTIES, SURFACES, BIKE_TYPES } from "@/constants/routes";
@@ -23,6 +24,7 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
   const { id } = use(params);
   const router = useRouter();
   const { user } = useAuth();
+  const { showToast } = useToast();
 
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -264,7 +266,9 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
       const { error: gpxError } = await supabase.storage
         .from("route-gpx")
         .upload(path, gpxFile, { upsert: true, contentType: "application/gpx+xml" });
-      if (!gpxError) {
+      if (gpxError) {
+        showToast(`GPX не сохранился: ${gpxError.message}`, "error");
+      } else {
         // Force gpx_updated_at refresh even if path is unchanged
         await supabase.from("routes").update({ gpx_path: path, gpx_updated_at: new Date().toISOString() }).eq("id", id);
         try {

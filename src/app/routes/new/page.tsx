@@ -211,7 +211,9 @@ export default function NewRoutePage() {
       const { error: gpxError } = await supabase.storage
         .from("route-gpx")
         .upload(path, gpxFile, { upsert: true, contentType: "application/gpx+xml" });
-      if (!gpxError) {
+      if (gpxError) {
+        showToast(`GPX не сохранился: ${gpxError.message}`, "error");
+      } else {
         await supabase.from("routes").update({ gpx_path: path }).eq("id", routeData.id);
         try {
           const { startPoint, trackpoints } = await parseGpxFile(gpxFile);
