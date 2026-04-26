@@ -3,69 +3,69 @@ import Link from "next/link";
 export const metadata = {
   title: "CycleConnect — Сообщество велосипедистов",
   description:
-    "Открывай маршруты, организуй поездки, вступай в клубы и знакомься с велосипедистами со всей России.",
+    "От вечерних покатушек до многодневных путешествий. Находи идеальные треки, объединяйся с единомышленниками и превращай заезды в настоящие приключения.",
 };
 
 const features = [
   {
     icon: "🗺️",
     color: "bg-orange-light text-orange",
-    title: "Маршруты",
+    title: "Карта маршрутов",
     description:
-      "Тысячи маршрутов с детальным описанием: дистанция, набор высоты, тип покрытия и точки выхода. Поиск через ИИ на живом языке.",
+      "Тысячи проверенных треков: дистанция, рельеф, тип покрытия и важные точки. Выбирай маршрут, который подходит именно тебе и твоему байку.",
   },
   {
     icon: "📅",
     color: "bg-teal-light text-teal",
-    title: "События",
+    title: "Совместные выезды",
     description:
-      "Многодневные экспедиции и групповые заезды. Регистрируйся, следи за участниками, получай уведомления в Telegram.",
+      "От локальных заездов выходного дня до масштабных велотуров. Регистрируйся в один клик и получай апдейты прямо в Telegram.",
   },
   {
     icon: "🚴",
     color: "bg-purple-light text-purple",
-    title: "Клубы",
+    title: "Клубы по интересам",
     description:
-      "Создавай клуб или вступай в существующий. Открытые, закрытые и клубы по заявкам — гибкое управление участниками.",
+      "Гревел, шоссе или MTB? Вступай в клубы или создавай свой, чтобы собрать собственную команду для покатушек.",
   },
   {
     icon: "🏆",
     color: "bg-orange-light text-orange",
-    title: "Достижения",
+    title: "Мотивация и награды",
     description:
-      "Разблокируй награды за активность: первый маршрут, подписчики, километры. Показывай на профиле, что ты за гонщик.",
+      "Получай ачивки за пройденные километры и новые маршруты. Покажи всему комьюнити свой стиль езды.",
   },
   {
     icon: "🤖",
     color: "bg-teal-light text-teal",
-    title: "ИИ-поиск",
+    title: "Умный ИИ-поиск",
     description:
-      'Спроси "лёгкий маршрут по асфальту на 50 км рядом с Питером" — ИИ сам разберёт запрос и найдёт подходящие треки.',
+      'Просто напиши: "грунтовый маршрут на 50 км под Питером" — и нейросеть мгновенно подберёт лучшие варианты.',
   },
   {
     icon: "📊",
     color: "bg-purple-light text-purple",
-    title: "Strava-интеграция",
+    title: "Синхронизация со Strava",
     description:
-      "Подключи Strava и все твои активности автоматически появятся в профиле. Одна экосистема для всех данных.",
+      "Подключи аккаунт в пару кликов, и вся твоя статистика поездок автоматически подтянется в профиль.",
   },
 ];
 
 const steps = [
   {
     num: "01",
-    title: "Создай профиль",
-    body: "Зарегистрируйся за 30 секунд. Добавь фото, город, ссылку на Strava и Telegram — и ты в сообществе.",
+    title: "Вливайся в комьюнити",
+    body: "Пара кликов для регистрации, привязка Telegram — и ты часть огромного велосообщества.",
   },
   {
     num: "02",
-    title: "Найди маршрут",
-    body: "Используй фильтры или просто напиши запрос в поиске. ИИ подберёт треки под твой уровень и велосипед.",
+    title: "Выбери свой путь",
+    body: "Используй удобные фильтры или попроси ИИ найти идеальный трек под твоё настроение.",
   },
   {
     num: "03",
-    title: "Поехали вместе",
-    body: "Зарегистрируйся на событие, вступи в клуб и познакомься с теми, кто едет тем же маршрутом в те же выходные.",
+    title: "Жми на педали",
+    body: "Присоединяйся к событию, зови друзей из клуба и отправляйся в путь!",
   },
 ];
 
@@ -75,10 +75,11 @@ export default function LandingPage() {
       {/* Nav */}
       <header className="sticky top-0 z-50 border-b border-border bg-surface/90 backdrop-blur-sm">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-2">
-            <span className="text-xl font-bold text-orange">Cycle</span>
-            <span className="text-xl font-bold text-text">Connect</span>
-          </div>
+          {/* Logo — matches main site: Cycle dark, Connect orange */}
+          <span className="text-[1.35rem] font-extrabold tracking-tight select-none">
+            <span className="text-text">Cycle</span><span className="text-orange">Connect</span>
+          </span>
+
           <nav className="hidden items-center gap-6 text-sm text-muted md:flex">
             <a href="#features" className="hover:text-text transition-colors">
               Возможности
@@ -108,20 +109,19 @@ export default function LandingPage() {
         <div className="relative mx-auto max-w-4xl px-6 text-center">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm text-muted shadow-card">
             <span className="h-2 w-2 rounded-full bg-teal animate-pulse" />
-            Платформа для велосипедистов России
+            Сообщество велосипедистов России
           </div>
 
           <h1 className="mb-6 text-5xl font-extrabold leading-tight tracking-tight text-text md:text-6xl">
-            Езди дальше.{" "}
-            <span className="text-orange">Открывай новое.</span>{" "}
-            Знакомься с{" "}
-            <span className="text-teal">велосипедистами.</span>
+            Катайся больше.{" "}
+            <span className="text-orange">Открывай новые маршруты.</span>{" "}
+            <span className="text-teal">Находи своих.</span>
           </h1>
 
           <p className="mx-auto mb-10 max-w-2xl text-lg text-muted leading-relaxed">
-            CycleConnect — это место, где маршруты превращаются в приключения,
-            а одиночные заезды становятся групповыми. Открывай треки, вступай
-            в клубы и находи тех, кто едет рядом.
+            От вечерних покатушек до многодневных путешествий. Находи идеальные
+            треки с помощью ИИ, объединяйся с единомышленниками и превращай
+            заезды в настоящие приключения!
           </p>
 
           <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -163,11 +163,11 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-16 text-center">
             <h2 className="mb-4 text-4xl font-extrabold text-text">
-              Всё, что нужно велосипедисту
+              Твой идеальный заезд начинается здесь.
             </h2>
             <p className="mx-auto max-w-xl text-muted">
-              Маршруты, события, клубы, достижения и ИИ-поиск — в одном месте,
-              без лишнего.
+              Мы собрали лучшие инструменты, чтобы ты меньше времени тратил на
+              планирование и больше — на катание.
             </p>
           </div>
 
@@ -197,10 +197,10 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-16 text-center">
             <h2 className="mb-4 text-4xl font-extrabold text-text">
-              Как это работает
+              От идеи до старта — всего 3 шага.
             </h2>
             <p className="text-muted">
-              Три шага от регистрации до первой групповой поездки.
+              Меньше организации, больше катания.
             </p>
           </div>
 
@@ -229,12 +229,13 @@ export default function LandingPage() {
                   Сообщество
                 </div>
                 <h2 className="mb-6 text-4xl font-extrabold leading-tight">
-                  Клубы для всех стилей катания
+                  Находи клубы под любой стиль катания
                 </h2>
                 <p className="mb-8 text-sm leading-relaxed opacity-70">
-                  Гравел, шоссе, MTB, туринг — в CycleConnect каждый найдёт
-                  клуб по душе. Создай свой или вступи в один из существующих
-                  и планируй поездки вместе.
+                  Будь то неспешный велотуризм, грязный MTB, скоростное шоссе
+                  или городские покатушки на фиксах — здесь есть клуб для
+                  каждого. Присоединяйся к локальным райдерам или собирай свою
+                  тусовку.
                 </p>
                 <Link
                   href="/clubs"
@@ -255,17 +256,12 @@ export default function LandingPage() {
                       key={name}
                       className="w-56 rounded-2xl bg-surface/10 p-4 backdrop-blur-sm ring-1 ring-white/10"
                     >
-                      <div className="mb-1 font-semibold text-surface">
-                        {name}
-                      </div>
+                      <div className="mb-1 font-semibold text-surface">{name}</div>
                       <div className="text-xs opacity-60">{city}</div>
                       <div className="mt-3 flex items-center gap-1.5">
                         <div className="flex -space-x-2">
                           {[...Array(3)].map((_, i) => (
-                            <div
-                              key={i}
-                              className="h-6 w-6 rounded-full bg-orange/60 ring-2 ring-text"
-                            />
+                            <div key={i} className="h-6 w-6 rounded-full bg-orange/60 ring-2 ring-text" />
                           ))}
                         </div>
                         <span className="text-xs opacity-60">{n} участников</span>
@@ -282,17 +278,12 @@ export default function LandingPage() {
                       key={name}
                       className="w-56 rounded-2xl bg-surface/10 p-4 backdrop-blur-sm ring-1 ring-white/10"
                     >
-                      <div className="mb-1 font-semibold text-surface">
-                        {name}
-                      </div>
+                      <div className="mb-1 font-semibold text-surface">{name}</div>
                       <div className="text-xs opacity-60">{city}</div>
                       <div className="mt-3 flex items-center gap-1.5">
                         <div className="flex -space-x-2">
                           {[...Array(3)].map((_, i) => (
-                            <div
-                              key={i}
-                              className="h-6 w-6 rounded-full bg-teal/60 ring-2 ring-text"
-                            />
+                            <div key={i} className="h-6 w-6 rounded-full bg-teal/60 ring-2 ring-text" />
                           ))}
                         </div>
                         <span className="text-xs opacity-60">{n} участников</span>
@@ -313,17 +304,17 @@ export default function LandingPage() {
             🤖
           </div>
           <h2 className="mb-4 text-4xl font-extrabold text-text">
-            Поиск на живом языке
+            Ищешь маршрут? Просто попроси.
           </h2>
           <p className="mx-auto mb-8 max-w-xl text-muted">
-            Не нужно возиться с фильтрами. Просто напиши что хочешь — ИИ
-            разберёт запрос и найдёт треки под твои условия.
+            Забудь про сложные фильтры на картах. Опиши идеальную поездку своими
+            словами, а наш ИИ подберёт нужные треки за секунду.
           </p>
           <div className="mx-auto max-w-lg rounded-2xl border border-border bg-bg p-5 text-left shadow-card">
             <div className="flex items-center gap-3">
               <div className="h-3 w-3 rounded-full bg-border-strong" />
               <p className="text-sm text-muted italic">
-                "лёгкий маршрут по асфальту на выходной, 60–80 км, Карелия"
+                "грунтовый маршрут на 50 км под Питером"
               </p>
             </div>
             <div className="mt-4 flex items-center gap-2 text-sm font-semibold text-teal">
@@ -338,17 +329,18 @@ export default function LandingPage() {
       <section className="bg-orange py-24 text-white">
         <div className="mx-auto max-w-3xl px-6 text-center">
           <h2 className="mb-4 text-4xl font-extrabold leading-tight">
-            Готов крутить педали с нами?
+            Готов к новому заезду?
           </h2>
           <p className="mb-10 text-lg opacity-80">
-            Регистрация бесплатна. Первый маршрут — уже сегодня.
+            Присоединяйся к CycleConnect бесплатно. Твоё следующее приключение
+            начинается прямо сейчас.
           </p>
           <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
               href="/"
               className="rounded-xl bg-white px-8 py-3.5 font-semibold text-orange shadow-card hover:opacity-90 transition-opacity"
             >
-              Начать бесплатно
+              Влиться в комьюнити
             </Link>
             <Link
               href="/routes"
@@ -363,9 +355,9 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="border-t border-border bg-surface py-10">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 text-sm text-muted sm:flex-row">
-          <div className="flex items-center gap-1.5 font-semibold text-text">
-            <span className="text-orange">Cycle</span>Connect
-          </div>
+          <span className="font-extrabold tracking-tight text-text">
+            Cycle<span className="text-orange">Connect</span>
+          </span>
           <div className="flex gap-6">
             <Link href="/routes" className="hover:text-text transition-colors">
               Маршруты
