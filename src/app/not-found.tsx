@@ -15,9 +15,8 @@ export default function NotFound() {
       {/* Header */}
       <header className="relative z-10 border-b border-border bg-surface/80 backdrop-blur-sm">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link href="/" className="flex items-center gap-1 text-xl font-bold">
-            <span className="text-orange">Cycle</span>
-            <span className="text-text">Connect</span>
+          <Link href="/" className="text-xl font-bold">
+            <span className="text-text">Cycle</span><span className="text-orange">Connect</span>
           </Link>
         </div>
       </header>
