@@ -15,6 +15,7 @@ jobs:
         with:
           command_timeout: 20m
           host: 77.222.35.42
+          port: 2222
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
