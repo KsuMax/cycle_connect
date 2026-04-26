@@ -35,6 +35,7 @@ interface RouteFilters {
   distance_max?: number;
   /** Target distance for relevance sorting — not passed to SQL */
   distance_target?: number;
+  elevation_min?: number;
   elevation_max?: number;
   surface?: string[];
   route_types?: string[];
@@ -117,6 +118,52 @@ function extractDistance(q: string, out: RouteFilters): boolean {
   return false;
 }
 
+// ─── Elevation helper ─────────────────────────────────────────────────────────
+
+function extractElevation(q: string, out: RouteFilters): void {
+  const hasElevCtx = /набор\w*|подъём\w*|подъем\w*|перепад\w*/.test(q);
+
+  // "набор/подъём [более/от/до] N" — elevation context first, no unit required
+  const ctxMin = q.match(/(?:набор\w*|подъём\w*|подъем\w*)\s+(?:более|больше|свыше|от|выше)\s+(\d+)/);
+  if (ctxMin) { out.elevation_min = parseInt(ctxMin[1], 10); return; }
+
+  const ctxMax = q.match(/(?:набор\w*|подъём\w*|подъем\w*)\s+(?:до|менее|меньше|не\s*бол[её]е?\w*)\s+(\d+)/);
+  if (ctxMax) { out.elevation_max = parseInt(ctxMax[1], 10); return; }
+
+  // "от X до Y м/метров [набора/подъёма]" — explicit range with unit
+  const rangeM = q.match(/от\s+(\d+)\s+до\s+(\d+)\s*(?:м|метр\w*)/);
+  if (rangeM && hasElevCtx) {
+    out.elevation_min = parseInt(rangeM[1], 10);
+    out.elevation_max = parseInt(rangeM[2], 10);
+    return;
+  }
+
+  // "более/больше/свыше N м" or "от N м" near elevation context — minimum
+  const minM =
+    q.match(/(?:более|больше|свыше|выше)\s+(\d+)\s*(?:м|метр\w*)/) ||
+    q.match(/от\s+(\d+)\s*(?:м|метр\w*)/);
+  if (minM && hasElevCtx) { out.elevation_min = parseInt(minM[1], 10); return; }
+
+  // "N м и более/больше" — minimum, number first
+  const minM2 = q.match(/(\d+)\s*(?:м|метр\w*)\s+(?:и\s+)?(?:более|больше)/);
+  if (minM2 && hasElevCtx) { out.elevation_min = parseInt(minM2[1], 10); return; }
+
+  // "до/не более/менее N м" — maximum
+  const maxM = q.match(/(?:до|не\s*бол[её]е?\w*|не\s*больш\w*|менее|меньше)\s+(\d+)\s*(?:м|метр\w*)/);
+  if (maxM && hasElevCtx) { out.elevation_max = parseInt(maxM[1], 10); return; }
+
+  // Semantic: minimal climbing — flat route
+  if (/минимальн\w+\s+(?:подъём|набор|перепад|количеств)|мало\s+подъём|без\s+подъём|ровн\w+|плоск\w+/.test(q)) {
+    out.elevation_max = 100;
+    return;
+  }
+
+  // Semantic: lots of climbing (no explicit number)
+  if (/много\s+подъём|горист\w+|с\s+набором\s+высот/.test(q)) {
+    if (out.elevation_min == null) out.elevation_min = 500;
+  }
+}
+
 // ─── Regex extraction (always runs, reliable for explicit values) ──────────────
 
 function extractFromText(query: string): RouteFilters {
@@ -140,6 +187,9 @@ function extractFromText(query: string): RouteFilters {
       out.distance_max = 150;
     }
   }
+
+  // Elevation
+  extractElevation(q, out);
 
   // Urban / near-city hints
   if (/\bгород|\bпо городу|недалеко от город|рядом с город|окраин/.test(q)) {
@@ -198,7 +248,7 @@ const SYSTEM_PROMPT = `You are a cycling route search assistant for CycleConnect
 Extract search filters from the user message. Return ONLY raw JSON, no markdown, no explanation.
 
 Output schema (all fields optional):
-{"difficulty":"easy"|"medium"|"hard","distance_min":number,"distance_max":number,"distance_target":number,"elevation_max":number,"surface":["asphalt"|"gravel"|"dirt"|"mixed"],"route_types":["road"|"gravel"|"mtb"|"urban"],"bike_types":["road"|"mountain"|"gravel"],"region":"Карелия"|"Санкт-Петербург"|"Ленинградская область"|"Москва"|"Подмосковье"|"Краснодарский край"|"Крым"|"Алтай"|"Байкал"|"Урал","search_text":"string"}
+{"difficulty":"easy"|"medium"|"hard","distance_min":number,"distance_max":number,"distance_target":number,"elevation_min":number,"elevation_max":number,"surface":["asphalt"|"gravel"|"dirt"|"mixed"],"route_types":["road"|"gravel"|"mtb"|"urban"],"bike_types":["road"|"mountain"|"gravel"],"region":"Карелия"|"Санкт-Петербург"|"Ленинградская область"|"Москва"|"Подмосковье"|"Краснодарский край"|"Крым"|"Алтай"|"Байкал"|"Урал","search_text":"string"}
 
 Rules (apply all that match):
 1. If user says "N км" → distance_target=N, distance_min=N*0.75, distance_max=N*1.25
@@ -210,7 +260,10 @@ Rules (apply all that match):
 7. "асфальт"/"шоссе" → surface=["asphalt"]; "гравий"/"грунт" → ["gravel"]
 8. Region names → region field
 9. Nature words (море, озеро, лес) → search_text
-10. Return {} only if truly nothing can be extracted`;
+10. Return {} only if truly nothing can be extracted
+11. "набор/подъём более N" or "более N м набора" → elevation_min=N; "набор до N" or "до N м набора" → elevation_max=N
+12. "ровный"/"плоский"/"без подъёмов"/"минимальный подъём"/"мало подъёмов" → elevation_max=100
+13. "много подъёмов"/"гористый"/"с набором высот" (no explicit N) → elevation_min=500`;
 
 // ─── AI filter parsing ────────────────────────────────────────────────────────
 
@@ -268,6 +321,10 @@ function mergeFilters(ai: RouteFilters, regex: RouteFilters): RouteFilters {
   if (regex.route_types?.length && !merged.route_types?.length) merged.route_types = regex.route_types;
   if (regex.region && !merged.region) merged.region = regex.region;
 
+  // Regex wins for elevation when explicitly extracted from the query
+  if (regex.elevation_min != null) merged.elevation_min = regex.elevation_min;
+  if (regex.elevation_max != null && merged.elevation_max == null) merged.elevation_max = regex.elevation_max;
+
   return merged;
 }
 
@@ -287,6 +344,7 @@ async function searchRoutes(filters: RouteFilters): Promise<RouteResult[]> {
   if (filters.difficulty) q = q.eq("difficulty", filters.difficulty);
   if (filters.distance_min) q = q.gte("distance_km", filters.distance_min);
   if (filters.distance_max) q = q.lte("distance_km", filters.distance_max);
+  if (filters.elevation_min) q = q.gte("elevation_m", filters.elevation_min);
   if (filters.elevation_max) q = q.lte("elevation_m", filters.elevation_max);
   if (filters.region) q = q.ilike("region", `%${filters.region}%`);
   if (filters.surface?.length) q = q.overlaps("surface", filters.surface);
