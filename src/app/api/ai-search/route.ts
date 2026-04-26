@@ -153,13 +153,13 @@ function extractElevation(q: string, out: RouteFilters): void {
   if (maxM && hasElevCtx) { out.elevation_max = parseInt(maxM[1], 10); return; }
 
   // Semantic: minimal climbing — flat route
-  if (/минимальн\w+\s+(?:подъём|набор|перепад|количеств)|мало\s+подъём|без\s+подъём|ровн\w+|плоск\w+/.test(q)) {
+  if (/минимальн\S*\s+(?:подъём|набор|перепад|количеств)|мало\s+подъём|без\s+подъём|ровн|плоск/.test(q)) {
     out.elevation_max = 100;
     return;
   }
 
   // Semantic: lots of climbing (no explicit number)
-  if (/много\s+подъём|горист\w+|с\s+набором\s+высот/.test(q)) {
+  if (/много\s+подъём|горист|с\s+набором\s+высот/.test(q)) {
     if (out.elevation_min == null) out.elevation_min = 500;
   }
 }
