@@ -304,6 +304,7 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
       }
     }
 
+    router.refresh();
     router.push(`/routes/${id}`);
   };
 

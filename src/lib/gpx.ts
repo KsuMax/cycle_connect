@@ -21,8 +21,13 @@ export async function parseGpxFile(file: File): Promise<GpxGeometry> {
   const text = await file.text();
   const doc = new DOMParser().parseFromString(text, "application/xml");
 
-  const trkpts = Array.from(doc.querySelectorAll("trkpt, rtept, wpt"));
-  const trackpoints: GpxPoint[] = trkpts
+  // Prioritise one point type to avoid doubling distance when a GPX contains
+  // both <trkpt> (recorded track) and <rtept> (route waypoints) for the same path.
+  let ptEls = Array.from(doc.querySelectorAll("trkpt"));
+  if (ptEls.length === 0) ptEls = Array.from(doc.querySelectorAll("rtept"));
+  if (ptEls.length === 0) ptEls = Array.from(doc.querySelectorAll("wpt"));
+
+  const trackpoints: GpxPoint[] = ptEls
     .map((pt) => {
       const lat = parseFloat(pt.getAttribute("lat") ?? "");
       const lng = parseFloat(pt.getAttribute("lon") ?? "");
