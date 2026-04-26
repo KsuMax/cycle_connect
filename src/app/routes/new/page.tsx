@@ -207,14 +207,14 @@ export default function NewRoutePage() {
 
     // GPX upload (optional)
     if (gpxFile) {
-      const path = `${routeData.id}/route.gpx`;
-      const { error: gpxError } = await supabase.storage
-        .from("route-gpx")
-        .upload(path, gpxFile, { upsert: true, contentType: "application/gpx+xml" });
-      if (gpxError) {
-        showToast(`GPX не сохранился: ${gpxError.message}`, "error");
+      const gpxForm = new FormData();
+      gpxForm.append("routeId", routeData.id);
+      gpxForm.append("file", gpxFile);
+      const gpxRes = await fetch("/api/routes/upload-gpx", { method: "POST", body: gpxForm });
+      if (!gpxRes.ok) {
+        const err = await gpxRes.json().catch(() => ({ error: "unknown error" }));
+        showToast(`GPX не сохранился: ${err.error ?? gpxRes.statusText}`, "error");
       } else {
-        await supabase.from("routes").update({ gpx_path: path }).eq("id", routeData.id);
         try {
           const { startPoint, trackpoints } = await parseGpxFile(gpxFile);
           if (startPoint) {
