@@ -8,15 +8,15 @@
 import type { DbProfile, DbRoute, DbEvent, DbClub, DbClubMember } from "@/lib/supabase";
 import type { Route, RouteTopComment, CycleEvent, User, RouteType, ExitPoint, Club, ClubMember, ClubRef } from "@/types";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-
-/** Turn a stored `gpx_path` into a public URL. Defaults to the route-gpx bucket. */
+/** Turn a stored `gpx_path` into a download URL via the same-origin proxy.
+ * Using a relative URL means: (a) download attribute works in all browsers,
+ * (b) no dependency on NEXT_PUBLIC_SUPABASE_URL at runtime, (c) works in Russia. */
 export function gpxPathToUrl(
   path: string | null | undefined,
   bucket: "route-gpx" | "event-gpx" = "route-gpx",
 ): string | null {
-  if (!path || !SUPABASE_URL) return null;
-  return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
+  if (!path) return null;
+  return `/api/supabase/storage/v1/object/public/${bucket}/${path}`;
 }
 
 function toInitials(name: string): string {
