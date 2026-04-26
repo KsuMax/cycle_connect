@@ -254,6 +254,12 @@ export default function NewRoutePage() {
 
     showToast("Маршрут опубликован!", "success");
     checkAndAward("route_created", { routesCount: (profile?.routes_count ?? 0) + 1 });
+    // Fire-and-forget: index for AI search (non-blocking).
+    fetch("/api/routes/embed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: routeData.id }),
+    }).catch(() => {});
     router.push(`/routes/${routeData.id}`);
   };
 

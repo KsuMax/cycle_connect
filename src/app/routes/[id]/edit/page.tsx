@@ -307,6 +307,13 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
       }
     }
 
+    // Fire-and-forget: refresh AI-search embedding (non-blocking).
+    fetch("/api/routes/embed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    }).catch(() => {});
+
     router.refresh();
     router.push(`/routes/${id}`);
   };

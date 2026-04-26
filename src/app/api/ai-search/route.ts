@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { embedQuery, toPgVector } from "@/lib/embeddings/jina";
 
 export const dynamic = "force-dynamic";
 
@@ -330,45 +331,53 @@ function mergeFilters(ai: RouteFilters, regex: RouteFilters): RouteFilters {
 
 // ─── Supabase query ───────────────────────────────────────────────────────────
 
-async function searchRoutes(filters: RouteFilters): Promise<RouteResult[]> {
-  const hasDistanceTarget = filters.distance_target != null;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let q: any = getSupabase()
-    .from("routes")
-    .select("id, title, distance_km, elevation_m, duration_min, difficulty, region, cover_url, tags")
-    // Fetch more when we need to re-rank by distance closeness
-    .limit(hasDistanceTarget ? 30 : 6)
-    .order("created_at", { ascending: false });
-
-  if (filters.difficulty) q = q.eq("difficulty", filters.difficulty);
-  if (filters.distance_min) q = q.gte("distance_km", filters.distance_min);
-  if (filters.distance_max) q = q.lte("distance_km", filters.distance_max);
-  if (filters.elevation_min) q = q.gte("elevation_m", filters.elevation_min);
-  if (filters.elevation_max) q = q.lte("elevation_m", filters.elevation_max);
-  if (filters.region) q = q.ilike("region", `%${filters.region}%`);
-  if (filters.surface?.length) q = q.overlaps("surface", filters.surface);
-  if (filters.route_types?.length) q = q.overlaps("route_types", filters.route_types);
-  if (filters.bike_types?.length) q = q.overlaps("bike_types", filters.bike_types);
-  if (filters.search_text) {
-    q = q.or(
-      `title.ilike.%${filters.search_text}%,description.ilike.%${filters.search_text}%`,
-    );
+async function searchRoutes(
+  filters: RouteFilters,
+  query: string,
+): Promise<RouteResult[]> {
+  // Try semantic search via match_routes RPC. Fall back to NULL embedding on
+  // failure (Jina down / no key) — RPC then degrades to recency ordering.
+  let queryEmbedding: string | null = null;
+  try {
+    const v = await embedQuery(query);
+    queryEmbedding = toPgVector(v);
+  } catch (e) {
+    console.warn("[ai-search] embedQuery failed:", e);
   }
 
-  const { data } = await q;
-  let results: RouteResult[] = (data as RouteResult[]) ?? [];
+  const { data, error } = await getSupabase().rpc("match_routes", {
+    query_embedding: queryEmbedding,
+    filter_difficulty: filters.difficulty ?? null,
+    filter_distance_min: filters.distance_min ?? null,
+    filter_distance_max: filters.distance_max ?? null,
+    filter_elevation_min: filters.elevation_min ?? null,
+    filter_elevation_max: filters.elevation_max ?? null,
+    filter_region: filters.region ?? null,
+    filter_surface: filters.surface ?? null,
+    filter_route_types: filters.route_types ?? null,
+    filter_bike_types: filters.bike_types ?? null,
+    filter_search_text: filters.search_text ?? null,
+    filter_distance_target: filters.distance_target ?? null,
+    match_count: 6,
+  });
 
-  // Re-rank by closeness to target distance, then take top 6
-  if (hasDistanceTarget && results.length > 1) {
-    const target = filters.distance_target!;
-    results.sort((a, b) =>
-      Math.abs(a.distance_km - target) - Math.abs(b.distance_km - target),
-    );
-    results = results.slice(0, 6);
+  if (error) {
+    console.error("[ai-search] match_routes RPC error:", error);
+    return [];
   }
 
-  return results;
+  // Strip similarity score from the public response — keep RouteResult shape.
+  return (data ?? []).map((r: RouteResult & { similarity?: number }) => ({
+    id: r.id,
+    title: r.title,
+    distance_km: r.distance_km,
+    elevation_m: r.elevation_m,
+    duration_min: r.duration_min,
+    difficulty: r.difficulty,
+    region: r.region,
+    cover_url: r.cover_url,
+    tags: r.tags,
+  }));
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
@@ -407,7 +416,7 @@ export async function POST(req: NextRequest) {
     filters.region = closestRegion(lat, lng);
   }
 
-  const routes = await searchRoutes(filters);
+  const routes = await searchRoutes(filters, query);
 
   return NextResponse.json({ routes, filters });
 }
