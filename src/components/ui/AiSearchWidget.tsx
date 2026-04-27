@@ -32,6 +32,40 @@ interface Chip {
   apply: (f: RouteFilters, routes: RouteResult[]) => RouteFilters | null;
 }
 
+// ─── Smart fallback: relax the most restrictive filter ───────────────────────
+
+interface RelaxResult {
+  filters: RouteFilters;
+  reason: string;
+}
+
+function relaxFilters(f: RouteFilters): RelaxResult | null {
+  if (f.elevation_min != null && f.elevation_min > 0) {
+    return { filters: { ...f, elevation_min: undefined }, reason: "убрали минимальный набор высот" };
+  }
+  if (f.elevation_max != null && f.elevation_max < 400) {
+    return { filters: { ...f, elevation_max: undefined }, reason: "убрали ограничение по набору высот" };
+  }
+  if (f.difficulty) {
+    return { filters: { ...f, difficulty: undefined }, reason: "убрали фильтр по сложности" };
+  }
+  if (f.surface?.length) {
+    return { filters: { ...f, surface: undefined }, reason: "убрали фильтр по покрытию" };
+  }
+  if (f.distance_min != null || f.distance_max != null) {
+    return {
+      filters: { ...f, distance_min: undefined, distance_max: undefined, distance_target: undefined },
+      reason: "расширили диапазон дистанции",
+    };
+  }
+  if (f.region) {
+    return { filters: { ...f, region: undefined }, reason: "убрали фильтр по региону" };
+  }
+  return null;
+}
+
+// ─── Chip definitions ─────────────────────────────────────────────────────────
+
 const CHIPS: Chip[] = [
   {
     label: "Покороче",
@@ -190,6 +224,7 @@ export function AiSearchWidget() {
   const [routes, setRoutes] = useState<RouteResult[] | null>(null);
   const [detectedRegion, setDetectedRegion] = useState<string | null>(null);
   const [activeFilters, setActiveFilters] = useState<RouteFilters | null>(null);
+  const [relaxedReason, setRelaxedReason] = useState<string | null>(null);
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -202,6 +237,7 @@ export function AiSearchWidget() {
       setError("");
       setDetectedRegion(null);
       setActiveFilters(null);
+      setRelaxedReason(null);
     }
   }, [open]);
 
@@ -219,6 +255,7 @@ export function AiSearchWidget() {
     setError("");
     setRoutes(null);
     setDetectedRegion(null);
+    setRelaxedReason(null);
 
     let lat: number | undefined;
     let lng: number | undefined;
@@ -255,9 +292,34 @@ export function AiSearchWidget() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Ошибка поиска");
-      setRoutes(data.routes ?? []);
-      setActiveFilters(data.filters ?? null);
-      if (data.filters?.region) setDetectedRegion(data.filters.region);
+
+      const resultRoutes: RouteResult[] = data.routes ?? [];
+      const resultFilters: RouteFilters = data.filters ?? {};
+
+      // Smart fallback: if empty results, try relaxing the tightest filter once.
+      if (resultRoutes.length === 0 && !overrideFilters) {
+        const relaxed = relaxFilters(resultFilters);
+        if (relaxed) {
+          const r2 = await fetch("/api/ai-search", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query: trimmed, filters: relaxed.filters }),
+          });
+          const d2 = await r2.json();
+          const fallbackRoutes: RouteResult[] = d2.routes ?? [];
+          if (fallbackRoutes.length > 0) {
+            setRoutes(fallbackRoutes);
+            setActiveFilters(relaxed.filters);
+            setRelaxedReason(relaxed.reason);
+            if (relaxed.filters.region) setDetectedRegion(relaxed.filters.region);
+            return;
+          }
+        }
+      }
+
+      setRoutes(resultRoutes);
+      setActiveFilters(resultFilters);
+      if (resultFilters.region) setDetectedRegion(resultFilters.region);
     } catch {
       setError("Не удалось выполнить поиск. Попробуй ещё раз.");
     } finally {
@@ -427,20 +489,34 @@ export function AiSearchWidget() {
           {/* No results */}
           {!loading && routes !== null && routes.length === 0 && (
             <div className="text-center py-8">
-              <p className="text-sm text-[#71717A]">Маршрутов не нашлось 😔</p>
-              <p className="text-xs text-[#A1A1AA] mt-1">Попробуй другое описание</p>
+              <p className="text-2xl mb-2">🔍</p>
+              <p className="text-sm font-medium text-[#1C1C1E]">Ничего не нашлось</p>
+              <p className="text-xs text-[#71717A] mt-1 max-w-xs mx-auto">
+                Попробуй убрать часть условий или описать маршрут по-другому
+              </p>
             </div>
           )}
 
           {/* Results */}
           {!loading && routes !== null && routes.length > 0 && (
             <div className="space-y-2.5 pt-1">
-              <p className="text-xs text-[#71717A]">
-                {detectedRegion
-                  ? `📍 ${detectedRegion} · ${routes.length} маршрут${routes.length === 1 ? "" : routes.length < 5 ? "а" : "ов"}`
-                  : `Найдено ${routes.length} маршрут${routes.length === 1 ? "" : routes.length < 5 ? "а" : "ов"} по запросу «${query}»`
-                }
-              </p>
+              {/* Relaxed-filters banner */}
+              {relaxedReason ? (
+                <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-100 mb-1">
+                  <span className="text-base leading-none mt-0.5">🔎</span>
+                  <div>
+                    <p className="text-xs font-medium text-amber-800">Точных совпадений нет — вот похожие</p>
+                    <p className="text-xs text-amber-600 mt-0.5">{relaxedReason[0].toUpperCase() + relaxedReason.slice(1)}</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-[#71717A]">
+                  {detectedRegion
+                    ? `📍 ${detectedRegion} · ${routes.length} маршрут${routes.length === 1 ? "" : routes.length < 5 ? "а" : "ов"}`
+                    : `Найдено ${routes.length} маршрут${routes.length === 1 ? "" : routes.length < 5 ? "а" : "ов"} по запросу «${query}»`
+                  }
+                </p>
+              )}
 
               {/* Refinement chips */}
               {visibleChips.length > 0 && (
