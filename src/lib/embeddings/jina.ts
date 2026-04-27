@@ -1,54 +1,57 @@
 /**
- * Jina Embeddings v3 — 1024-dim multilingual vectors.
- * Docs: https://api.jina.ai/v1/embeddings
+ * Embedding helper — Ollama bge-m3 (1024-dim, multilingual incl. Russian).
+ *
+ * Requires Ollama running on the same host with bge-m3 pulled:
+ *   curl -fsSL https://ollama.com/install.sh | sh
+ *   ollama pull bge-m3
+ *
+ * Env vars:
+ *   OLLAMA_URL  — base URL (default: http://localhost:11434)
  */
 
-const JINA_URL = "https://api.jina.ai/v1/embeddings";
-const MODEL = "jina-embeddings-v3";
+const OLLAMA_URL = (process.env.OLLAMA_URL ?? "http://localhost:11434").replace(/\/$/, "");
+const MODEL = "bge-m3";
 
-type JinaTask = "retrieval.query" | "retrieval.passage";
-
-interface JinaResponse {
-  data?: Array<{ embedding: number[] }>;
-  detail?: string;
+interface OllamaEmbedResponse {
+  embeddings?: number[][];
+  /** legacy single-embedding field */
+  embedding?: number[];
+  error?: string;
 }
 
-async function jinaEmbed(inputs: string[], task: JinaTask): Promise<number[][]> {
-  const key = process.env.JINA_API_KEY;
-  if (!key) throw new Error("JINA_API_KEY not configured");
+async function ollamaEmbed(inputs: string[]): Promise<number[][]> {
+  if (!inputs.length) return [];
 
-  const res = await fetch(JINA_URL, {
+  const res = await fetch(`${OLLAMA_URL}/api/embed`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ model: MODEL, task, input: inputs }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: MODEL, input: inputs }),
   });
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Jina ${res.status}: ${text.slice(0, 200)}`);
+    throw new Error(`Ollama ${res.status}: ${text.slice(0, 200)}`);
   }
 
-  const data = (await res.json()) as JinaResponse;
-  const out = data.data?.map((d) => d.embedding) ?? [];
+  const data = (await res.json()) as OllamaEmbedResponse;
+  if (data.error) throw new Error(`Ollama error: ${data.error}`);
+
+  const out = data.embeddings ?? (data.embedding ? [data.embedding] : []);
   if (out.length !== inputs.length) {
-    throw new Error(`Jina returned ${out.length} embeddings for ${inputs.length} inputs`);
+    throw new Error(`Ollama returned ${out.length} embeddings for ${inputs.length} inputs`);
   }
   return out;
 }
 
-/** Embed a search query (asymmetric retrieval task). */
+/** Embed a search query. */
 export async function embedQuery(text: string): Promise<number[]> {
-  const [v] = await jinaEmbed([text], "retrieval.query");
+  const [v] = await ollamaEmbed([text]);
   return v;
 }
 
 /** Embed route documents in a single batch. */
 export async function embedPassages(texts: string[]): Promise<number[][]> {
-  if (!texts.length) return [];
-  return jinaEmbed(texts, "retrieval.passage");
+  return ollamaEmbed(texts);
 }
 
 /** Build the canonical embedding text for a route row. */
