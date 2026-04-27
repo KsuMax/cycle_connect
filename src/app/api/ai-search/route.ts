@@ -43,6 +43,8 @@ interface RouteFilters {
   bike_types?: string[];
   region?: string;
   search_text?: string;
+  /** Ranking mode: 'relevance' (default cosine) | 'popular' (weighted score) */
+  sort_by?: "relevance" | "popular";
 }
 
 export interface RouteResult {
@@ -192,6 +194,11 @@ function extractFromText(query: string): RouteFilters {
   // Elevation
   extractElevation(q, out);
 
+  // Popularity sort
+  if (/популярн|рейтинг|лучш[иейая]|топ\b|часто\s+езд|рекоменд|самый\s+посещ|народн/.test(q)) {
+    out.sort_by = "popular";
+  }
+
   // Urban / near-city hints
   if (/\bгород|\bпо городу|недалеко от город|рядом с город|окраин/.test(q)) {
     out.route_types = ["urban"];
@@ -249,7 +256,7 @@ const SYSTEM_PROMPT = `You are a cycling route search assistant for CycleConnect
 Extract search filters from the user message. Return ONLY raw JSON, no markdown, no explanation.
 
 Output schema (all fields optional):
-{"difficulty":"easy"|"medium"|"hard","distance_min":number,"distance_max":number,"distance_target":number,"elevation_min":number,"elevation_max":number,"surface":["asphalt"|"gravel"|"dirt"|"mixed"],"route_types":["road"|"gravel"|"mtb"|"urban"],"bike_types":["road"|"mountain"|"gravel"],"region":"Карелия"|"Санкт-Петербург"|"Ленинградская область"|"Москва"|"Подмосковье"|"Краснодарский край"|"Крым"|"Алтай"|"Байкал"|"Урал","search_text":"string"}
+{"difficulty":"easy"|"medium"|"hard","distance_min":number,"distance_max":number,"distance_target":number,"elevation_min":number,"elevation_max":number,"surface":["asphalt"|"gravel"|"dirt"|"mixed"],"route_types":["road"|"gravel"|"mtb"|"urban"],"bike_types":["road"|"mountain"|"gravel"],"region":"Карелия"|"Санкт-Петербург"|"Ленинградская область"|"Москва"|"Подмосковье"|"Краснодарский край"|"Крым"|"Алтай"|"Байкал"|"Урал","search_text":"string","sort_by":"relevance"|"popular"}
 
 Rules (apply all that match):
 1. If user says "N км" → distance_target=N, distance_min=N*0.75, distance_max=N*1.25
@@ -326,6 +333,10 @@ function mergeFilters(ai: RouteFilters, regex: RouteFilters): RouteFilters {
   if (regex.elevation_min != null) merged.elevation_min = regex.elevation_min;
   if (regex.elevation_max != null && merged.elevation_max == null) merged.elevation_max = regex.elevation_max;
 
+  // Either source can set sort_by; regex takes priority
+  if (regex.sort_by) merged.sort_by = regex.sort_by;
+  else if (ai.sort_by) merged.sort_by = ai.sort_by;
+
   return merged;
 }
 
@@ -359,6 +370,7 @@ async function searchRoutes(
     filter_search_text: filters.search_text ?? null,
     filter_distance_target: filters.distance_target ?? null,
     match_count: 6,
+    sort_by: filters.sort_by ?? "relevance",
   });
 
   if (error) {

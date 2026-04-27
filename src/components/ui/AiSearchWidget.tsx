@@ -21,6 +21,7 @@ interface RouteFilters {
   bike_types?: string[];
   region?: string;
   search_text?: string;
+  sort_by?: "relevance" | "popular";
 }
 
 // ─── Chip definitions ─────────────────────────────────────────────────────────
@@ -183,6 +184,22 @@ const CHIPS: Chip[] = [
     apply: (f) => {
       if (!f.region) return null;
       return { ...f, region: undefined };
+    },
+  },
+  {
+    label: "По популярности",
+    emoji: "🔥",
+    apply: (f) => {
+      if (f.sort_by === "popular") return null;
+      return { ...f, sort_by: "popular" };
+    },
+  },
+  {
+    label: "По совпадению",
+    emoji: "✨",
+    apply: (f) => {
+      if (f.sort_by !== "popular") return null;
+      return { ...f, sort_by: "relevance" };
     },
   },
   {
@@ -577,6 +594,11 @@ export function AiSearchWidget() {
           {!loading && routes !== null && routes.length > 0 && (
             <div className="space-y-2.5 pt-1">
               {/* Relaxed-filters banner */}
+              {activeFilters?.sort_by === "popular" && !relaxedReason && (
+                <div className="flex items-center gap-1.5 text-xs text-orange-600 font-medium mb-1">
+                  <span>🔥</span> Сортировка по популярности
+                </div>
+              )}
               {relaxedReason ? (
                 <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-100 mb-1">
                   <span className="text-base leading-none mt-0.5">🔎</span>
