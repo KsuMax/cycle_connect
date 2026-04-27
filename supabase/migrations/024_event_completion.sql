@@ -163,20 +163,23 @@ create policy organizer_manage_participants on public.event_participants
     )
   );
 
--- ─── 7. pg_cron schedule: run daily at 06:30 UTC (09:30 Moscow) ─────────────
+-- ─── 7. pg_cron schedule (optional): run daily at 06:30 UTC (09:30 Moscow) ──
+-- Skip silently if pg_cron isn't installed on this instance — the function
+-- still exists and can be invoked by an external scheduler.
 do $$
 begin
-  if exists (select 1 from cron.job where jobname = 'event-completion') then
-    perform cron.unschedule('event-completion');
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    if exists (select 1 from cron.job where jobname = 'event-completion') then
+      perform cron.unschedule('event-completion');
+    end if;
+    perform cron.schedule(
+      'event-completion',
+      '30 6 * * *',
+      $cron$select public.complete_finished_events();$cron$
+    );
   end if;
 end
 $$;
-
-select cron.schedule(
-  'event-completion',
-  '30 6 * * *',
-  $$select public.complete_finished_events();$$
-);
 
 -- ─── 8. Backfill: complete events that already ended ────────────────────────
 select public.complete_finished_events();
