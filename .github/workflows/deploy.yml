@@ -28,6 +28,7 @@ jobs:
               --name cycleconnect-app \
               --restart unless-stopped \
               -p 127.0.0.1:4000:4000 \
+              --add-host=host.docker.internal:host-gateway \
               --env-file /opt/cycleconnect/.env.production \
               cycleconnect:latest
             echo "✅ Deployed"
