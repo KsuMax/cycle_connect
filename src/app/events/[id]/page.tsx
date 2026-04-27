@@ -114,8 +114,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [reportDraft, setReportDraft] = useState("");
   const [savingReport, setSavingReport] = useState(false);
 
-  // Admin: force-add participant
+  // Organizer / admin: manage participants
   const [showAddParticipant, setShowAddParticipant] = useState(false);
+  const [removingUserId, setRemovingUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Array<{ id: string; name: string; username: string | null; avatar_url: string | null }>>([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -219,6 +220,24 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       .limit(8);
     setSearchResults(data ?? []);
     setSearchLoading(false);
+  };
+
+  const handleRemoveParticipant = async (targetUserId: string, targetName: string) => {
+    if (!event) return;
+    setRemovingUserId(targetUserId);
+    const { error } = await supabase
+      .from("event_participants")
+      .delete()
+      .eq("event_id", event.id)
+      .eq("user_id", targetUserId);
+    if (error) {
+      showToast("Не удалось убрать участника", "error");
+    } else {
+      setEvent((prev) => prev ? { ...prev, participants: prev.participants.filter((p) => p.id !== targetUserId) } : prev);
+      if (user?.id === targetUserId) setGoing(false);
+      showToast(`${targetName} убран из мероприятия`, "info");
+    }
+    setRemovingUserId(null);
   };
 
   const handleAdminAddParticipant = async (targetUserId: string, targetName: string) => {
@@ -540,11 +559,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     {event.participants.length}{event.max_participants ? `/${event.max_participants}` : ""}
                   </span>
                 </h2>
-                {isAdmin && (
+                {(isAdmin || isOrganizer) && (
                   <button
                     onClick={() => { setShowAddParticipant(true); setSearchQuery(""); setSearchResults([]); }}
                     className="flex items-center gap-1.5 text-xs text-[#7C5CFC] hover:text-[#6347E0] border border-[#E4E4E7] px-2.5 py-1.5 rounded-lg hover:bg-[#F5F4F1] transition-colors"
-                    title="Добавить участника (Админ)">
+                    title="Добавить участника">
                     <UserPlus size={13} /> Добавить
                   </button>
                 )}
@@ -607,6 +626,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         event.participants.some((x) => x.id === user.id)
                       );
                     const showContact = viewerIsInsider && user?.id !== p.id;
+                    const canRemove = (isOrganizer || isAdmin) && p.id !== event.organizer_id;
+                    const isRemoving = removingUserId === p.id;
                     return (
                       <div key={p.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#F5F4F1] transition-colors">
                         <Link href={`/users/${p.id}`} className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity">
@@ -614,6 +635,18 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                           <span className="text-sm text-[#1C1C1E] truncate">{p.name}</span>
                         </Link>
                         {showContact && <ContactButton user={p} />}
+                        {canRemove && (
+                          <button
+                            onClick={() => handleRemoveParticipant(p.id, p.name)}
+                            disabled={isRemoving}
+                            title="Убрать из мероприятия"
+                            className="p-1.5 rounded-lg text-[#A1A1AA] hover:text-[#EF4444] hover:bg-[#FEF2F2] transition-colors disabled:opacity-50">
+                            {isRemoving
+                              ? <div className="w-3.5 h-3.5 border-2 border-[#EF4444] border-t-transparent rounded-full animate-spin" />
+                              : <X size={14} />
+                            }
+                          </button>
+                        )}
                       </div>
                     );
                   })}
