@@ -32,6 +32,59 @@ interface Chip {
   apply: (f: RouteFilters, routes: RouteResult[]) => RouteFilters | null;
 }
 
+// ─── Match explanation ────────────────────────────────────────────────────────
+
+const DIFFICULTY_LABELS_SHORT: Record<string, string> = {
+  easy: "лёгкий",
+  medium: "средний",
+  hard: "сложный",
+};
+
+const SURFACE_LABELS: Record<string, string> = {
+  asphalt: "асфальт",
+  gravel: "гравий",
+  dirt: "грунт",
+  mixed: "микс",
+};
+
+/** Returns up to 3 short reasons why this route matched the active filters. */
+function matchReasons(route: RouteResult, filters: RouteFilters): string[] {
+  const out: string[] = [];
+
+  if (filters.region && route.region) {
+    out.push(`📍 ${route.region}`);
+  }
+
+  const hasDist = filters.distance_target != null || filters.distance_min != null || filters.distance_max != null;
+  if (hasDist) {
+    out.push(`${route.distance_km} км`);
+  }
+
+  if (filters.difficulty) {
+    out.push(DIFFICULTY_LABELS_SHORT[route.difficulty] ?? route.difficulty);
+  }
+
+  if (filters.elevation_min != null || filters.elevation_max != null) {
+    out.push(`набор ${route.elevation_m} м`);
+  }
+
+  if (filters.surface?.length) {
+    const label = filters.surface.map((s) => SURFACE_LABELS[s] ?? s).join("/");
+    out.push(label);
+  }
+
+  // Semantic-only match (no structural filters extracted from query)
+  if (out.length === 0) {
+    if (route.tags?.length) {
+      out.push(...route.tags.slice(0, 2));
+    } else {
+      out.push("по смыслу запроса");
+    }
+  }
+
+  return out.slice(0, 3);
+}
+
 // ─── Smart fallback: relax the most restrictive filter ───────────────────────
 
 interface RelaxResult {
@@ -564,10 +617,28 @@ export function AiSearchWidget() {
                         {DIFFICULTY_LABELS[r.difficulty] ?? r.difficulty}
                       </span>
                     </div>
-                    <p className="text-xs text-[#A1A1AA] mt-1 flex items-center gap-1">
-                      <MapPin size={10} />
-                      {r.region}
-                    </p>
+                    {!activeFilters?.region && r.region && (
+                      <p className="text-xs text-[#A1A1AA] mt-1 flex items-center gap-1">
+                        <MapPin size={10} />
+                        {r.region}
+                      </p>
+                    )}
+
+                    {/* Match explanation */}
+                    {activeFilters && (() => {
+                      const reasons = matchReasons(r, activeFilters);
+                      return (
+                        <p className="text-xs text-[#A1A1AA] mt-1.5 flex items-center gap-1 flex-wrap">
+                          <span className="text-[#7C5CFC] font-medium">совпало:</span>
+                          {reasons.map((reason, i) => (
+                            <span key={i} className="flex items-center gap-1">
+                              {i > 0 && <span className="text-[#D4D4D8]">·</span>}
+                              {reason}
+                            </span>
+                          ))}
+                        </p>
+                      );
+                    })()}
                   </div>
                 </Link>
               ))}
