@@ -404,12 +404,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "query required" }, { status: 400 });
   }
 
-  const [aiFilters, regexFilters] = await Promise.all([
-    parseAI(query),
-    Promise.resolve(extractFromText(query)),
-  ]);
+  let filters: RouteFilters;
 
-  const filters = mergeFilters(aiFilters, regexFilters);
+  // Chip refinement: client sends pre-built filters, skip LLM parsing entirely.
+  if (body.filters && typeof body.filters === "object") {
+    filters = body.filters as RouteFilters;
+  } else {
+    const [aiFilters, regexFilters] = await Promise.all([
+      parseAI(query),
+      Promise.resolve(extractFromText(query)),
+    ]);
+    filters = mergeFilters(aiFilters, regexFilters);
+  }
 
   // If coordinates provided and no region extracted from text — use nearest region
   if (lat !== undefined && lng !== undefined && !filters.region) {

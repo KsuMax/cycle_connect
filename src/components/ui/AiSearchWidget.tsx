@@ -7,6 +7,115 @@ import { Sparkles, X, ArrowUp, MapPin, Mountain, LocateFixed } from "lucide-reac
 import type { RouteResult } from "@/app/api/ai-search/route";
 import { proxyImageUrl } from "@/lib/supabase";
 
+// ─── Filters type (mirrors server RouteFilters) ───────────────────────────────
+
+interface RouteFilters {
+  difficulty?: string;
+  distance_min?: number;
+  distance_max?: number;
+  distance_target?: number;
+  elevation_min?: number;
+  elevation_max?: number;
+  surface?: string[];
+  route_types?: string[];
+  bike_types?: string[];
+  region?: string;
+  search_text?: string;
+}
+
+// ─── Chip definitions ─────────────────────────────────────────────────────────
+
+interface Chip {
+  label: string;
+  emoji: string;
+  /** Returns null if chip is not applicable given current filters/results. */
+  apply: (f: RouteFilters, routes: RouteResult[]) => RouteFilters | null;
+}
+
+const CHIPS: Chip[] = [
+  {
+    label: "Покороче",
+    emoji: "📏",
+    apply: (f) => {
+      const max = f.distance_max ?? f.distance_target;
+      if (!max) return null;
+      const newMax = Math.round(max * 0.65);
+      if (newMax < 5) return null;
+      return { ...f, distance_max: newMax, distance_min: undefined, distance_target: undefined };
+    },
+  },
+  {
+    label: "Подлиннее",
+    emoji: "🚴",
+    apply: (f) => {
+      const base = f.distance_max ?? f.distance_target ?? f.distance_min;
+      if (!base) return null;
+      const newMin = Math.round(base * 1.3);
+      return { ...f, distance_min: newMin, distance_max: undefined, distance_target: undefined };
+    },
+  },
+  {
+    label: "Проще",
+    emoji: "😌",
+    apply: (f) => {
+      if (f.difficulty === "easy") return null;
+      const down: Record<string, string> = { hard: "medium", medium: "easy" };
+      const next = down[f.difficulty ?? "medium"] ?? "easy";
+      return { ...f, difficulty: next };
+    },
+  },
+  {
+    label: "Сложнее",
+    emoji: "💪",
+    apply: (f) => {
+      if (f.difficulty === "hard") return null;
+      const up: Record<string, string> = { easy: "medium", medium: "hard" };
+      const next = up[f.difficulty ?? "medium"] ?? "hard";
+      return { ...f, difficulty: next };
+    },
+  },
+  {
+    label: "Ровнее",
+    emoji: "🏞",
+    apply: (f) => {
+      if (f.elevation_max != null && f.elevation_max <= 150) return null;
+      return { ...f, elevation_max: 150, elevation_min: undefined };
+    },
+  },
+  {
+    label: "Больше подъёмов",
+    emoji: "⛰️",
+    apply: (f) => {
+      if (f.elevation_min != null && f.elevation_min >= 600) return null;
+      return { ...f, elevation_min: 600, elevation_max: undefined };
+    },
+  },
+  {
+    label: "Другой регион",
+    emoji: "🗺️",
+    apply: (f) => {
+      if (!f.region) return null;
+      return { ...f, region: undefined };
+    },
+  },
+  {
+    label: "Только асфальт",
+    emoji: "🛣️",
+    apply: (f) => {
+      if (f.surface?.includes("asphalt") && f.surface.length === 1) return null;
+      return { ...f, surface: ["asphalt"] };
+    },
+  },
+  {
+    label: "Грунт / гравий",
+    emoji: "🌲",
+    apply: (f) => {
+      if (f.surface?.includes("gravel")) return null;
+      return { ...f, surface: ["gravel", "dirt"] };
+    },
+  },
+];
+
 const SUGGESTIONS = [
   "Маршруты рядом со мной",
   "Лёгкий маршрут на 50 км",
@@ -80,6 +189,7 @@ export function AiSearchWidget() {
   const [locating, setLocating] = useState(false);
   const [routes, setRoutes] = useState<RouteResult[] | null>(null);
   const [detectedRegion, setDetectedRegion] = useState<string | null>(null);
+  const [activeFilters, setActiveFilters] = useState<RouteFilters | null>(null);
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -91,6 +201,7 @@ export function AiSearchWidget() {
       setQuery("");
       setError("");
       setDetectedRegion(null);
+      setActiveFilters(null);
     }
   }, [open]);
 
@@ -100,7 +211,7 @@ export function AiSearchWidget() {
     return () => document.removeEventListener("keydown", handler);
   }, []);
 
-  async function handleSearch(q: string) {
+  async function handleSearch(q: string, overrideFilters?: RouteFilters) {
     const trimmed = q.trim();
     if (!trimmed) return;
     setQuery(trimmed);
@@ -111,15 +222,13 @@ export function AiSearchWidget() {
 
     let lat: number | undefined;
     let lng: number | undefined;
-    let approxLocation = false;
 
-    if (needsLocation(trimmed)) {
+    if (!overrideFilters && needsLocation(trimmed)) {
       setLocating(true);
       try {
         const coords = await requestCoords();
         lat = coords.lat;
         lng = coords.lng;
-        approxLocation = coords.approximate ?? false;
       } catch (err) {
         const isPermission = err instanceof GeolocationPositionError && err.code === 1;
         setError(
@@ -135,14 +244,19 @@ export function AiSearchWidget() {
     }
 
     try {
+      const body = overrideFilters
+        ? { query: trimmed, filters: overrideFilters }
+        : { query: trimmed, lat, lng };
+
       const res = await fetch("/api/ai-search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: trimmed, lat, lng }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Ошибка поиска");
       setRoutes(data.routes ?? []);
+      setActiveFilters(data.filters ?? null);
       if (data.filters?.region) setDetectedRegion(data.filters.region);
     } catch {
       setError("Не удалось выполнить поиск. Попробуй ещё раз.");
@@ -160,6 +274,18 @@ export function AiSearchWidget() {
     setQuery(s);
     handleSearch(s);
   }
+
+  function onChip(chip: Chip) {
+    if (!activeFilters) return;
+    const newFilters = chip.apply(activeFilters, routes ?? []);
+    if (!newFilters) return;
+    setActiveFilters(newFilters);
+    handleSearch(query, newFilters);
+  }
+
+  const visibleChips = activeFilters && routes !== null && routes.length > 0
+    ? CHIPS.filter((c) => c.apply(activeFilters, routes) !== null).slice(0, 5)
+    : [];
 
   return (
     <>
@@ -309,12 +435,29 @@ export function AiSearchWidget() {
           {/* Results */}
           {!loading && routes !== null && routes.length > 0 && (
             <div className="space-y-2.5 pt-1">
-              <p className="text-xs text-[#71717A] mb-3">
+              <p className="text-xs text-[#71717A]">
                 {detectedRegion
                   ? `📍 ${detectedRegion} · ${routes.length} маршрут${routes.length === 1 ? "" : routes.length < 5 ? "а" : "ов"}`
                   : `Найдено ${routes.length} маршрут${routes.length === 1 ? "" : routes.length < 5 ? "а" : "ов"} по запросу «${query}»`
                 }
               </p>
+
+              {/* Refinement chips */}
+              {visibleChips.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pb-1">
+                  {visibleChips.map((chip) => (
+                    <button
+                      key={chip.label}
+                      onClick={() => onChip(chip)}
+                      className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-full border border-[#E4E4E7] text-[#3F3F46] bg-white hover:border-[#7C5CFC] hover:text-[#7C5CFC] hover:bg-[#FAFAFF] transition-colors active:scale-95"
+                    >
+                      <span>{chip.emoji}</span>
+                      <span>{chip.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {routes.map((r) => (
                 <Link
                   key={r.id}
