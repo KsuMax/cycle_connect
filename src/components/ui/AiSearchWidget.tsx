@@ -203,11 +203,11 @@ const CHIPS: Chip[] = [
   },
 ];
 
-const SUGGESTIONS = [
-  "Маршруты рядом со мной",
+const FALLBACK_SUGGESTIONS = [
   "Лёгкий маршрут на 50 км",
   "Горный MTB в Карелии",
   "Городская покатушка на 2 часа",
+  "Гравийный маршрут с видами",
 ];
 
 const DIFFICULTY_STYLES: Record<string, string> = {
@@ -278,12 +278,21 @@ export function AiSearchWidget() {
   const [detectedRegion, setDetectedRegion] = useState<string | null>(null);
   const [activeFilters, setActiveFilters] = useState<RouteFilters | null>(null);
   const [relaxedReason, setRelaxedReason] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>(FALLBACK_SUGGESTIONS);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (open) {
       setTimeout(() => inputRef.current?.focus(), 80);
+      // Load personalized suggestions once per open (non-blocking).
+      setSuggestionsLoading(true);
+      fetch("/api/ai-search/suggestions")
+        .then((r) => r.json())
+        .then((d) => { if (d.suggestions?.length) setSuggestions(d.suggestions); })
+        .catch(() => {})
+        .finally(() => setSuggestionsLoading(false));
     } else {
       setRoutes(null);
       setQuery("");
@@ -498,21 +507,35 @@ export function AiSearchWidget() {
 
           {/* Suggestions */}
           {!loading && routes === null && !error && (
-            <div className="flex flex-wrap gap-2 pt-1">
-              {SUGGESTIONS.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => onSuggestion(s)}
-                  className={`text-xs px-3 py-1.5 rounded-full border transition-colors flex items-center gap-1
-                    ${s.includes("рядом")
-                      ? "border-[#7C5CFC]/30 text-[#7C5CFC] bg-[#F5F3FF] hover:bg-[#EDE9FF]"
-                      : "border-[#E4E4E7] text-[#3F3F46] hover:border-[#7C5CFC] hover:text-[#7C5CFC]"
-                    }`}
-                >
-                  {s.includes("рядом") && <LocateFixed size={11} />}
-                  {s}
-                </button>
-              ))}
+            <div className="flex flex-col gap-2 pt-1">
+              {suggestionsLoading ? (
+                <div className="flex flex-wrap gap-2">
+                  {[72, 96, 80, 88].map((w) => (
+                    <div
+                      key={w}
+                      className="h-7 rounded-full bg-[#F5F4F1] animate-pulse"
+                      style={{ width: w }}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {suggestions.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => onSuggestion(s)}
+                      className={`text-xs px-3 py-1.5 rounded-full border transition-colors flex items-center gap-1
+                        ${s.toLowerCase().includes("рядом")
+                          ? "border-[#7C5CFC]/30 text-[#7C5CFC] bg-[#F5F3FF] hover:bg-[#EDE9FF]"
+                          : "border-[#E4E4E7] text-[#3F3F46] hover:border-[#7C5CFC] hover:text-[#7C5CFC]"
+                        }`}
+                    >
+                      {s.toLowerCase().includes("рядом") && <LocateFixed size={11} />}
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
