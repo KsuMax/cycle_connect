@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/Header";
-import { MapPin, Link as LinkIcon, ChevronRight, AlertCircle, Shield } from "lucide-react";
+import { MapPin, Link as LinkIcon, ChevronRight, AlertCircle, Shield, Download, Loader2, CheckCircle2 } from "lucide-react";
 import { ImageUpload } from "@/components/routes/ImageUpload";
 import { CoverUpload } from "@/components/routes/CoverUpload";
 import { GpxUpload } from "@/components/routes/GpxUpload";
@@ -51,6 +51,9 @@ export default function NewRoutePage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [attempted, setAttempted] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importStatus, setImportStatus] = useState<"idle" | "success" | "error">("idle");
+  const [importError, setImportError] = useState<string | null>(null);
 
   useEffect(() => {
     supabase
@@ -118,6 +121,53 @@ export default function NewRoutePage() {
       if (stats.durationMin > 0) setDuration(String(stats.durationMin));
     } catch {
       // Non-critical — fields stay empty
+    }
+  };
+
+  const handleMapUrlChange = (value: string) => {
+    setMapUrl(value);
+    setImportStatus("idle");
+    setImportError(null);
+  };
+
+  const isMapMagicUrl = (url: string) => {
+    try { return new URL(url).hostname.endsWith("mapmagic.app"); } catch { return false; }
+  };
+
+  const handleImport = async () => {
+    if (!mapUrl || importing) return;
+    setImporting(true);
+    setImportStatus("idle");
+    setImportError(null);
+    try {
+      const res = await fetch("/api/routes/import-mapmagic", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: mapUrl }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        const messages: Record<string, string> = {
+          invalid_url: "Это не похоже на ссылку MapMagic. Проверь адрес.",
+          not_found: "Не нашли маршрут по этой ссылке. Возможно, он удалён или приватный.",
+          fetch_failed: "Не удалось получить маршрут из MapMagic. Попробуй чуть позже.",
+          no_geometry: "У этого маршрута нет геоданных в MapMagic.",
+        };
+        setImportError(messages[data.reason] ?? "Не удалось загрузить GPX. Добавь файл вручную ниже.");
+        setImportStatus("error");
+        return;
+      }
+      const blob = new Blob([data.gpx], { type: "application/gpx+xml" });
+      const file = new File([blob], `mapmagic-${Date.now()}.gpx`, { type: "application/gpx+xml" });
+      await handleGpxChange(file);
+      if (!title.trim() && data.name) setTitle(data.name);
+      if (!description.trim() && data.description) setDescription(data.description);
+      setImportStatus("success");
+    } catch {
+      setImportError("Ошибка соединения. Попробуй ещё раз или добавь GPX вручную.");
+      setImportStatus("error");
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -420,16 +470,50 @@ export default function NewRoutePage() {
               <span className="flex items-center gap-2"><LinkIcon size={15} /> Ссылка на маршрут</span>
             </label>
             <p className="text-xs text-[#71717A] mb-3">Вставь ссылку из MapMagic, Komoot или другого планировщика</p>
-            <input type="url" placeholder="https://mapmagic.app/map?routes=..."
-              value={mapUrl} onChange={(e) => setMapUrl(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors font-mono" />
+            <div className="flex gap-2">
+              <input type="url" placeholder="https://mapmagic.app/map?routes=..."
+                value={mapUrl} onChange={(e) => handleMapUrlChange(e.target.value)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors font-mono min-w-0" />
+              {isMapMagicUrl(mapUrl) && (
+                <button
+                  type="button"
+                  onClick={handleImport}
+                  disabled={importing}
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-colors shrink-0 disabled:opacity-60"
+                  style={{ backgroundColor: "#0BBFB5" }}
+                >
+                  {importing
+                    ? <><Loader2 size={14} className="animate-spin" /> Загружаю…</>
+                    : <><Download size={14} /> Загрузить GPX</>}
+                </button>
+              )}
+            </div>
+            {importStatus === "success" && (
+              <div className="mt-2 flex items-center gap-2 text-xs text-emerald-700">
+                <CheckCircle2 size={13} />
+                GPX загружен из MapMagic. Название и описание подставлены — поправь, если нужно.
+              </div>
+            )}
+            {importStatus === "error" && importError && (
+              <div className="mt-2 text-xs text-red-600">
+                {importError} Загрузи GPX-файл вручную ниже.
+              </div>
+            )}
+            {mapUrl && !isMapMagicUrl(mapUrl) && (
+              <p className="mt-2 text-xs text-[#A1A1AA]">
+                Из MapMagic GPX подтягивается автоматически. Для других сервисов — загрузи .gpx файл вручную ниже.
+              </p>
+            )}
           </div>
 
           {/* GPX file */}
           <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
             <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">GPX-файл</label>
-            <p className="text-xs text-[#71717A] mb-3">Экспортируй из MapMagic и загрузи — пользователи смогут скачать его одной кнопкой</p>
+            <p className="text-xs text-[#71717A] mb-3">Пользователи смогут скачать его одной кнопкой</p>
             <GpxUpload currentName={gpxFile?.name ?? null} onChange={handleGpxChange} />
+            <p className="mt-3 text-xs text-[#A1A1AA] leading-relaxed">
+              GPX делает поиск точнее — ИИ найдёт твой маршрут людям, которые ищут «вдоль реки» или «через лес», а не только по названию. Чем точнее трек, тем больше райдеров увидят маршрут в подборках.
+            </p>
           </div>
 
           {/* Exit points */}

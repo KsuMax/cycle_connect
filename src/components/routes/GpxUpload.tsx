@@ -80,7 +80,7 @@ export function GpxUpload({ currentName, onChange, onClear }: GpxUploadProps) {
           <div className="text-sm text-[#71717A] text-center px-4">
             Загрузи <span className="font-medium text-[#1C1C1E]">.gpx</span> файл маршрута
             <br />
-            <span className="text-xs text-[#A1A1AA]">Экспортируй из MapMagic и перетащи сюда</span>
+            <span className="text-xs text-[#A1A1AA]">Экспортируй из любого планировщика или перетащи сюда</span>
           </div>
         </div>
       )}
