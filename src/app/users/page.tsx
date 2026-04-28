@@ -24,6 +24,7 @@ export default function UsersPage() {
   const { isFollowing, follow, unfollow, loaded: followLoaded } = useFollow();
 
   const [profiles, setProfiles] = useState<DbProfile[]>([]);
+  const [total, setTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortKey>("km_total");
@@ -32,10 +33,17 @@ export default function UsersPage() {
   useEffect(() => {
     supabase
       .from("profiles")
-      .select("*")
+      .select("*", { count: "exact" })
       .order("km_total", { ascending: false })
-      .then(({ data }) => {
+      .range(0, 9999)
+      .then(({ data, error, count }) => {
+        if (error) {
+          console.error("[users] fetch failed", error);
+          setLoading(false);
+          return;
+        }
         if (data) setProfiles(data as DbProfile[]);
+        if (typeof count === "number") setTotal(count);
         setLoading(false);
       });
   }, []);
@@ -97,7 +105,7 @@ export default function UsersPage() {
           <div>
             <h1 className="text-xl font-bold text-[#1C1C1E]">Участники</h1>
             <p className="text-sm text-[#71717A]">
-              {loading ? "Загрузка..." : `${profiles.length} велосипедистов`}
+              {loading ? "Загрузка..." : `${total ?? profiles.length} велосипедистов`}
             </p>
           </div>
         </div>

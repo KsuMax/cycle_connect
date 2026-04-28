@@ -97,7 +97,7 @@ function dbToEventData(data: DbEvent): EventData {
 
 export default function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { user, isAdmin } = useAuth();
+  const { user, profile, isAdmin } = useAuth();
   const { isLiked, toggleLike } = useEventLikes();
   const { requireAuth } = useAuthModal();
   const { showToast } = useToast();
@@ -168,15 +168,45 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   const handleGoingToggle = async () => {
     if (!requireAuth("записаться на поездку")) return;
-    if (!event) return;
+    if (!event || !user) return;
     const wasGoing = going;
     setGoing(!wasGoing);
     if (wasGoing) {
-      await supabase.from("event_participants").delete().eq("event_id", event.id).eq("user_id", user!.id);
-      setEvent((prev) => prev ? { ...prev, participants: prev.participants.filter((p) => p.id !== user!.id) } : prev);
+      const { error } = await supabase
+        .from("event_participants")
+        .delete()
+        .eq("event_id", event.id)
+        .eq("user_id", user.id);
+      if (error) {
+        setGoing(true);
+        showToast("Не удалось отменить участие", "error");
+        return;
+      }
+      setEvent((prev) => prev ? { ...prev, participants: prev.participants.filter((p) => p.id !== user.id) } : prev);
       showToast("Вы отменили участие", "info");
     } else {
-      await supabase.from("event_participants").insert({ event_id: event.id, user_id: user!.id });
+      const { error } = await supabase
+        .from("event_participants")
+        .insert({ event_id: event.id, user_id: user.id });
+      if (error) {
+        setGoing(false);
+        console.error("[event] join failed", error);
+        showToast("Не удалось записаться. Попробуйте позже.", "error");
+        return;
+      }
+      const me: User = profile
+        ? dbToUser(profile, "#0BBFB5")
+        : {
+            id: user.id,
+            name: (user.user_metadata?.name as string | undefined) ?? "Я",
+            initials: "Я",
+            color: "#0BBFB5",
+            avatar_url: (user.user_metadata?.avatar_url as string | undefined) ?? null,
+            km_total: 0,
+            routes_count: 0,
+            events_count: 0,
+          };
+      setEvent((prev) => prev ? { ...prev, participants: [...prev.participants, me] } : prev);
       showToast("Вы записались на поездку!", "success");
       checkAndAward("event_joined", {});
     }
