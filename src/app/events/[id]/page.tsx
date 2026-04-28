@@ -14,7 +14,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useEventLikes } from "@/lib/context/EventLikesContext";
 import {
   ChevronLeft, Calendar, Bike, Heart,
-  Share2, Users, MapPin, ExternalLink, Flag, ChevronRight, Pencil, Lock, Trash2, UserPlus, Search, X, Download, RefreshCw,
+  Share2, Users, MapPin, ExternalLink, Flag, ChevronRight, Pencil, Lock, Trash2, UserPlus, Search, X, Download, RefreshCw, Info,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { useAuthModal } from "@/components/ui/AuthModal";
@@ -48,12 +48,14 @@ interface EventData {
 }
 
 function dbToEventData(data: DbEvent): EventData {
-  const days: EventDay[] = (data.event_days ?? [])
+  const rawDays = data.event_days ?? [];
+  const isSingleDay = rawDays.length === 1;
+  const days: EventDay[] = rawDays
     .sort((a: DbEventDay, b: DbEventDay) => a.day_number - b.day_number)
     .map((d: DbEventDay) => ({
       day: d.day_number,
       date: d.date ?? "",
-      title: d.title ?? `День ${d.day_number}`,
+      title: d.title ?? (isSingleDay ? "Организационная информация" : `День ${d.day_number}`),
       distance_km: d.distance_km ?? 0,
       start_point: d.start_point ?? "",
       end_point: d.end_point ?? "",
@@ -517,10 +519,17 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                       style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
                       <button className="w-full text-left p-5 flex items-center gap-4 hover:bg-[#FAFAF9] transition-colors"
                         onClick={() => setActiveDay(isOpen ? null : day.day)}>
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shrink-0"
-                          style={{ backgroundColor: "#F4632A" }}>
-                          {day.day}
-                        </div>
+                        {isMultiDay ? (
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shrink-0"
+                            style={{ backgroundColor: "#F4632A" }}>
+                            {day.day}
+                          </div>
+                        ) : (
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+                            style={{ backgroundColor: "#FFF7ED" }}>
+                            <Info size={18} style={{ color: "#F4632A" }} />
+                          </div>
+                        )}
                         <div className="flex-1 min-w-0">
                           <div className="font-semibold text-[#1C1C1E] text-sm mb-0.5">{day.title}</div>
                           <div className="flex items-center gap-3 text-xs text-[#71717A]">
