@@ -1,0 +1,126 @@
+<!-- CycleConnect — Email confirmation template (Russian) -->
+<!-- Apply in: Supabase Dashboard → Authentication → Email Templates → Confirm signup -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Подтверди регистрацию — CycleConnect</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F5F4F1;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F4F1;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;">
+
+          <!-- Logo header -->
+          <tr>
+            <td align="center" style="padding-bottom:24px;">
+              <table cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="background-color:#F4632A;border-radius:12px;width:44px;height:44px;text-align:center;vertical-align:middle;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:10px;">
+                      <circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/>
+                      <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5L9 11l3-2 2 4h4"/>
+                    </svg>
+                  </td>
+                  <td style="padding-left:10px;vertical-align:middle;">
+                    <span style="font-size:20px;font-weight:700;color:#1C1C1E;">Cycle</span><span style="font-size:20px;font-weight:700;color:#F4632A;">Connect</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Main card -->
+          <tr>
+            <td style="background-color:#ffffff;border-radius:20px;border:1px solid #E4E4E7;box-shadow:0 1px 3px 0 rgba(0,0,0,0.07);overflow:hidden;">
+
+              <!-- Orange top strip -->
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="background-color:#F4632A;height:6px;"></td>
+                </tr>
+              </table>
+
+              <!-- Body -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 36px 36px;">
+                <tr>
+                  <td align="center" style="padding-bottom:28px;">
+                    <div style="background-color:#FFF4F0;border-radius:50%;width:64px;height:64px;line-height:64px;text-align:center;margin:0 auto 20px;">
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#F4632A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                        <polyline points="22 4 12 14.01 9 11.01"/>
+                      </svg>
+                    </div>
+                    <h1 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#1C1C1E;line-height:1.3;">Почти готово! 🚴</h1>
+                    <p style="margin:0;font-size:15px;color:#71717A;line-height:1.6;">
+                      Ты зарегистрировался на <strong style="color:#1C1C1E;">CycleConnect</strong>.<br/>
+                      Осталось подтвердить email — это займёт 10 секунд.
+                    </p>
+                  </td>
+                </tr>
+
+                <!-- CTA Button -->
+                <tr>
+                  <td align="center" style="padding-bottom:28px;">
+                    <a href="{{ .ConfirmationURL }}"
+                       style="display:inline-block;background-color:#F4632A;color:#ffffff;text-decoration:none;font-size:16px;font-weight:600;padding:14px 40px;border-radius:12px;letter-spacing:0.01em;">
+                      ✓ Подтвердить email
+                    </a>
+                  </td>
+                </tr>
+
+                <!-- Divider -->
+                <tr>
+                  <td style="border-top:1px solid #E4E4E7;padding-top:24px;padding-bottom:16px;">
+                    <p style="margin:0 0 8px;font-size:13px;color:#A1A1AA;text-align:center;">
+                      Кнопка не работает? Перейди по ссылке вручную:
+                    </p>
+                    <p style="margin:0;font-size:12px;text-align:center;word-break:break-all;">
+                      <a href="{{ .ConfirmationURL }}" style="color:#F4632A;text-decoration:underline;">
+                        {{ .ConfirmationURL }}
+                      </a>
+                    </p>
+                  </td>
+                </tr>
+
+                <!-- Spam tip -->
+                <tr>
+                  <td>
+                    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;">
+                      <tr>
+                        <td style="padding:14px 16px;">
+                          <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#92400E;">Не видишь письмо в следующий раз?</p>
+                          <p style="margin:0;font-size:12px;color:#B45309;line-height:1.6;">
+                            Проверь папки <strong>«Спам»</strong> и <strong>«Промоакции»</strong>. Ссылка действует <strong>24 часа</strong>.
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:24px 0 8px;" align="center">
+              <p style="margin:0 0 4px;font-size:12px;color:#A1A1AA;">
+                Ты получил это письмо, потому что кто-то (надеемся, ты!) зарегистрировался на
+                <a href="https://cycleconnect.cc" style="color:#A1A1AA;">cycleconnect.cc</a>.
+              </p>
+              <p style="margin:0;font-size:12px;color:#A1A1AA;">
+                Если это не ты — просто проигнорируй письмо. Аккаунт останется неактивным.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

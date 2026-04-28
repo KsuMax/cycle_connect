@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Bike, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { GoogleOAuthButton } from "@/components/ui/GoogleOAuthButton";
 import { supabase } from "@/lib/supabase";
 
 function LoginForm() {
@@ -56,6 +57,16 @@ function LoginForm() {
         </div>
 
         <div className="bg-white rounded-2xl p-6 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+          {/* Google OAuth */}
+          <div className="mb-5">
+            <GoogleOAuthButton />
+            <div className="flex items-center gap-3 mt-4">
+              <div className="flex-1 h-px bg-[#E4E4E7]" />
+              <span className="text-xs text-[#A1A1AA]">или</span>
+              <div className="flex-1 h-px bg-[#E4E4E7]" />
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
