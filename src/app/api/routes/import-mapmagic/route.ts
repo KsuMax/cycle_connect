@@ -130,21 +130,41 @@ export async function POST(req: NextRequest) {
   const track = Array.isArray(tracks) ? tracks[0] : null;
   if (!track) return fail("not_found");
 
+  type MMPieces = {
+    lines?: string[];
+    ndigits?: number;
+    elevations?: unknown;
+    surfaces?: unknown;
+  };
+
   type MMTrack = {
     id_track?: string;
-    segments?: { simplified_line?: string }[];
+    segments?: { simplified_line?: string; pieces?: MMPieces }[];
     constant_meta?: { distance?: number; elevation_gain?: number };
     variable_meta?: { title?: string };
     description?: string;
   };
 
   const t = track as MMTrack;
-  const simplifiedLine = t.segments?.[0]?.simplified_line;
-  if (!simplifiedLine) return fail("no_geometry");
+  const seg = t.segments?.[0];
+
+  // MapMagic encodes polylines with ndigits precision (typically 6, not the
+  // Google-standard 5). Reading it from pieces.ndigits avoids the 10× coord error.
+  const pieces = seg?.pieces;
+  const ndigits = pieces?.ndigits ?? 5;
+  const pieceLines = pieces?.lines;
 
   let points: [number, number][];
   try {
-    points = polyline.decode(simplifiedLine);
+    if (Array.isArray(pieceLines) && pieceLines.length > 0) {
+      // Full track: concatenate all segment polylines decoded at correct precision.
+      points = pieceLines.flatMap((line) => polyline.decode(line, ndigits));
+    } else {
+      // Fallback to simplified_line if pieces unavailable.
+      const simplifiedLine = seg?.simplified_line;
+      if (!simplifiedLine) return fail("no_geometry");
+      points = polyline.decode(simplifiedLine, ndigits);
+    }
     if (points.length === 0) return fail("no_geometry");
   } catch {
     return fail("no_geometry");
