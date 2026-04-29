@@ -93,7 +93,19 @@ export default function RegisterPage() {
       return;
     }
 
-    const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        data: {
+          name: name.trim(),
+          username: usernameClean,
+          telegram_username: tgClean || null,
+          strava_url: stravaUrl.trim() || null,
+        },
+      },
+    });
     if (signUpError) {
       setError(
         signUpError.message === "User already registered"
@@ -104,7 +116,8 @@ export default function RegisterPage() {
       return;
     }
 
-    if (data.user) {
+    if (data.user && data.session) {
+      // Email confirmation disabled — user is already signed in
       await supabase.from("profiles").insert({
         id: data.user.id,
         name: name.trim(),
@@ -116,12 +129,9 @@ export default function RegisterPage() {
         telegram_username: tgClean || null,
         strava_url: stravaUrl.trim() || null,
       });
-
-      if (data.session) {
-        router.push("/");
-        router.refresh();
-        return;
-      }
+      router.push("/");
+      router.refresh();
+      return;
     }
 
     setSuccess(true);
