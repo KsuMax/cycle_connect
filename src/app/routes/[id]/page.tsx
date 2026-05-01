@@ -19,6 +19,7 @@ import { useAuthModal } from "@/components/ui/AuthModal";
 import { useToast } from "@/lib/context/ToastContext";
 import { useAchievements } from "@/lib/context/AchievementsContext";
 import { RideIntentsSection } from "@/components/routes/RideIntentsSection";
+import { WindWidget } from "@/components/routes/WindWidget";
 import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users, Download, Train, Bus, CarTaxiFront, Route as RouteIcon, MoreVertical } from "lucide-react";
 import type { ExitPointKind } from "@/types";
 import { formatDate } from "@/lib/utils";
@@ -570,6 +571,9 @@ export default function RouteDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               </Link>
             </div>
+
+            {/* Wind forecast for this route over the next 7 days */}
+            <WindWidget routeId={route.id} />
 
             {/* Upcoming events linked to this route */}
             {upcomingEvents.length > 0 && (
