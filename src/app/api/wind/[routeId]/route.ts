@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase-admin";
 
 interface OpenMeteoResponse {
@@ -23,6 +24,7 @@ interface BearingRow {
 }
 
 const CACHE_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
+const OPEN_METEO_TIMEOUT_MS = 8000;        // 8 s – fail fast on network issues
 const FORECAST_DAYS = 7;
 
 function json(data: unknown, status = 200) {
@@ -42,10 +44,16 @@ async function fetchOpenMeteo(lat: number, lng: number): Promise<{
   url.searchParams.set("timezone", "UTC");
   url.searchParams.set("wind_speed_unit", "ms");
 
-  const res = await fetch(url.toString(), {
-    // Server-side cache header — also revalidate every 30 min at the edge.
-    next: { revalidate: 1800 },
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OPEN_METEO_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), { signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+
   if (!res.ok) throw new Error(`open-meteo ${res.status}`);
   const body = (await res.json()) as OpenMeteoResponse;
 
@@ -55,14 +63,17 @@ async function fetchOpenMeteo(lat: number, lng: number): Promise<{
   if (time.length === 0 || time.length !== speeds.length || time.length !== dirs.length) {
     throw new Error("open-meteo malformed response");
   }
-  // Open-Meteo emits "2026-04-29T14:00" in the selected timezone (UTC here).
-  // Append "Z" so JS parses it as UTC unambiguously.
-  const hours = time.map((t) => (t.endsWith("Z") ? t : `${t}:00Z`).replace(/:00:00Z$/, ":00:00.000Z"));
+
+  // Open-Meteo emits "2026-04-29T14:00" UTC; normalise to full ISO-8601.
+  const hours = time.map((t) => {
+    const iso = t.endsWith("Z") ? t : `${t}:00Z`;
+    return iso.replace(/:00:00Z$/, ":00:00.000Z");
+  });
   return { hours, dirs, speeds };
 }
 
 export async function GET(
-  _req: Request,
+  _req: NextRequest,
   ctx: { params: Promise<{ routeId: string }> },
 ) {
   const { routeId } = await ctx.params;
@@ -70,21 +81,33 @@ export async function GET(
     return json({ error: "routeId required" }, 400);
   }
 
-  const admin = createAdminSupabase();
+  let admin;
+  try {
+    admin = createAdminSupabase();
+  } catch (err) {
+    console.error("[wind] admin client init failed:", err);
+    return json({ error: "server config" }, 503);
+  }
 
+  // ── 1. Fetch bearing profile + centroid ────────────────────────────────────
   const { data: bearingRows, error: bearingErr } = await admin.rpc(
     "route_bearing_with_centroid",
     { rid: routeId },
   );
-  if (bearingErr) return json({ error: bearingErr.message }, 500);
+  if (bearingErr) {
+    console.error("[wind] bearing RPC error for", routeId, bearingErr.message);
+    return json({ error: bearingErr.message }, 500);
+  }
   const bearing = (bearingRows as BearingRow[] | null)?.[0];
-  if (!bearing) {
-    return json({ error: "route has no geometry" }, 404);
+  if (!bearing || bearing.total_m === 0) {
+    // Route has no geometry → not an error, just no data.
+    return json({ error: "no geometry" }, 404);
   }
 
-  // Check cache freshness.
+  // ── 2. Check cache freshness ───────────────────────────────────────────────
   const nowMs = Date.now();
-  const horizonIso = new Date(nowMs - 60 * 60 * 1000).toISOString(); // 1h grace
+  const horizonIso = new Date(nowMs - 60 * 60 * 1000).toISOString();
+
   const { data: freshness } = await admin
     .from("wind_forecast_cache")
     .select("fetched_at")
@@ -98,6 +121,7 @@ export async function GET(
     : 0;
   const stale = nowMs - lastFetchedMs > CACHE_TTL_MS;
 
+  // ── 3. Refresh cache from Open-Meteo if needed ────────────────────────────
   if (stale) {
     try {
       const fc = await fetchOpenMeteo(bearing.lat, bearing.lng);
@@ -111,25 +135,32 @@ export async function GET(
         .from("wind_forecast_cache")
         .upsert(rows, { onConflict: "route_id,forecast_hour" });
       if (upsertErr) {
-        // Soft-fail: serve whatever cache we have rather than 500.
-        console.warn("[wind] cache upsert failed", upsertErr.message);
+        console.warn("[wind] cache upsert failed:", upsertErr.message);
       }
     } catch (err) {
-      console.warn("[wind] open-meteo fetch failed", err);
-      // Serve stale cache below if anything is there; otherwise return 503.
+      // Open-Meteo unreachable or timed out.
+      // If we have *any* cached data (even stale), serve it anyway.
+      // Only hard-fail if the cache is completely empty.
+      console.warn("[wind] open-meteo unavailable:", err instanceof Error ? err.message : err);
       if (lastFetchedMs === 0) {
         return json({ error: "forecast unavailable" }, 503);
       }
+      // Fall through → serve stale cache below.
     }
   }
 
+  // ── 4. Read cache and return ───────────────────────────────────────────────
   const { data: rows, error: rowsErr } = await admin
     .from("wind_forecast_cache")
     .select("forecast_hour, wind_dir_deg, wind_speed_ms")
     .eq("route_id", routeId)
     .gte("forecast_hour", horizonIso)
     .order("forecast_hour", { ascending: true });
-  if (rowsErr) return json({ error: rowsErr.message }, 500);
+
+  if (rowsErr) {
+    console.error("[wind] cache read error:", rowsErr.message);
+    return json({ error: rowsErr.message }, 500);
+  }
 
   const forecast = ((rows ?? []) as CacheRow[]).map((r) => ({
     ts: new Date(r.forecast_hour).toISOString(),
@@ -141,5 +172,6 @@ export async function GET(
     profile: { buckets: bearing.buckets, total_m: bearing.total_m },
     centroid: { lat: bearing.lat, lng: bearing.lng },
     forecast,
+    stale: stale && lastFetchedMs > 0,
   });
 }

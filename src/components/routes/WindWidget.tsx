@@ -62,7 +62,9 @@ export function WindWidget({ routeId }: WindWidgetProps) {
     fetch(`/api/wind/${routeId}`)
       .then(async (res) => {
         if (!res.ok) {
-          if (res.status === 404) throw new Error("noprofile");
+          // 404 → no geometry, nothing to show (silent).
+          // 503 → forecast service down, also silent (don't alarm user).
+          if (res.status === 404 || res.status === 503) throw new Error("silent");
           throw new Error(`api_${res.status}`);
         }
         return (await res.json()) as ApiResponse;
@@ -131,20 +133,8 @@ export function WindWidget({ routeId }: WindWidgetProps) {
     );
   }
 
-  if (error === "noprofile" || (data && data.profile.total_m === 0)) {
-    // Don't render anything if the route has no geometry — nothing to score.
-    return null;
-  }
-
-  if (error) {
-    return (
-      <div className="bg-white rounded-2xl p-4 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-        <div className="flex items-center gap-2 text-sm text-[#71717A]">
-          <Wind size={14} /> Прогноз ветра недоступен
-        </div>
-      </div>
-    );
-  }
+  // Silent states: no geometry, service temporarily down, or network errors.
+  if (error || (data && data.profile.total_m === 0)) return null;
 
   if (!data || slots.length === 0) return null;
 
