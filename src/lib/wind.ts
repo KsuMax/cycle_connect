@@ -102,6 +102,9 @@ export function floorToHourUTC(ts: Date | string): string {
  * Map a directional score to a discrete band for UI colour bucketing.
  * Bands chosen so that pure crosswind (~0) lands in `neutral` and only
  * meaningful headwinds/tailwinds register as red/green.
+ *
+ * @deprecated Use `bandOfSlot` for the widget — it factors in wind speed.
+ * This overload is kept for unit tests only.
  */
 export type WindBand = "tailwind" | "favorable" | "neutral" | "unfavorable" | "headwind";
 
@@ -110,6 +113,33 @@ export function bandOf(score: number): WindBand {
   if (score >= 0.2) return "favorable";
   if (score > -0.2) return "neutral";
   if (score > -0.55) return "unfavorable";
+  return "headwind";
+}
+
+/**
+ * Speed-weighted band for the heatmap widget.
+ *
+ * Pure directional score is dimensionless and ignores wind magnitude — a 0.4
+ * score at 1 m/s is imperceptible while the same score at 8 m/s is a real
+ * assist. We use `tailwindMs` (= score × speed in m/s) so bands reflect
+ * what the cyclist will actually feel.
+ *
+ * Thresholds (m/s of effective tailwind component):
+ *   tailwind    ≥  2.0   — clearly pushed forward
+ *   favorable   ≥  0.8   — noticeable help
+ *   neutral    -0.8..0.8 — minimal effect
+ *   unfavorable ≤ -0.8   — noticeable drag
+ *   headwind    ≤ -2.0   — clearly working against you
+ *
+ * Wind < 1 m/s overall → always neutral regardless of direction.
+ */
+export function bandOfSlot(slot: WindScore, speedMs: number): WindBand {
+  if (speedMs < 1.0) return "neutral";
+  const ms = slot.tailwindMs;
+  if (ms >= 2.0) return "tailwind";
+  if (ms >= 0.8) return "favorable";
+  if (ms > -0.8) return "neutral";
+  if (ms > -2.0) return "unfavorable";
   return "headwind";
 }
 

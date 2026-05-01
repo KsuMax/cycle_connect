@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Wind, RotateCw, Info } from "lucide-react";
 import {
   scoreWind,
-  bandOf,
+  bandOfSlot,
   BAND_COLORS,
   type BearingProfile,
   type HourlyWind,
@@ -79,11 +79,14 @@ export function WindWidget({ routeId }: WindWidgetProps) {
   // anchored to the user's local timezone (forecast hours are UTC).
   const slots: Slot[][] = useMemo(() => {
     if (!data) return [];
+    // Key by UTC-floored hour so the map never depends on local timezone.
     const byHour = new Map<string, HourlyWind>();
     for (const w of data.forecast) {
       const d = new Date(w.ts);
-      d.setMinutes(0, 0, 0);
-      byHour.set(d.toISOString(), w);
+      const key = new Date(Date.UTC(
+        d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(),
+      )).toISOString();
+      byHour.set(key, w);
     }
     const out: Slot[][] = [];
     const today = new Date();
@@ -173,8 +176,12 @@ export function WindWidget({ routeId }: WindWidgetProps) {
               <div className="flex-1 grid grid-cols-6 gap-1">
                 {HOUR_SLOTS.map((h) => {
                   const slot = row.find((s) => s.hour === h);
-                  if (!slot) return <div key={h} className="h-7 rounded bg-[#FAFAFA] border border-[#F4F4F5]" />;
-                  const band = bandOf(slot.score.score);
+                  if (!slot) return (
+                    <div key={h} className="h-7 rounded flex items-center justify-center text-[9px] text-[#D4D4D8]">
+                      {h}
+                    </div>
+                  );
+                  const band = bandOfSlot(slot.score, slot.wind.speed_ms);
                   const colors = BAND_COLORS[band];
                   const isSelected = selected === slot.ts;
                   return (
