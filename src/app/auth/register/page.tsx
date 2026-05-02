@@ -69,6 +69,10 @@ export default function RegisterPage() {
   const [stravaUrl, setStravaUrl] = useState("");
   const [showOptional, setShowOptional] = useState(false);
 
+  // Consent (152-FZ) — must be explicit, unchecked by default
+  const [consent, setConsent] = useState(false);
+  const CONSENT_VERSION = "2026-05-02";
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -89,6 +93,12 @@ export default function RegisterPage() {
     const tgClean = telegramUsername.trim().replace(/^@/, "");
     if (tgClean && !/^[A-Za-z0-9_]{5,32}$/.test(tgClean)) {
       setError("Никнейм Telegram: от 5 до 32 символов, только буквы, цифры и _");
+      setLoading(false);
+      return;
+    }
+
+    if (!consent) {
+      setError("Чтобы зарегистрироваться, подтвердите согласие на обработку персональных данных");
       setLoading(false);
       return;
     }
@@ -128,6 +138,8 @@ export default function RegisterPage() {
         events_count: 0,
         telegram_username: tgClean || null,
         strava_url: stravaUrl.trim() || null,
+        consent_given_at: new Date().toISOString(),
+        consent_version: CONSENT_VERSION,
       });
       router.push("/");
       router.refresh();
@@ -420,6 +432,36 @@ export default function RegisterPage() {
                 </div>
               </div>
             )}
+
+            {/* ── Consent (152-FZ) ── */}
+            <label className="flex items-start gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={consent}
+                onChange={(e) => setConsent(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-[#E4E4E7] accent-[#F4632A] cursor-pointer shrink-0"
+              />
+              <span className="text-xs text-[#71717A] leading-relaxed">
+                Я даю{" "}
+                <Link
+                  href="/legal/consent"
+                  target="_blank"
+                  className="font-medium hover:underline"
+                  style={{ color: "#F4632A" }}
+                >
+                  согласие на обработку персональных данных
+                </Link>{" "}
+                и принимаю{" "}
+                <Link
+                  href="/legal/terms"
+                  target="_blank"
+                  className="font-medium hover:underline"
+                  style={{ color: "#F4632A" }}
+                >
+                  Пользовательское соглашение
+                </Link>
+              </span>
+            </label>
 
             <Button type="submit" variant="secondary" size="lg" loading={loading} className="w-full">
               Зарегистрироваться

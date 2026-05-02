@@ -13,8 +13,10 @@ import { NavigationProvider } from "@/lib/context/NavigationContext";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { TopProgressBar } from "@/components/layout/TopProgressBar";
 import { UserFeatures } from "@/components/layout/UserFeatures";
+import { LegalFooter } from "@/components/layout/LegalFooter";
 import { AuthModalWrapper } from "@/components/ui/AuthModalWrapper";
 import { AiSearchWidget } from "@/components/ui/AiSearchWidget";
+import { CookieBanner } from "@/components/ui/CookieBanner";
 import { AchievementsProvider } from "@/lib/context/AchievementsContext";
 import { NotificationsProvider } from "@/lib/context/NotificationsContext";
 
@@ -46,9 +48,11 @@ export default function RootLayout({
                               <NotificationsProvider>
                                 <TopProgressBar />
                                 {children}
+                                <LegalFooter />
                                 <AiSearchWidget />
                                 <BottomNav />
                                 <UserFeatures />
+                                <CookieBanner />
                               </NotificationsProvider>
                             </AchievementsProvider>
                           </IntentsProvider>
