@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { ArrowLeft, Eye, EyeOff, Check, X, LogOut, Send } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Check, X, LogOut, Send, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 function getPasswordStrength(password: string): { score: number; label: string; color: string } {
@@ -56,6 +56,9 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleteText, setDeleteText] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/auth/login");
@@ -502,7 +505,7 @@ export default function SettingsPage() {
           </button>
         </form>
 
-        <div className="mt-4 mb-24 sm:mb-8">
+        <div className="mt-4 mb-24 sm:mb-8 space-y-3">
           <button
             type="button"
             onClick={async () => { await signOut(); router.push("/"); router.refresh(); }}
@@ -510,6 +513,69 @@ export default function SettingsPage() {
             <LogOut size={16} />
             Выйти из аккаунта
           </button>
+
+          {!deleteConfirm ? (
+            <button
+              type="button"
+              onClick={() => setDeleteConfirm(true)}
+              className="w-full py-3 rounded-xl border border-red-200 bg-white text-sm font-semibold text-[#EF4444] flex items-center justify-center gap-2 hover:bg-red-50 transition-colors">
+              <Trash2 size={16} />
+              Удалить аккаунт
+            </button>
+          ) : (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-4 space-y-3">
+              <div className="text-sm text-[#1C1C1E]">
+                <p className="font-semibold text-red-700 mb-1">Удалить аккаунт навсегда?</p>
+                <p className="text-xs text-[#71717A]">
+                  Будут удалены профиль, маршруты, заезды, привязка Strava и Telegram. Действие необратимо.
+                </p>
+              </div>
+              <input
+                type="text"
+                value={deleteText}
+                onChange={(e) => setDeleteText(e.target.value)}
+                placeholder="Введите УДАЛИТЬ для подтверждения"
+                className={INPUT_CLS}
+                autoCapitalize="characters"
+                autoCorrect="off"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setDeleteConfirm(false); setDeleteText(""); setError(null); }}
+                  disabled={deleting}
+                  className="flex-1 py-2.5 rounded-xl border border-[#E4E4E7] bg-white text-sm font-semibold text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors disabled:opacity-60">
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  disabled={deleteText.trim() !== "УДАЛИТЬ" || deleting}
+                  onClick={async () => {
+                    setError(null);
+                    setDeleting(true);
+                    try {
+                      const res = await fetch("/api/account/delete", { method: "POST" });
+                      if (!res.ok) {
+                        const { error: err } = await res.json().catch(() => ({ error: "Не удалось удалить аккаунт" }));
+                        setError(err ?? "Не удалось удалить аккаунт");
+                        setDeleting(false);
+                        return;
+                      }
+                      await signOut();
+                      router.push("/");
+                      router.refresh();
+                    } catch {
+                      setError("Не удалось удалить аккаунт");
+                      setDeleting(false);
+                    }
+                  }}
+                  className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold bg-[#EF4444] hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                  <Trash2 size={15} />
+                  {deleting ? "Удаление…" : "Удалить"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </main>
 
