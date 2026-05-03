@@ -130,6 +130,14 @@ export default function NewRoutePage() {
     setImportError(null);
   };
 
+  // Auto-import: trigger 800ms after user stops typing a MapMagic URL.
+  useEffect(() => {
+    if (!isMapMagicUrl(mapUrl) || importStatus !== "idle" || importing) return;
+    const timer = setTimeout(() => { handleImport(); }, 800);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapUrl]);
+
   const isMapMagicUrl = (url: string) => {
     try { return new URL(url).hostname.endsWith("mapmagic.app"); } catch { return false; }
   };

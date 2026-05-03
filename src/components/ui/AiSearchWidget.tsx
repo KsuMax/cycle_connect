@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, FormEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Sparkles, X, ArrowUp, MapPin, Mountain, LocateFixed } from "lucide-react";
+import { Sparkles, X, ArrowUp, MapPin, Mountain, LocateFixed, Wind } from "lucide-react";
 import type { RouteResult } from "@/app/api/ai-search/route";
 import { proxyImageUrl } from "@/lib/supabase";
 
@@ -22,6 +22,7 @@ interface RouteFilters {
   region?: string;
   search_text?: string;
   sort_by?: "relevance" | "popular";
+  wind_intent?: boolean;
 }
 
 // ─── Chip definitions ─────────────────────────────────────────────────────────
@@ -48,8 +49,27 @@ const SURFACE_LABELS: Record<string, string> = {
   mixed: "микс",
 };
 
+/**
+ * Wind badge: label + colors for a directional score.
+ * Returns null when score is too low to show anything.
+ */
+function windBadgeInfo(score: number, speedMs: number, hourIso: string) {
+  if (score < 0.1) return null;
+  const ms = Math.abs(score * speedMs).toFixed(1);
+  const hour = new Date(hourIso).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  const label = score >= 0.5 ? "Попутный" : "Попутный";
+  return {
+    text: `${label} ${ms} м/с · ${hour}`,
+    bg: score >= 0.5 ? "#DCFCE7" : "#ECFCCB",
+    fg: score >= 0.5 ? "#15803D" : "#65A30D",
+  };
+}
+
 /** Returns up to 3 short reasons why this route matched the active filters. */
 function matchReasons(route: RouteResult, filters: RouteFilters): string[] {
+  // Wind intent: the wind badge IS the explanation — don't duplicate
+  if (filters.wind_intent && route.wind_score != null) return [];
+
   const out: string[] = [];
 
   if (filters.region && route.region) {
@@ -187,6 +207,14 @@ const CHIPS: Chip[] = [
     },
   },
   {
+    label: "С попутным ветром",
+    emoji: "🌬️",
+    apply: (f) => {
+      if (f.wind_intent) return null;
+      return { ...f, wind_intent: true };
+    },
+  },
+  {
     label: "По популярности",
     emoji: "🔥",
     apply: (f) => {
@@ -221,9 +249,9 @@ const CHIPS: Chip[] = [
 ];
 
 const FALLBACK_SUGGESTIONS = [
+  "С попутным ветром сегодня",
   "Лёгкий маршрут на 50 км",
   "Горный MTB в Карелии",
-  "Городская покатушка на 2 часа",
   "Гравийный маршрут с видами",
 ];
 
@@ -593,8 +621,15 @@ export function AiSearchWidget() {
           {/* Results */}
           {!loading && routes !== null && routes.length > 0 && (
             <div className="space-y-2.5 pt-1">
-              {/* Relaxed-filters banner */}
-              {activeFilters?.sort_by === "popular" && !relaxedReason && (
+              {/* Wind search banner */}
+              {activeFilters?.wind_intent && !relaxedReason && (
+                <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-medium mb-1 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100">
+                  <Wind size={12} />
+                  Маршруты с попутным ветром — отсортированы по лучшему прогнозу
+                </div>
+              )}
+              {/* Popularity banner */}
+              {activeFilters?.sort_by === "popular" && !relaxedReason && !activeFilters.wind_intent && (
                 <div className="flex items-center gap-1.5 text-xs text-orange-600 font-medium mb-1">
                   <span>🔥</span> Сортировка по популярности
                 </div>
@@ -669,9 +704,23 @@ export function AiSearchWidget() {
                       </p>
                     )}
 
+                    {/* Wind badge */}
+                    {r.wind_score != null && r.wind_speed_ms != null && r.best_wind_hour != null && (() => {
+                      const badge = windBadgeInfo(r.wind_score, r.wind_speed_ms, r.best_wind_hour);
+                      if (!badge) return null;
+                      return (
+                        <p className="text-xs font-semibold mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full"
+                          style={{ backgroundColor: badge.bg, color: badge.fg }}>
+                          <Wind size={10} />
+                          {badge.text}
+                        </p>
+                      );
+                    })()}
+
                     {/* Match explanation */}
                     {activeFilters && (() => {
                       const reasons = matchReasons(r, activeFilters);
+                      if (reasons.length === 0) return null;
                       return (
                         <p className="text-xs text-[#A1A1AA] mt-1.5 flex items-center gap-1 flex-wrap">
                           <span className="text-[#7C5CFC] font-medium">совпало:</span>

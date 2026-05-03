@@ -14,9 +14,45 @@ import {
   Users,
   ChevronDown,
   ChevronUp,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { GoogleOAuthButton } from "@/components/ui/GoogleOAuthButton";
 import { supabase } from "@/lib/supabase";
+
+function ResendButton({ email }: { email: string }) {
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleResend = async () => {
+    setLoading(true);
+    setError("");
+    const { error } = await supabase.auth.resend({ type: "signup", email });
+    setLoading(false);
+    if (error) {
+      setError("Не удалось отправить. Попробуй позже.");
+    } else {
+      setSent(true);
+      setTimeout(() => setSent(false), 30000);
+    }
+  };
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={handleResend}
+        disabled={loading || sent}
+        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-[#E4E4E7] text-sm font-medium text-[#71717A] hover:border-[#F4632A] hover:text-[#F4632A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
+        {sent ? "Письмо отправлено!" : loading ? "Отправляем..." : "Отправить письмо повторно"}
+      </button>
+      {error && <p className="text-xs text-red-600 mt-1 text-center">{error}</p>}
+    </div>
+  );
+}
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -32,6 +68,10 @@ export default function RegisterPage() {
   const [telegramUsername, setTelegramUsername] = useState("");
   const [stravaUrl, setStravaUrl] = useState("");
   const [showOptional, setShowOptional] = useState(false);
+
+  // Consent (152-FZ) — must be explicit, unchecked by default
+  const [consent, setConsent] = useState(false);
+  const CONSENT_VERSION = "2026-05-02";
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -57,7 +97,25 @@ export default function RegisterPage() {
       return;
     }
 
-    const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
+    if (!consent) {
+      setError("Чтобы зарегистрироваться, подтвердите согласие на обработку персональных данных");
+      setLoading(false);
+      return;
+    }
+
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        data: {
+          name: name.trim(),
+          username: usernameClean,
+          telegram_username: tgClean || null,
+          strava_url: stravaUrl.trim() || null,
+        },
+      },
+    });
     if (signUpError) {
       setError(
         signUpError.message === "User already registered"
@@ -68,7 +126,8 @@ export default function RegisterPage() {
       return;
     }
 
-    if (data.user) {
+    if (data.user && data.session) {
+      // Email confirmation disabled — user is already signed in
       await supabase.from("profiles").insert({
         id: data.user.id,
         name: name.trim(),
@@ -79,6 +138,8 @@ export default function RegisterPage() {
         events_count: 0,
         telegram_username: tgClean || null,
         strava_url: stravaUrl.trim() || null,
+        consent_given_at: new Date().toISOString(),
+        consent_version: CONSENT_VERSION,
       });
 
       if (data.session) {
@@ -95,22 +156,63 @@ export default function RegisterPage() {
   if (success) {
     return (
       <div className="min-h-screen bg-[#F5F4F1] flex items-center justify-center px-4">
-        <div className="w-full max-w-sm text-center">
+        <div className="w-full max-w-sm">
           <div
             className="bg-white rounded-2xl p-8 border border-[#E4E4E7]"
             style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}
           >
-            <CheckCircle size={48} className="mx-auto mb-4" style={{ color: "#22C55E" }} />
-            <h2 className="text-lg font-bold text-[#1C1C1E] mb-2">Аккаунт создан!</h2>
-            <p className="text-sm text-[#71717A] mb-6">
-              Мы отправили письмо с подтверждением на <strong>{email}</strong>. Перейди по
-              ссылке в письме, затем войди.
-            </p>
-            <Link href="/auth/login">
-              <Button variant="secondary" size="lg" className="w-full">
-                Войти
-              </Button>
-            </Link>
+            {/* Header */}
+            <div className="text-center mb-6">
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                style={{ backgroundColor: "#F4632A1A" }}
+              >
+                <CheckCircle size={32} style={{ color: "#F4632A" }} />
+              </div>
+              <h2 className="text-xl font-bold text-[#1C1C1E]">Подтверди email</h2>
+              <p className="text-sm text-[#71717A] mt-1">
+                Письмо отправлено на <strong className="text-[#1C1C1E]">{email}</strong>
+              </p>
+            </div>
+
+            {/* Steps */}
+            <div className="space-y-3 mb-5">
+              {[
+                { n: 1, text: "Открой письмо от CycleConnect в своей почте" },
+                { n: 2, text: 'Нажми кнопку «Подтвердить email» в письме' },
+                { n: 3, text: "Вернись сюда и войди в аккаунт" },
+              ].map(({ n, text }) => (
+                <div key={n} className="flex items-start gap-3">
+                  <div
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 mt-0.5"
+                    style={{ backgroundColor: "#F4632A" }}
+                  >
+                    {n}
+                  </div>
+                  <p className="text-sm text-[#3F3F46]">{text}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Spam warning */}
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 mb-5">
+              <p className="text-sm text-amber-800 font-medium mb-0.5">Не видишь письмо?</p>
+              <p className="text-xs text-amber-700 leading-relaxed">
+                Проверь папки <strong>«Спам»</strong> и <strong>«Промоакции»</strong> —
+                Gmail и другие почтовые сервисы иногда туда перенаправляют.
+                Письмо приходит в течение 1–2 минут.
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="space-y-2">
+              <ResendButton email={email} />
+              <Link href="/auth/login">
+                <Button variant="secondary" size="lg" className="w-full">
+                  Перейти ко входу
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -142,6 +244,16 @@ export default function RegisterPage() {
           className="bg-white rounded-2xl p-6 border border-[#E4E4E7]"
           style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}
         >
+          {/* Google OAuth */}
+          <div className="mb-5">
+            <GoogleOAuthButton />
+            <div className="flex items-center gap-3 mt-4">
+              <div className="flex-1 h-px bg-[#E4E4E7]" />
+              <span className="text-xs text-[#A1A1AA]">или</span>
+              <div className="flex-1 h-px bg-[#E4E4E7]" />
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
@@ -323,6 +435,36 @@ export default function RegisterPage() {
                 </div>
               </div>
             )}
+
+            {/* ── Consent (152-FZ) ── */}
+            <label className="flex items-start gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={consent}
+                onChange={(e) => setConsent(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-[#E4E4E7] accent-[#F4632A] cursor-pointer shrink-0"
+              />
+              <span className="text-xs text-[#71717A] leading-relaxed">
+                Я даю{" "}
+                <Link
+                  href="/legal/consent"
+                  target="_blank"
+                  className="font-medium hover:underline"
+                  style={{ color: "#F4632A" }}
+                >
+                  согласие на обработку персональных данных
+                </Link>{" "}
+                и принимаю{" "}
+                <Link
+                  href="/legal/terms"
+                  target="_blank"
+                  className="font-medium hover:underline"
+                  style={{ color: "#F4632A" }}
+                >
+                  Пользовательское соглашение
+                </Link>
+              </span>
+            </label>
 
             <Button type="submit" variant="secondary" size="lg" loading={loading} className="w-full">
               Зарегистрироваться

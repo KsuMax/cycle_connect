@@ -15,6 +15,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { embedQuery, toPgVector } from "@/lib/embeddings/jina";
+import { scoreWind } from "@/lib/wind";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,8 @@ interface RouteFilters {
   search_text?: string;
   /** Ranking mode: 'relevance' (default cosine) | 'popular' (weighted score) */
   sort_by?: "relevance" | "popular";
+  /** When true, re-rank candidates by wind favorability for the target window. */
+  wind_intent?: boolean;
 }
 
 export interface RouteResult {
@@ -57,6 +60,12 @@ export interface RouteResult {
   region: string;
   cover_url: string | null;
   tags: string[];
+  /** Only set when the search was wind-aware. Directional score −1…+1. */
+  wind_score?: number;
+  /** Wind speed in m/s at the best hour. */
+  wind_speed_ms?: number;
+  /** UTC ISO timestamp of the best wind window found. */
+  best_wind_hour?: string;
 }
 
 // ─── Geolocation: nearest region ─────────────────────────────────────────────
@@ -230,6 +239,11 @@ function extractFromText(query: string): RouteFilters {
     out.bike_types = ["gravel"];
   }
 
+  // Wind intent — user wants routes with favorable wind conditions
+  if (/попутн\w*\s+ветер|ветер\s+попутн|ветер\s+в\s+спину|по\s+ветру|с\s+попутн\w*|без\s+встречн\w*\s+ветр|не\s+против\s+ветр|ветр\w*\s+(?:сегодня|завтра|утром|вечером)/.test(q)) {
+    out.wind_intent = true;
+  }
+
   // Region — matched against all inflected forms (genitive, prepositional, etc.)
   const REGIONS: Array<[RegExp, string]> = [
     [/карел/i,                          "Карелия"],
@@ -256,7 +270,7 @@ const SYSTEM_PROMPT = `You are a cycling route search assistant for CycleConnect
 Extract search filters from the user message. Return ONLY raw JSON, no markdown, no explanation.
 
 Output schema (all fields optional):
-{"difficulty":"easy"|"medium"|"hard","distance_min":number,"distance_max":number,"distance_target":number,"elevation_min":number,"elevation_max":number,"surface":["asphalt"|"gravel"|"dirt"|"mixed"],"route_types":["road"|"gravel"|"mtb"|"urban"],"bike_types":["road"|"mountain"|"gravel"],"region":"Карелия"|"Санкт-Петербург"|"Ленинградская область"|"Москва"|"Подмосковье"|"Краснодарский край"|"Крым"|"Алтай"|"Байкал"|"Урал","search_text":"string","sort_by":"relevance"|"popular"}
+{"difficulty":"easy"|"medium"|"hard","distance_min":number,"distance_max":number,"distance_target":number,"elevation_min":number,"elevation_max":number,"surface":["asphalt"|"gravel"|"dirt"|"mixed"],"route_types":["road"|"gravel"|"mtb"|"urban"],"bike_types":["road"|"mountain"|"gravel"],"region":"Карелия"|"Санкт-Петербург"|"Ленинградская область"|"Москва"|"Подмосковье"|"Краснодарский край"|"Крым"|"Алтай"|"Байкал"|"Урал","search_text":"string","sort_by":"relevance"|"popular","wind_intent":true}
 
 Rules (apply all that match):
 1. If user says "N км" → distance_target=N, distance_min=N*0.75, distance_max=N*1.25
@@ -271,7 +285,8 @@ Rules (apply all that match):
 10. Return {} only if truly nothing can be extracted
 11. "набор/подъём более N" or "более N м набора" → elevation_min=N; "набор до N" or "до N м набора" → elevation_max=N
 12. "ровный"/"плоский"/"без подъёмов"/"минимальный подъём"/"мало подъёмов" → elevation_max=100
-13. "много подъёмов"/"гористый"/"с набором высот" (no explicit N) → elevation_min=500`;
+13. "много подъёмов"/"гористый"/"с набором высот" (no explicit N) → elevation_min=500
+14. "попутный ветер"/"ветер в спину"/"по ветру"/"с попутным"/"без встречного ветра" → wind_intent=true`;
 
 // ─── AI filter parsing ────────────────────────────────────────────────────────
 
@@ -337,17 +352,20 @@ function mergeFilters(ai: RouteFilters, regex: RouteFilters): RouteFilters {
   if (regex.sort_by) merged.sort_by = regex.sort_by;
   else if (ai.sort_by) merged.sort_by = ai.sort_by;
 
+  // Either source can flag wind intent
+  if (regex.wind_intent || ai.wind_intent) merged.wind_intent = true;
+
   return merged;
 }
 
 // ─── Supabase query ───────────────────────────────────────────────────────────
 
-async function searchRoutes(
+/** Low-level wrapper around the match_routes RPC. */
+async function runMatchRoutes(
   filters: RouteFilters,
   query: string,
+  count: number,
 ): Promise<RouteResult[]> {
-  // Try semantic search via match_routes RPC. Fall back to NULL embedding on
-  // failure (Jina down / no key) — RPC then degrades to recency ordering.
   let queryEmbedding: string | null = null;
   try {
     const v = await embedQuery(query);
@@ -369,7 +387,7 @@ async function searchRoutes(
     filter_bike_types: filters.bike_types ?? null,
     filter_search_text: filters.search_text ?? null,
     filter_distance_target: filters.distance_target ?? null,
-    match_count: 6,
+    match_count: count,
     sort_by: filters.sort_by ?? "relevance",
   });
 
@@ -378,7 +396,6 @@ async function searchRoutes(
     return [];
   }
 
-  // Strip similarity score from the public response — keep RouteResult shape.
   return (data ?? []).map((r: RouteResult & { similarity?: number }) => ({
     id: r.id,
     title: r.title,
@@ -390,6 +407,238 @@ async function searchRoutes(
     cover_url: r.cover_url,
     tags: r.tags,
   }));
+}
+
+// ─── Wind-aware search helpers ────────────────────────────────────────────────
+
+const WIND_HOUR_SLOTS = [6, 9, 12, 15, 18, 21];
+
+/**
+ * Moscow offset used server-side to interpret time hints like "сегодня вечером".
+ * Most users are Russian cyclists; callers can override by passing the offset.
+ */
+const MOSCOW_OFFSET_MS = 3 * 3600 * 1000; // UTC+3
+
+/**
+ * Returns UTC Date objects for the HOUR_SLOTS the user cares about.
+ * Defaults to all remaining slots today; falls back to tomorrow if none remain.
+ */
+function getWindTargetSlots(query: string): Date[] {
+  const q = query.toLowerCase();
+  const nowUtcMs = Date.now();
+
+  // Compute today's midnight in Moscow time, then back to UTC
+  const moscowNowMs = nowUtcMs + MOSCOW_OFFSET_MS;
+  const moscowToday = new Date(moscowNowMs);
+  moscowToday.setUTCHours(0, 0, 0, 0);
+  const todayUtcMs = moscowToday.getTime() - MOSCOW_OFFSET_MS;
+
+  // Which calendar day(s)?
+  let dayOffsets = [0]; // 0 = today
+  if (/завтра/.test(q)) dayOffsets = [1];
+  else if (/на\s+выходных|в\s+субботу|в\s+воскресенье/.test(q)) dayOffsets = [5, 6]; // rough
+
+  // Time-of-day filter
+  let hourFilter: number[] | null = null;
+  if (/утром|утра\b/.test(q)) hourFilter = [6, 9];
+  else if (/днём|дня\b|обед/.test(q)) hourFilter = [12, 15];
+  else if (/вечером|вечера\b/.test(q)) hourFilter = [18, 21];
+
+  const slots: Date[] = [];
+  for (const dayOff of dayOffsets) {
+    const dayStartUtcMs = todayUtcMs + dayOff * 86_400_000;
+    for (const h of hourFilter ?? WIND_HOUR_SLOTS) {
+      // Moscow H:00 = UTC (H − 3):00
+      const slotUtcMs = dayStartUtcMs + h * 3_600_000 - MOSCOW_OFFSET_MS;
+      if (slotUtcMs < nowUtcMs - 30 * 60_000) continue; // skip past
+      slots.push(new Date(slotUtcMs));
+    }
+  }
+
+  // Nothing left today → try tomorrow
+  if (slots.length === 0) {
+    const tomorrowStartUtcMs = todayUtcMs + 86_400_000;
+    for (const h of hourFilter ?? WIND_HOUR_SLOTS) {
+      const slotUtcMs = tomorrowStartUtcMs + h * 3_600_000 - MOSCOW_OFFSET_MS;
+      slots.push(new Date(slotUtcMs));
+    }
+  }
+
+  return slots;
+}
+
+interface WindPoint {
+  ts: string;      // UTC ISO
+  dir_deg: number;
+  speed_ms: number;
+}
+
+/** Fetches 2-day hourly wind forecast from Open-Meteo for a single lat/lng. */
+async function fetchWindForecastForPoint(lat: number, lng: number): Promise<WindPoint[]> {
+  const url = new URL("https://api.open-meteo.com/v1/forecast");
+  url.searchParams.set("latitude", lat.toFixed(4));
+  url.searchParams.set("longitude", lng.toFixed(4));
+  url.searchParams.set("hourly", "wind_speed_10m,wind_direction_10m");
+  url.searchParams.set("forecast_days", "2");
+  url.searchParams.set("timezone", "UTC");
+  url.searchParams.set("wind_speed_unit", "ms");
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(url.toString(), { signal: controller.signal });
+    if (!res.ok) throw new Error(`open-meteo ${res.status}`);
+    const body = await res.json() as {
+      hourly?: { time?: string[]; wind_speed_10m?: number[]; wind_direction_10m?: number[] };
+    };
+    const time = body.hourly?.time ?? [];
+    const speeds = body.hourly?.wind_speed_10m ?? [];
+    const dirs = body.hourly?.wind_direction_10m ?? [];
+    return time.map((t, i) => ({
+      ts: (t.endsWith("Z") ? t : `${t}:00Z`).replace(/:00:00Z$/, ":00:00.000Z"),
+      dir_deg: Math.round(((dirs[i] % 360) + 360) % 360),
+      speed_ms: Number(speeds[i]?.toFixed(1) ?? 0),
+    }));
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Scores each candidate route against a set of forecast hours and returns
+ * the top results sorted by best wind score (descending).
+ * Routes with no bearing profile or a net headwind at all target hours are excluded.
+ */
+function applyWindScoring(
+  candidates: RouteResult[],
+  profiles: Map<string, { buckets: number[]; total_m: number }>,
+  forecastByHour: Map<string, WindPoint>,
+  targetSlots: Date[],
+): RouteResult[] {
+  const scored: Array<RouteResult & { _wScore: number }> = [];
+
+  for (const route of candidates) {
+    const profile = profiles.get(route.id);
+    if (!profile || profile.total_m <= 0) continue;
+
+    let bestScore = -Infinity;
+    let bestHour = "";
+    let bestSpeed = 0;
+
+    for (const slot of targetSlots) {
+      // Build the same UTC-floored key used throughout the wind system
+      const key = new Date(Date.UTC(
+        slot.getUTCFullYear(), slot.getUTCMonth(), slot.getUTCDate(), slot.getUTCHours(),
+      )).toISOString();
+      const wind = forecastByHour.get(key);
+      if (!wind) continue;
+
+      const { score } = scoreWind(
+        { buckets: profile.buckets, total_m: profile.total_m },
+        { ts: wind.ts, dir_deg: wind.dir_deg, speed_ms: wind.speed_ms },
+      );
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestHour = wind.ts;
+        bestSpeed = wind.speed_ms;
+      }
+    }
+
+    // Only surface routes where wind is at least slightly favorable
+    if (bestScore < 0.1) continue;
+
+    scored.push({
+      ...route,
+      wind_score: Math.round(bestScore * 100) / 100,
+      wind_speed_ms: bestSpeed,
+      best_wind_hour: bestHour,
+      _wScore: bestScore,
+    });
+  }
+
+  return scored
+    .sort((a, b) => b._wScore - a._wScore)
+    .slice(0, 6)
+    .map(({ _wScore: _, ...rest }) => rest);
+}
+
+/** Full wind-aware search: broader candidate fetch → bearing profiles → forecast → re-rank. */
+async function searchRoutesWind(
+  filters: RouteFilters,
+  query: string,
+): Promise<RouteResult[]> {
+  // 1. Wider candidate pool — semantic/filter match without wind constraint
+  const candidates = await runMatchRoutes(
+    { ...filters, wind_intent: undefined },
+    query,
+    24, // 4× normal so re-ranking has material to work with
+  );
+  if (candidates.length === 0) return [];
+
+  // 2. Batch-fetch bearing profiles for all candidates
+  const routeIds = candidates.map((r) => r.id);
+  const { data: profileRows } = await getSupabase()
+    .from("route_bearing_profile")
+    .select("route_id, buckets, total_m")
+    .in("route_id", routeIds);
+
+  if (!profileRows?.length) {
+    // No bearing data yet → return plain candidates
+    return candidates.slice(0, 6);
+  }
+
+  const profiles = new Map(
+    profileRows.map((p) => [
+      p.route_id as string,
+      { buckets: p.buckets as number[], total_m: p.total_m as number },
+    ]),
+  );
+
+  // 3. Determine region centroid for the forecast call
+  const regionName = filters.region ?? "Москва";
+  const regionEntry =
+    REGION_CENTERS.find(([name]) => name === regionName) ??
+    REGION_CENTERS.find(([name]) => name === "Москва")!;
+  const [, lat, lng] = regionEntry;
+
+  // 4. Fetch regional wind forecast (one Open-Meteo call)
+  let forecast: WindPoint[] = [];
+  try {
+    forecast = await fetchWindForecastForPoint(lat, lng);
+  } catch (err) {
+    console.warn("[ai-search wind] Open-Meteo unavailable:", err);
+    return candidates.slice(0, 6);
+  }
+
+  // Build lookup map: UTC-hour ISO → wind point
+  const forecastByHour = new Map<string, WindPoint>();
+  for (const w of forecast) {
+    const d = new Date(w.ts);
+    const key = new Date(Date.UTC(
+      d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(),
+    )).toISOString();
+    forecastByHour.set(key, w);
+  }
+
+  // 5. Target hours from the query
+  const targetSlots = getWindTargetSlots(query);
+
+  // 6. Score, filter, re-rank
+  const windResults = applyWindScoring(candidates, profiles, forecastByHour, targetSlots);
+
+  // If scoring yielded nothing (calm day, no bearing data, etc.) fall back to plain results
+  return windResults.length > 0 ? windResults : candidates.slice(0, 6);
+}
+
+async function searchRoutes(
+  filters: RouteFilters,
+  query: string,
+): Promise<RouteResult[]> {
+  if (filters.wind_intent) {
+    return searchRoutesWind(filters, query);
+  }
+  return runMatchRoutes(filters, query, 6);
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────

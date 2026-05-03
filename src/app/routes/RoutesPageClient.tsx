@@ -60,6 +60,11 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
   const [regionSearch, setRegionSearch] = useState("");
   const [regionOpen, setRegionOpen] = useState(false);
   const regionRef = useRef<HTMLDivElement>(null);
+  const [clubId, setClubId] = useState("");
+  const [clubs, setClubs] = useState<{ id: string; name: string }[]>([]);
+  const [clubSearch, setClubSearch] = useState("");
+  const [clubOpen, setClubOpen] = useState(false);
+  const clubRef = useRef<HTMLDivElement>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<"newest" | "oldest">("newest");
   const [routes, setRoutes] = useState<Route[]>(initialRoutes);
@@ -116,9 +121,21 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
       if (regionRef.current && !regionRef.current.contains(e.target as Node)) {
         setRegionOpen(false);
       }
+      if (clubRef.current && !clubRef.current.contains(e.target as Node)) {
+        setClubOpen(false);
+      }
     }
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  // ── Load clubs for filter ─────────────────────────────────────────────────
+  useEffect(() => {
+    supabase
+      .from("clubs")
+      .select("id, name")
+      .order("name")
+      .then(({ data }) => { if (data) setClubs(data as { id: string; name: string }[]); });
   }, []);
 
   // ── Load routes (skipped when SSR already provided data) ──────────────────
@@ -293,6 +310,7 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
     if (minKm !== null && !Number.isNaN(minKm) && route.distance_km < minKm) return false;
     if (maxKm !== null && !Number.isNaN(maxKm) && route.distance_km > maxKm) return false;
     if (region && route.region !== region) return false;
+    if (clubId && route.club?.id !== clubId) return false;
     return true;
   }).sort((a, b) =>
     sortBy === "oldest"
@@ -308,7 +326,8 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
     || selectedSurfaces.length > 0
     || minDistance !== ""
     || maxDistance !== ""
-    || region !== "";
+    || region !== ""
+    || clubId !== "";
 
   const resetRouteFilters = () => {
     deactivateNearMe();
@@ -319,6 +338,7 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
     setMinDistance("");
     setMaxDistance("");
     setRegion("");
+    setClubId("");
   };
 
   // ── Events filtering / sorting ────────────────────────────────────────────
@@ -466,6 +486,52 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
                           ))
                         }
                         {regions.filter((r) => r.toLowerCase().includes(regionSearch.toLowerCase())).length === 0 && (
+                          <p className="px-3 py-2 text-sm text-[#A1A1AA]">Ничего не найдено</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mb-5">
+                  <label className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-2 block">Клуб</label>
+                  <div className="relative" ref={clubRef}>
+                    <input
+                      type="text"
+                      placeholder={clubs.find((c) => c.id === clubId)?.name || "Все клубы"}
+                      value={clubOpen ? clubSearch : (clubs.find((c) => c.id === clubId)?.name || "")}
+                      onFocus={() => { setClubOpen(true); setClubSearch(""); }}
+                      onChange={(e) => setClubSearch(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border text-sm outline-none transition-colors"
+                      style={{
+                        borderColor: clubId ? "#F4632A" : "#E4E4E7",
+                        color: clubId && !clubOpen ? "#F4632A" : "#1C1C1E",
+                        fontWeight: clubId && !clubOpen ? 500 : 400,
+                      }}
+                    />
+                    {clubOpen && (
+                      <div className="absolute z-10 top-full mt-1 w-full bg-white border border-[#E4E4E7] rounded-xl shadow-lg overflow-hidden max-h-64 overflow-y-auto">
+                        <button
+                          type="button"
+                          onMouseDown={() => { setClubId(""); setClubOpen(false); setClubSearch(""); }}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-[#F5F4F1] transition-colors"
+                          style={clubId === "" ? { color: "#F4632A", fontWeight: 500 } : { color: "#71717A" }}>
+                          Все клубы
+                        </button>
+                        {clubs
+                          .filter((c) => c.name.toLowerCase().includes(clubSearch.toLowerCase()))
+                          .map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onMouseDown={() => { setClubId(c.id); setClubOpen(false); setClubSearch(""); }}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-[#F5F4F1] transition-colors"
+                              style={clubId === c.id ? { color: "#F4632A", fontWeight: 500 } : { color: "#1C1C1E" }}>
+                              {c.name}
+                            </button>
+                          ))
+                        }
+                        {clubs.filter((c) => c.name.toLowerCase().includes(clubSearch.toLowerCase())).length === 0 && (
                           <p className="px-3 py-2 text-sm text-[#A1A1AA]">Ничего не найдено</p>
                         )}
                       </div>
@@ -731,6 +797,51 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
                           ))
                         }
                         {regions.filter((r) => r.toLowerCase().includes(regionSearch.toLowerCase())).length === 0 && (
+                          <p className="px-3 py-2 text-sm text-[#A1A1AA]">Ничего не найдено</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-2">Клуб</div>
+                  <div className="relative" ref={clubRef}>
+                    <input
+                      type="text"
+                      placeholder={clubs.find((c) => c.id === clubId)?.name || "Все клубы"}
+                      value={clubOpen ? clubSearch : (clubs.find((c) => c.id === clubId)?.name || "")}
+                      onFocus={() => { setClubOpen(true); setClubSearch(""); }}
+                      onChange={(e) => setClubSearch(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border text-sm outline-none transition-colors"
+                      style={{
+                        borderColor: clubId ? "#F4632A" : "#E4E4E7",
+                        color: clubId && !clubOpen ? "#F4632A" : "#1C1C1E",
+                        fontWeight: clubId && !clubOpen ? 500 : 400,
+                      }}
+                    />
+                    {clubOpen && (
+                      <div className="absolute z-10 top-full mt-1 w-full bg-white border border-[#E4E4E7] rounded-xl shadow-lg overflow-hidden max-h-64 overflow-y-auto">
+                        <button
+                          type="button"
+                          onMouseDown={() => { setClubId(""); setClubOpen(false); setClubSearch(""); }}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-[#F5F4F1] transition-colors"
+                          style={clubId === "" ? { color: "#F4632A", fontWeight: 500 } : { color: "#71717A" }}>
+                          Все клубы
+                        </button>
+                        {clubs
+                          .filter((c) => c.name.toLowerCase().includes(clubSearch.toLowerCase()))
+                          .map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onMouseDown={() => { setClubId(c.id); setClubOpen(false); setClubSearch(""); }}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-[#F5F4F1] transition-colors"
+                              style={clubId === c.id ? { color: "#F4632A", fontWeight: 500 } : { color: "#1C1C1E" }}>
+                              {c.name}
+                            </button>
+                          ))
+                        }
+                        {clubs.filter((c) => c.name.toLowerCase().includes(clubSearch.toLowerCase())).length === 0 && (
                           <p className="px-3 py-2 text-sm text-[#A1A1AA]">Ничего не найдено</p>
                         )}
                       </div>

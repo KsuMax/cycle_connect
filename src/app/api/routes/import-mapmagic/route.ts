@@ -22,14 +22,35 @@ function escapeXml(s: string) {
     .replace(/"/g, "&quot;");
 }
 
-function buildGpx(name: string, description: string, points: [number, number][]): string {
+type MmPoi = { lat?: number; lon?: number; title?: string; description?: string; type?: string };
+
+function buildGpx(
+  name: string,
+  description: string,
+  points: [number, number][],
+  pois: MmPoi[] = [],
+): string {
   const trkpts = points
     .map(([lat, lon]) => `<trkpt lat="${lat}" lon="${lon}"/>`)
     .join("");
+
+  const wpts = pois
+    .filter((p) => p.lat != null && p.lon != null)
+    .map((p) => {
+      const inner = [
+        p.title ? `<name>${escapeXml(p.title)}</name>` : "",
+        p.description ? `<desc>${escapeXml(p.description)}</desc>` : "",
+        p.type ? `<type>${escapeXml(p.type)}</type>` : "",
+      ].join("");
+      return `<wpt lat="${p.lat}" lon="${p.lon}">${inner}</wpt>`;
+    })
+    .join("");
+
   return (
     `<?xml version="1.0" encoding="UTF-8"?>` +
     `<gpx version="1.1" creator="cycleconnect.cc via MapMagic">` +
     `<metadata><name>${escapeXml(name)}</name><desc>${escapeXml(description)}</desc></metadata>` +
+    wpts +
     `<trk><name>${escapeXml(name)}</name><trkseg>${trkpts}</trkseg></trk>` +
     `</gpx>`
   );
@@ -143,6 +164,7 @@ export async function POST(req: NextRequest) {
     constant_meta?: { distance?: number; elevation_gain?: number };
     variable_meta?: { title?: string };
     description?: string;
+    poi?: MmPoi[];
   };
 
   const t = track as MMTrack;
@@ -171,13 +193,14 @@ export async function POST(req: NextRequest) {
   }
 
   const name = t.variable_meta?.title ?? `MapMagic маршрут`;
-  const description = (t as { description?: string }).description ?? "";
+  const description = t.description ?? "";
   const distanceKm = t.constant_meta?.distance
     ? Math.round(t.constant_meta.distance / 100) / 10
     : null;
   const elevationM = t.constant_meta?.elevation_gain ?? null;
+  const pois = t.poi ?? [];
 
-  const gpxXml = buildGpx(name, description, points);
+  const gpxXml = buildGpx(name, description, points, pois);
 
   // Upsert cache.
   await admin.from("mapmagic_route_cache").upsert({
