@@ -38,16 +38,14 @@ export default function PrivacyPolicyPage() {
       </p>
       <ul>
         <li>
-          <strong>Оператор:</strong> [ЗАПОЛНИТЬ: ФИО физлица / самозанятого, или
-          реквизиты ИП/ООО]
+          <strong>Оператор:</strong> Максакова Ксения Николаевна
         </li>
         <li>
-          <strong>Адрес для корреспонденции:</strong> [ЗАПОЛНИТЬ: почтовый
-          адрес или email для официальных запросов]
+          <strong>Адрес для корреспонденции:</strong> me@ksumax.ru
         </li>
         <li>
           <strong>Адрес электронной почты:</strong>{" "}
-          <a href="mailto:maxeniya69@gmail.com">maxeniya69@gmail.com</a>
+          <a href="mailto:me@ksumax.ru">me@ksumax.ru</a>
         </li>
       </ul>
 
@@ -285,7 +283,7 @@ export default function PrivacyPolicyPage() {
       </ul>
       <p>
         Запросы о реализации прав направляются на адрес электронной почты:{" "}
-        <a href="mailto:maxeniya69@gmail.com">maxeniya69@gmail.com</a>. Ответ
+        <a href="mailto:me@ksumax.ru">me@ksumax.ru</a>. Ответ
         предоставляется в течение 10 (десяти) рабочих дней с момента получения
         запроса.
       </p>
@@ -317,7 +315,7 @@ export default function PrivacyPolicyPage() {
       <p>
         По всем вопросам, связанным с обработкой персональных данных, можно
         обратиться по адресу:{" "}
-        <a href="mailto:maxeniya69@gmail.com">maxeniya69@gmail.com</a>.
+        <a href="mailto:me@ksumax.ru">me@ksumax.ru</a>.
       </p>
     </>
   );
