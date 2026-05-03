@@ -17,6 +17,7 @@ import { LegalFooter } from "@/components/layout/LegalFooter";
 import { AuthModalWrapper } from "@/components/ui/AuthModalWrapper";
 import { AiSearchWidget } from "@/components/ui/AiSearchWidget";
 import { CookieBanner } from "@/components/ui/CookieBanner";
+import { YandexMetrika } from "@/components/analytics/YandexMetrika";
 import { AchievementsProvider } from "@/lib/context/AchievementsContext";
 import { NotificationsProvider } from "@/lib/context/NotificationsContext";
 
@@ -53,6 +54,7 @@ export default function RootLayout({
                                 <BottomNav />
                                 <UserFeatures />
                                 <CookieBanner />
+                                <YandexMetrika />
                               </NotificationsProvider>
                             </AchievementsProvider>
                           </IntentsProvider>
