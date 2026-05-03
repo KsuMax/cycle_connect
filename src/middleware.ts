@@ -19,6 +19,19 @@ function isProtectedRoute(pathname: string): boolean {
   return PROTECTED_PATTERNS.some((pattern) => pattern.test(pathname));
 }
 
+/**
+ * Paths that should NOT redirect to /onboarding even when the user is new.
+ * Onboarding itself, auth flows, API/webhooks, and the public landing page
+ * must remain reachable so the user can complete the flow or sign out.
+ */
+function shouldEnforceOnboarding(pathname: string): boolean {
+  if (pathname === "/onboarding" || pathname.startsWith("/onboarding/")) return false;
+  if (pathname.startsWith("/auth/")) return false;
+  if (pathname.startsWith("/api/")) return false;
+  if (pathname === "/welcome") return false;
+  return true;
+}
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -54,6 +67,22 @@ export async function middleware(request: NextRequest) {
     loginUrl.pathname = "/auth/login";
     loginUrl.searchParams.set("redirect", request.nextUrl.pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // Force first-time users through /onboarding before they can browse the app.
+  if (user && shouldEnforceOnboarding(request.nextUrl.pathname)) {
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("onboarded_at")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (prof && prof.onboarded_at == null) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/onboarding";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;

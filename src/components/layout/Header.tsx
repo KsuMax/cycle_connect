@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Map, Newspaper, LogOut } from "lucide-react";
+import { Map, Newspaper, LogOut, HelpCircle } from "lucide-react";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useNavigation } from "@/lib/context/NavigationContext";
 import { proxyImageUrl } from "@/lib/supabase";
@@ -79,6 +79,13 @@ export function Header() {
         <div className="hidden sm:flex items-center gap-2 shrink-0">
           {user ? (
             <>
+              <button
+                onClick={() => navigate("/onboarding")}
+                title="Что я могу здесь делать?"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-[#A1A1AA] hover:text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors"
+              >
+                <HelpCircle size={18} />
+              </button>
               <NotificationBell />
               <a
                 href="/profile"

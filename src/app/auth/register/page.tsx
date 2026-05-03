@@ -82,7 +82,7 @@ export default function RegisterPage() {
       });
 
       if (data.session) {
-        router.push("/");
+        router.push("/onboarding");
         router.refresh();
         return;
       }

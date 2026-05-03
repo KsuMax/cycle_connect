@@ -81,6 +81,8 @@ export interface DbProfile {
   tg_link_code?: string | null;
   tg_link_code_exp?: string | null;
   tg_notify_intents?: boolean;
+  // Onboarding (migration 026). NULL until the user completes /onboarding.
+  onboarded_at?: string | null;
 }
 
 /**
