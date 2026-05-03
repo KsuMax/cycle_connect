@@ -49,7 +49,7 @@ export default function OnboardingPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
   const [busy, setBusy] = useState<string | null>(null);
-  const [needsConsent, setNeedsConsent] = useState(false);
+  const [needsConsent, setNeedsConsent] = useState<boolean | null>(null);
   const [consent, setConsent] = useState(false);
   const [consentError, setConsentError] = useState(false);
 
@@ -61,14 +61,12 @@ export default function OnboardingPage() {
       .eq("id", user.id)
       .maybeSingle()
       .then(({ data }) => {
-        if (data && data.consent_given_at == null) {
-          setNeedsConsent(true);
-        }
+        setNeedsConsent(data ? data.consent_given_at == null : false);
       });
   }, [user]);
 
   const completeAndGo = async (href: string) => {
-    if (!user || busy) return;
+    if (!user || busy || needsConsent === null) return;
 
     if (needsConsent && !consent) {
       setConsentError(true);
@@ -184,7 +182,7 @@ export default function OnboardingPage() {
               <button
                 key={href}
                 onClick={() => completeAndGo(href)}
-                disabled={!!busy}
+                disabled={!!busy || needsConsent === null}
                 className="group text-left rounded-2xl border border-[#E4E4E7] bg-white p-5 hover:border-[#F4632A] hover:shadow-sm transition-all disabled:opacity-60"
                 style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.04)" }}
               >
@@ -222,7 +220,7 @@ export default function OnboardingPage() {
           <Button
             variant="ghost"
             size="md"
-            disabled={!!busy}
+            disabled={!!busy || needsConsent === null}
             onClick={() => completeAndGo("/")}
           >
             Пропустить — я разберусь сам
