@@ -49,6 +49,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   const [startDate, setStartDate] = useState("");
   const [maxParticipants, setMaxParticipants] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
+  const [chatUrl, setChatUrl] = useState("");
   const [days, setDays] = useState<DayForm[]>([]);
   const [routes, setRoutes] = useState<RouteOption[]>([]);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
@@ -92,6 +93,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         setCoverPreview(ev.cover_url ?? null);
         setExistingGpxPath(ev.gpx_path ?? null);
         setClubId((ev as { club_id?: string | null }).club_id ?? null);
+        setChatUrl((ev as { chat_url?: string | null }).chat_url ?? "");
 
         // Load clubs where user is owner/admin/captain
         const { data: authData } = await supabase.auth.getUser();
@@ -161,6 +163,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         max_participants: parseInt(maxParticipants) || null,
         is_private: isPrivate,
         club_id: clubId,
+        chat_url: chatUrl.trim() || null,
       })
       .eq("id", id);
 
@@ -334,6 +337,19 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                   <div className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
                     style={{ transform: isPrivate ? "translateX(20px)" : "translateX(0)" }} />
                 </button>
+              </div>
+
+              {/* Chat link */}
+              <div>
+                <label className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-1.5 block">Ссылка на чат (необязательно)</label>
+                <input
+                  type="url"
+                  value={chatUrl}
+                  onChange={(e) => setChatUrl(e.target.value)}
+                  placeholder="https://t.me/joinchat/..."
+                  className="w-full px-4 py-2.5 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors"
+                />
+                <p className="text-xs text-[#A1A1AA] mt-1">Ссылка на Telegram-группу или канал — будет видна только участникам</p>
               </div>
             </div>
           </div>

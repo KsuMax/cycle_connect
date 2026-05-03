@@ -383,6 +383,41 @@ Deno.serve(async (req: Request) => {
     return new Response("bad json", { status: 400 });
   }
 
+  // ── callback_query — inline button presses ────────────────────────────────
+  const cq = update.callback_query;
+  if (cq) {
+    const cqChatId = cq.message?.chat?.id;
+    const data = cq.data ?? "";
+
+    if (data.startsWith("optout_event_") && cqChatId) {
+      const eventId = data.slice("optout_event_".length);
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("telegram_chat_id", cqChatId)
+        .maybeSingle();
+
+      if (profile) {
+        await supabase
+          .from("announcement_optouts")
+          .upsert({ event_id: eventId, user_id: profile.id }, { onConflict: "event_id,user_id" });
+      }
+
+      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          callback_query_id: cq.id,
+          text: "Готово — уведомления от этого события отключены",
+          show_alert: false,
+        }),
+      });
+    }
+
+    return new Response("ok");
+  }
+
   const message = update.message;
   if (!message) return new Response("ok");
 
@@ -486,6 +521,11 @@ Deno.serve(async (req: Request) => {
 interface TelegramUpdate {
   update_id: number;
   message?: TelegramMessage;
+  callback_query?: {
+    id: string;
+    data?: string;
+    message?: { chat: { id: number } };
+  };
 }
 
 interface TelegramMessage {

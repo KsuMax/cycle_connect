@@ -56,6 +56,7 @@ function CreateEventForm() {
   const [startDate, setStartDate] = useState("");
   const [maxParticipants, setMaxParticipants] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
+  const [chatUrl, setChatUrl] = useState("");
   const [days, setDays] = useState<DayForm[]>([newDay(0)]);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -126,6 +127,7 @@ function CreateEventForm() {
         setIsPrivate(data.is_private ?? false);
         if (data.club_id) setClubId(data.club_id);
         if (data.cover_url) setCoverPreview(data.cover_url);
+        setChatUrl((data as { chat_url?: string | null }).chat_url ?? "");
 
         // Shift each day date forward by 7 days
         const shiftDate = (iso: string | null) => {
@@ -186,6 +188,7 @@ function CreateEventForm() {
         is_private: isPrivate,
         likes_count: 0,
         club_id: clubId || null,
+        chat_url: chatUrl.trim() || null,
       })
       .select()
       .single();
@@ -403,6 +406,19 @@ function CreateEventForm() {
                   <div className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
                     style={{ transform: isPrivate ? "translateX(20px)" : "translateX(0)" }} />
                 </button>
+              </div>
+
+              {/* Chat link */}
+              <div>
+                <label className="text-xs font-semibold text-[#71717A] uppercase tracking-wide mb-1.5 block">Ссылка на чат (необязательно)</label>
+                <input
+                  type="url"
+                  value={chatUrl}
+                  onChange={(e) => setChatUrl(e.target.value)}
+                  placeholder="https://t.me/joinchat/..."
+                  className="w-full px-4 py-2.5 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors"
+                />
+                <p className="text-xs text-[#A1A1AA] mt-1">Ссылка на Telegram-группу или канал — будет видна только участникам</p>
               </div>
             </div>
           </div>

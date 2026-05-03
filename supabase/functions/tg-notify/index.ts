@@ -1,17 +1,13 @@
 /**
- * tg-notify — Telegram notifications for ride intents.
+ * tg-notify — Telegram notifications for ride intents and event announcements.
  *
- * Supports two modes via request body:
- *
- *  mode "joined"    — someone joined an intent; notify the creator.
- *                     Body: { mode: "joined", intentId: string, joinerId: string }
- *                     Auth: the joiner's JWT.
- *
- *  mode "broadcast" — creator broadcasts to all participants.
- *                     Body: { mode: "broadcast", intentId: string }
- *                     Auth: must be the creator's JWT.
- *
- * Returns { sent: number, skipped: number }
+ * Modes:
+ *  "joined"             — someone joined an intent; notify the creator.
+ *  "broadcast"          — creator broadcasts to all intent participants.
+ *  "club_event"         — post event announcement to club TG channel.
+ *  "event_announcement" — organizer sends announcement DM to all event participants.
+ *                         Body: { mode, eventId, body, isUrgent? }
+ *                         Saves to event_announcements, tracks delivery.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -37,6 +33,34 @@ async function sendTg(chatId: number, text: string): Promise<boolean> {
   return res.ok;
 }
 
+async function sendTgWithOptout(
+  chatId: number,
+  text: string,
+  eventId: string,
+  urgent: boolean,
+): Promise<boolean> {
+  const res = await fetch(
+    `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: "HTML",
+        disable_notification: !urgent,
+        reply_markup: {
+          inline_keyboard: [[{
+            text: "🔕 Не получать уведомления от этого события",
+            callback_data: `optout_event_${eventId}`,
+          }]],
+        },
+      }),
+    }
+  );
+  return res.ok;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return json({ error: "method not allowed" }, 405);
 
@@ -48,7 +72,7 @@ Deno.serve(async (req: Request) => {
   const { data: { user }, error: authErr } = await adminDb.auth.getUser(jwt);
   if (authErr || !user) return json({ error: "unauthorized" }, 401);
 
-  let body: { mode?: string; intentId?: string; joinerId?: string; eventId?: string };
+  let body: { mode?: string; intentId?: string; joinerId?: string; eventId?: string; body?: string; isUrgent?: boolean };
   try { body = await req.json(); } catch { return json({ error: "invalid json" }, 400); }
 
   const { mode = "broadcast", intentId, joinerId, eventId } = body;
@@ -81,6 +105,86 @@ Deno.serve(async (req: Request) => {
 
     const ok = await sendTg(channel as unknown as number, text);
     return json({ sent: ok ? 1 : 0, skipped: ok ? 0 : 1 });
+  }
+
+  // ── MODE: event_announcement — DM all TG-linked participants ─────────────────
+  if (mode === "event_announcement") {
+    const annBody = body.body;
+    const isUrgent = !!body.isUrgent;
+    const evId = eventId;
+    if (!evId || !annBody?.trim()) return json({ error: "eventId and body required" }, 400);
+
+    const { data: event } = await adminDb
+      .from("events")
+      .select("organizer_id, title")
+      .eq("id", evId)
+      .single();
+    if (!event) return json({ error: "event not found" }, 404);
+    if (event.organizer_id !== user.id) return json({ error: "forbidden" }, 403);
+
+    // Persist announcement
+    const { data: announcement } = await adminDb
+      .from("event_announcements")
+      .insert({ event_id: evId, author_id: user.id, body: annBody.trim(), is_urgent: isUrgent })
+      .select("id")
+      .single();
+    if (!announcement) return json({ error: "failed to save announcement" }, 500);
+
+    // Get participants excluding organizer
+    const { data: participants } = await adminDb
+      .from("event_participants")
+      .select("user_id, profile:profiles!user_id(telegram_chat_id)")
+      .eq("event_id", evId)
+      .neq("user_id", user.id);
+
+    // Get optouts
+    const { data: optouts } = await adminDb
+      .from("announcement_optouts")
+      .select("user_id")
+      .eq("event_id", evId);
+    const optoutSet = new Set((optouts ?? []).map((o: { user_id: string }) => o.user_id));
+
+    const text =
+      `📢 <b>${escapeHtml(event.title as string)}</b>\n\n${escapeHtml(annBody.trim())}`;
+
+    type DeliveryRow = {
+      announcement_id: string;
+      user_id: string;
+      status: string;
+      delivered_at: string | null;
+    };
+    const deliveries: DeliveryRow[] = [];
+    let sent = 0, noTg = 0, skipped = 0;
+
+    for (const p of participants ?? []) {
+      const prof = p.profile as { telegram_chat_id?: number | null } | null;
+      const uid = p.user_id as string;
+
+      if (optoutSet.has(uid)) {
+        skipped++;
+        continue;
+      }
+      if (!prof?.telegram_chat_id) {
+        noTg++;
+        deliveries.push({ announcement_id: announcement.id, user_id: uid, status: "no_tg", delivered_at: null });
+        continue;
+      }
+
+      const ok = await sendTgWithOptout(prof.telegram_chat_id, text, evId, isUrgent);
+      sent += ok ? 1 : 0;
+      deliveries.push({
+        announcement_id: announcement.id,
+        user_id: uid,
+        status: ok ? "sent" : "failed",
+        delivered_at: ok ? new Date().toISOString() : null,
+      });
+    }
+
+    if (deliveries.length > 0) {
+      await adminDb.from("announcement_deliveries").insert(deliveries);
+    }
+
+    return json({ sent, skipped, no_tg: noTg, announcement_id: announcement.id });
   }
 
   if (!intentId) return json({ error: "intentId required" }, 400);

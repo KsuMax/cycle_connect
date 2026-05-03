@@ -14,7 +14,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useEventLikes } from "@/lib/context/EventLikesContext";
 import {
   ChevronLeft, Calendar, Bike, Heart,
-  Share2, Users, MapPin, ExternalLink, Flag, ChevronRight, Pencil, Lock, Trash2, UserPlus, Search, X, Download, RefreshCw, Info,
+  Share2, Users, MapPin, ExternalLink, Flag, ChevronRight, Pencil, Lock, Trash2, UserPlus, Search, X, Download, RefreshCw, Info, MessageCircle, Send, Bell,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { useAuthModal } from "@/components/ui/AuthModal";
@@ -45,6 +45,14 @@ interface EventData {
   gpx_updated_at: string | null;
   report_text: string | null;
   report_published_at: string | null;
+  chat_url: string | null;
+}
+
+interface Announcement {
+  id: string;
+  body: string;
+  is_urgent: boolean;
+  created_at: string;
 }
 
 function dbToEventData(data: DbEvent): EventData {
@@ -92,6 +100,8 @@ function dbToEventData(data: DbEvent): EventData {
     report_text: (data as any).report_text ?? null,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     report_published_at: (data as any).report_published_at ?? null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    chat_url: (data as any).chat_url ?? null,
   };
 }
 
@@ -117,6 +127,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [editingReport, setEditingReport] = useState(false);
   const [reportDraft, setReportDraft] = useState("");
   const [savingReport, setSavingReport] = useState(false);
+
+  // Announcements
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [annDraft, setAnnDraft] = useState("");
+  const [annUrgent, setAnnUrgent] = useState(false);
+  const [annSending, setAnnSending] = useState(false);
+  const [annResult, setAnnResult] = useState<{ sent: number; no_tg: number } | null>(null);
 
   // Organizer / admin: manage participants
   const [showAddParticipant, setShowAddParticipant] = useState(false);
@@ -152,6 +169,46 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     }
     load();
   }, [id, user]);
+
+  // Load announcements (only for participants / organizer — RLS handles it)
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("event_announcements")
+      .select("id, body, is_urgent, created_at")
+      .eq("event_id", id)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => { if (data) setAnnouncements(data as Announcement[]); });
+  }, [id, user]);
+
+  const handleSendAnnouncement = async () => {
+    if (!annDraft.trim() || !event) return;
+    setAnnSending(true);
+    setAnnResult(null);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setAnnSending(false); return; }
+
+    const res = await supabase.functions.invoke("tg-notify", {
+      body: { mode: "event_announcement", eventId: event.id, body: annDraft.trim(), isUrgent: annUrgent },
+    });
+
+    if (!res.error) {
+      const { sent, no_tg } = res.data as { sent: number; no_tg: number };
+      setAnnResult({ sent, no_tg });
+      // Reload announcements to show the new one
+      const { data } = await supabase
+        .from("event_announcements")
+        .select("id, body, is_urgent, created_at")
+        .eq("event_id", id)
+        .order("created_at", { ascending: false });
+      if (data) setAnnouncements(data as Announcement[]);
+      setAnnDraft("");
+      setAnnUrgent(false);
+    } else {
+      showToast("Не удалось отправить оповещение", "error");
+    }
+    setAnnSending(false);
+  };
 
   const handleShare = async () => {
     const url = window.location.href;
@@ -419,6 +476,71 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 <h2 className="font-semibold text-[#1C1C1E] mb-3">О поездке</h2>
                 <div className="prose prose-sm max-w-none text-[#71717A] leading-relaxed"
                   dangerouslySetInnerHTML={{ __html: sanitizeHtml(event.description) }} />
+              </div>
+            )}
+
+            {/* Announcements — visible to participants/organizer; composer for organizer only */}
+            {user && (isOrganizer || going) && (
+              <div className="bg-white rounded-2xl p-6 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+                <h2 className="font-semibold text-[#1C1C1E] mb-4 flex items-center gap-2">
+                  <Bell size={16} style={{ color: "#F4632A" }} /> Оповещения
+                </h2>
+
+                {/* Composer — organizer only */}
+                {isOrganizer && (
+                  <div className="mb-5 pb-5 border-b border-[#F5F4F1]">
+                    <textarea
+                      value={annDraft}
+                      onChange={(e) => setAnnDraft(e.target.value)}
+                      placeholder="Напишите оповещение для всех участников..."
+                      rows={3}
+                      className="w-full text-sm border border-[#E4E4E7] rounded-xl px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-[#F4632A]/20 focus:border-[#F4632A] transition-all"
+                    />
+                    <div className="flex items-center justify-between mt-3 flex-wrap gap-3">
+                      <label className="flex items-center gap-2 text-sm text-[#71717A] cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={annUrgent}
+                          onChange={(e) => setAnnUrgent(e.target.checked)}
+                          className="w-4 h-4 rounded accent-[#F4632A]"
+                        />
+                        Срочно (со звуком)
+                      </label>
+                      <button
+                        onClick={handleSendAnnouncement}
+                        disabled={annSending || !annDraft.trim()}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-colors"
+                        style={{ backgroundColor: "#F4632A" }}>
+                        <Send size={13} />
+                        {annSending ? "Отправляем..." : "Отправить участникам"}
+                      </button>
+                    </div>
+                    {annResult && (
+                      <div className="mt-3 text-xs px-3 py-2 rounded-lg" style={{ backgroundColor: "#F0FDF4", color: "#22C55E" }}>
+                        ✓ Доставлено {annResult.sent} участникам
+                        {annResult.no_tg > 0 && ` · ${annResult.no_tg} без Telegram — увидят здесь`}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Feed */}
+                {announcements.length === 0 ? (
+                  <p className="text-sm text-[#A1A1AA]">{isOrganizer ? "Оповещений пока нет" : "Оповещений от организатора пока нет"}</p>
+                ) : (
+                  <div className="space-y-3">
+                    {announcements.map((a) => (
+                      <div key={a.id} className="rounded-xl px-4 py-3 text-sm"
+                        style={{ backgroundColor: a.is_urgent ? "#FFF7ED" : "#F5F4F1" }}>
+                        <div className="text-[#1C1C1E] whitespace-pre-wrap">{a.body}</div>
+                        <div className="text-xs text-[#A1A1AA] mt-1.5 flex items-center gap-1.5">
+                          {a.is_urgent && <span style={{ color: "#F4632A" }}>🔔 Срочно ·</span>}
+                          {new Date(a.created_at).toLocaleString("ru-RU", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -747,6 +869,18 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-[#E4E4E7] text-sm text-[#71717A] hover:bg-[#F5F4F1] transition-colors mb-3">
                   <Bike size={14} /> Посмотреть маршрут
                 </Link>
+              )}
+
+              {/* Chat link — visible only to participants / organizer */}
+              {event.chat_url && (isOrganizer || going) && (
+                <a
+                  href={event.chat_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-[#E4E4E7] text-sm font-medium hover:bg-[#F5F4F1] transition-colors mb-3"
+                  style={{ color: "#0BBFB5", borderColor: "#0BBFB5" }}>
+                  <MessageCircle size={14} /> Чат события
+                </a>
               )}
 
               <div className="flex gap-2">
