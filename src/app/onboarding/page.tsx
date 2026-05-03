@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Map, Calendar, Users, Send, ArrowRight, Bike } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+
+const CONSENT_VERSION = "2026-05-02";
 
 const ACTIONS = [
   {
@@ -47,14 +49,44 @@ export default function OnboardingPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
   const [busy, setBusy] = useState<string | null>(null);
+  const [needsConsent, setNeedsConsent] = useState(false);
+  const [consent, setConsent] = useState(false);
+  const [consentError, setConsentError] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("profiles")
+      .select("consent_given_at")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data && data.consent_given_at == null) {
+          setNeedsConsent(true);
+        }
+      });
+  }, [user]);
 
   const completeAndGo = async (href: string) => {
     if (!user || busy) return;
+
+    if (needsConsent && !consent) {
+      setConsentError(true);
+      return;
+    }
+
     setBusy(href);
-    await supabase
-      .from("profiles")
-      .update({ onboarded_at: new Date().toISOString() })
-      .eq("id", user.id);
+    setConsentError(false);
+
+    const updates: Record<string, string> = {
+      onboarded_at: new Date().toISOString(),
+    };
+    if (needsConsent) {
+      updates.consent_given_at = new Date().toISOString();
+      updates.consent_version = CONSENT_VERSION;
+    }
+
+    await supabase.from("profiles").update(updates).eq("id", user.id);
     router.push(href);
     router.refresh();
   };
@@ -96,6 +128,53 @@ export default function OnboardingPage() {
             заезды и встречают единомышленников. С чего начнёшь?
           </p>
         </div>
+
+        {/* Consent block — shown only for OAuth users who skipped the form */}
+        {needsConsent && (
+          <div
+            className={`mb-6 rounded-2xl border p-5 bg-white ${
+              consentError ? "border-red-400" : "border-[#E4E4E7]"
+            }`}
+            style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.04)" }}
+          >
+            <label className="flex items-start gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={consent}
+                onChange={(e) => {
+                  setConsent(e.target.checked);
+                  if (e.target.checked) setConsentError(false);
+                }}
+                className="mt-0.5 w-4 h-4 rounded border-[#E4E4E7] accent-[#F4632A] cursor-pointer shrink-0"
+              />
+              <span className="text-sm text-[#3F3F46] leading-relaxed">
+                Я даю{" "}
+                <Link
+                  href="/legal/consent"
+                  target="_blank"
+                  className="font-medium hover:underline"
+                  style={{ color: "#F4632A" }}
+                >
+                  согласие на обработку персональных данных
+                </Link>{" "}
+                и принимаю{" "}
+                <Link
+                  href="/legal/terms"
+                  target="_blank"
+                  className="font-medium hover:underline"
+                  style={{ color: "#F4632A" }}
+                >
+                  Пользовательское соглашение
+                </Link>
+              </span>
+            </label>
+            {consentError && (
+              <p className="mt-2 text-xs text-red-600">
+                Пожалуйста, подтвердите согласие на обработку персональных данных, чтобы продолжить
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Action cards */}
         <div className="grid gap-3 sm:grid-cols-2">

@@ -69,15 +69,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Force first-time users through /onboarding before they can browse the app.
+  // Force first-time users (or users missing consent) through /onboarding.
   if (user && shouldEnforceOnboarding(request.nextUrl.pathname)) {
     const { data: prof } = await supabase
       .from("profiles")
-      .select("onboarded_at")
+      .select("onboarded_at, consent_given_at")
       .eq("id", user.id)
       .maybeSingle();
 
-    if (prof && prof.onboarded_at == null) {
+    if (prof && (prof.onboarded_at == null || prof.consent_given_at == null)) {
       const url = request.nextUrl.clone();
       url.pathname = "/onboarding";
       url.search = "";
