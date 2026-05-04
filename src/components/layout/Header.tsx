@@ -1,9 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Map, Newspaper, LogOut, HelpCircle } from "lucide-react";
+import { Map, Newspaper, HelpCircle } from "lucide-react";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useNavigation } from "@/lib/context/NavigationContext";
 import { proxyImageUrl } from "@/lib/supabase";
@@ -16,15 +16,8 @@ const NAV_ITEMS = [
 
 export function Header() {
   const pathname = usePathname();
-  const router = useRouter();
-  const { user, profile, signOut } = useAuth();
+  const { user, profile } = useAuth();
   const { navigate, pendingHref } = useNavigation();
-
-  const handleSignOut = async () => {
-    await signOut();
-    router.push("/");
-    router.refresh();
-  };
 
   const handleClick = (href: string) => (e: React.MouseEvent) => {
     e.preventDefault();
@@ -105,11 +98,6 @@ export function Header() {
                 </div>
                 <span>{profile?.name ?? "Профиль"}</span>
               </a>
-              <button onClick={handleSignOut}
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-[#A1A1AA] hover:text-[#71717A] hover:bg-[#F5F4F1] transition-colors"
-                title="Выйти">
-                <LogOut size={16} />
-              </button>
             </>
           ) : (
             <>

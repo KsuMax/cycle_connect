@@ -28,6 +28,7 @@ function shouldEnforceOnboarding(pathname: string): boolean {
   if (pathname === "/onboarding" || pathname.startsWith("/onboarding/")) return false;
   if (pathname.startsWith("/auth/")) return false;
   if (pathname.startsWith("/api/")) return false;
+  if (pathname.startsWith("/legal/")) return false;
   if (pathname === "/welcome") return false;
   return true;
 }

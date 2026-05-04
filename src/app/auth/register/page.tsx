@@ -247,6 +247,16 @@ export default function RegisterPage() {
           {/* Google OAuth */}
           <div className="mb-5">
             <GoogleOAuthButton />
+            <p className="text-xs text-[#A1A1AA] text-center mt-2 leading-relaxed">
+              Регистрируясь, вы принимаете{" "}
+              <Link href="/legal/consent" target="_blank" className="font-medium hover:underline" style={{ color: "#F4632A" }}>
+                согласие на обработку данных
+              </Link>{" "}
+              и{" "}
+              <Link href="/legal/terms" target="_blank" className="font-medium hover:underline" style={{ color: "#F4632A" }}>
+                Пользовательское соглашение
+              </Link>
+            </p>
             <div className="flex items-center gap-3 mt-4">
               <div className="flex-1 h-px bg-[#E4E4E7]" />
               <span className="text-xs text-[#A1A1AA]">или</span>
