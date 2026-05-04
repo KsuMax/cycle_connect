@@ -152,6 +152,22 @@ export interface DbRoute {
   route_comments?: { id: string; text: string; likes_count: number; created_at: string; author: { name: string } | null }[];
 }
 
+export type RideReportVibe = "chill" | "push" | "epic" | "suffer" | "explore";
+
+export interface DbRideReport {
+  id: string;
+  route_id: string;
+  user_id: string;
+  ride_id: string | null;
+  ridden_at: string;
+  vibe: RideReportVibe | null;
+  text: string | null;
+  photos: string[];
+  created_at: string;
+  route?: { id: string; title: string; cover_url: string | null } | null;
+  author?: { name: string; avatar_url: string | null } | null;
+}
+
 export interface DbRouteExitPoint {
   id: string;
   route_id: string;

@@ -19,6 +19,7 @@ import { useAuthModal } from "@/components/ui/AuthModal";
 import { useToast } from "@/lib/context/ToastContext";
 import { useAchievements } from "@/lib/context/AchievementsContext";
 import { RideIntentsSection } from "@/components/routes/RideIntentsSection";
+import { RideReportsSection } from "@/components/routes/RideReportsSection";
 import { WindWidget } from "@/components/routes/WindWidget";
 import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users, Download, Train, Bus, CarTaxiFront, Route as RouteIcon, MoreVertical } from "lucide-react";
 import type { ExitPointKind } from "@/types";
@@ -142,6 +143,7 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
   const [intentsKey, setIntentsKey] = useState(0);
   const [showRideMenu, setShowRideMenu] = useState(false);
   const [removingRide, setRemovingRide] = useState(false);
+  const [reportPromptRideId, setReportPromptRideId] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -334,11 +336,12 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
           <div className="flex gap-2 group/rideactions">
             <div className="flex-1 relative group/ridebtn">
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (!requireAuth("отметить проезд")) return;
-                  addRide(route!.id, route!.distance_km);
+                  const rideId = await addRide(route!.id, route!.distance_km);
                   showToast("Проезд отмечен! +" + route!.distance_km + " км", "success");
                   checkAndAward("ride_added", { routeId: route!.id, authorId: route!.author.id, distanceKm: route!.distance_km });
+                  setReportPromptRideId(rideId);
                 }}
                 className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors"
                 style={{ backgroundColor: "#F4632A", color: "white" }}
@@ -393,11 +396,12 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
     return (
       <div className="flex-1 relative group/ridebtn">
         <button
-          onClick={() => {
+          onClick={async () => {
             if (!requireAuth("отметить маршрут")) return;
-            addRide(route!.id, route!.distance_km);
+            const rideId = await addRide(route!.id, route!.distance_km);
             showToast("Проезд отмечен! +" + route!.distance_km + " км", "success");
             checkAndAward("ride_added", { routeId: route!.id, authorId: route!.author.id, distanceKm: route!.distance_km });
+            setReportPromptRideId(rideId);
           }}
           className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors"
           style={{ backgroundColor: "#1C1C1E", color: "white" }}
@@ -473,6 +477,9 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
               </div>
             )}
 
+            {/* Ride reports */}
+            <RideReportsSection routeId={route.id} routeTitle={route.title} />
+
             {/* Comments */}
             <RouteComments routeId={route.id} />
           </div>
@@ -545,6 +552,28 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
                   <Heart size={14} fill={liked ? "#F4632A" : "none"} />
                 </button>
               </div>
+
+              {/* Report prompt — shown after marking a ride */}
+              {reportPromptRideId !== null && (
+                <div className="mt-3 p-3 rounded-xl border border-[#E4E4E7] bg-[#FAFAF9] flex items-center justify-between gap-3">
+                  <p className="text-xs text-[#3F3F46] font-medium">📝 Поделись впечатлениями?</p>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => setReportPromptRideId(null)}
+                      className="text-xs text-[#A1A1AA] hover:text-[#71717A] transition-colors"
+                    >
+                      Потом
+                    </button>
+                    <Link
+                      href={`/routes/${route.id}/report/new?rideId=${reportPromptRideId}`}
+                      className="text-xs font-semibold px-3 py-1 rounded-lg text-white transition-colors"
+                      style={{ backgroundColor: "#F4632A" }}
+                    >
+                      Написать
+                    </Link>
+                  </div>
+                </div>
+              )}
 
               {isAuthor && (
                 <div className="mt-3 flex gap-2">

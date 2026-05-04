@@ -4,18 +4,21 @@ import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { EventCard } from "@/components/events/EventCard";
-import { Bike, TrendingUp, Calendar, Users, Plus, ArrowRight } from "lucide-react";
+import { ReportCard } from "@/components/routes/ReportCard";
+import { Bike, TrendingUp, Calendar, Users, Plus, ArrowRight, BookOpen } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import type { Route, CycleEvent } from "@/types";
+import type { DbRideReport } from "@/lib/supabase";
 
 interface Props {
   initialRoutes: Route[];
   initialEvents: CycleEvent[];
+  initialReports: DbRideReport[];
 }
 
-export function FeedClient({ initialRoutes, initialEvents }: Props) {
+export function FeedClient({ initialRoutes, initialEvents, initialReports }: Props) {
   const { user } = useAuth();
   // null = ещё грузим, true = есть клуб, false = нет клуба
   const [hasClub, setHasClub] = useState<boolean | null>(null);
@@ -91,6 +94,24 @@ export function FeedClient({ initialRoutes, initialEvents }: Props) {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
                   {visibleEvents.map((event, i) => <EventCard key={event.id} event={event} priority={i === 0} />)}
+                </div>
+              </section>
+            )}
+
+            {/* Recent ride reports */}
+            {initialReports.length > 0 && (
+              <section>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-1 h-6 rounded-full" style={{ backgroundColor: "#22A75B" }} />
+                  <h2 className="text-lg font-bold text-[#1C1C1E] flex items-center gap-2">
+                    <BookOpen size={18} style={{ color: "#22A75B" }} />
+                    Свежие отчёты
+                  </h2>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {initialReports.map((report) => (
+                    <ReportCard key={report.id} report={report} showRoute />
+                  ))}
                 </div>
               </section>
             )}

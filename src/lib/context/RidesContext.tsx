@@ -10,8 +10,8 @@ interface RidesContextValue {
   /** routeId → number of times ridden */
   rideCounts: Map<string, number>;
   ridesLoaded: boolean;
-  /** Add one ride (manual or auto from event). Does NOT remove rides. */
-  addRide: (routeId: string, distanceKm?: number, eventId?: string) => Promise<void>;
+  /** Add one ride (manual or auto from event). Returns new ride id or null. Does NOT remove rides. */
+  addRide: (routeId: string, distanceKm?: number, eventId?: string) => Promise<string | null>;
   /** Remove one ride record. Returns true on success, error string on failure. */
   removeRide: (routeId: string) => Promise<true | string>;
   hasRidden: (routeId: string) => boolean;
@@ -76,14 +76,17 @@ export function RidesProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
-  const addRide = useCallback(async (routeId: string, distanceKm?: number, eventId?: string) => {
+  const addRide = useCallback(async (routeId: string, distanceKm?: number, eventId?: string): Promise<string | null> => {
+    let rideId: string | null = null;
+
     if (user) {
       try {
-        await supabase.from("route_rides").insert({
+        const { data } = await supabase.from("route_rides").insert({
           user_id: user.id,
           route_id: routeId,
           ...(eventId ? { event_id: eventId } : {}),
-        });
+        }).select("id").single();
+        rideId = data?.id ?? null;
         // km_total is updated automatically by the trg_sync_km_total DB trigger
       } catch {
         // Supabase unavailable — persist locally only
@@ -96,6 +99,8 @@ export function RidesProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(next)));
       return next;
     });
+
+    return rideId;
   }, [user]);
 
   const removeRide = useCallback(async (routeId: string): Promise<true | string> => {
