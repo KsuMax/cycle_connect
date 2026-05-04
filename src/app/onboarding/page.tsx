@@ -3,45 +3,100 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Map, Calendar, Users, Send, ArrowRight, Bike } from "lucide-react";
+import {
+  Search,
+  Wind,
+  Send,
+  Users,
+  Map,
+  Flag,
+  Calendar,
+  Bell,
+  ArrowRight,
+  Bike,
+} from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 
 const CONSENT_VERSION = "2026-05-02";
 
-const ACTIONS = [
+type Card = {
+  href: string;
+  icon: typeof Search;
+  accent: string;
+  bg: string;
+  title: string;
+  body: string;
+};
+
+const RIDER_CARDS: readonly Card[] = [
   {
     href: "/routes",
-    icon: Map,
+    icon: Search,
     accent: "#F4632A",
     bg: "#FFF0EB",
-    title: "Найди маршрут рядом",
-    body: "Сотни проверенных треков с GPX, фильтрами и AI‑поиском по описанию.",
+    title: "AI-поиск по описанию",
+    body: "Напиши «маршрут по гравийке до 60 км недалеко от меня» или «равнинный маршрут на пару часов» — подберём подходящие треки из базы.",
   },
   {
-    href: "/events",
-    icon: Calendar,
+    href: "/routes",
+    icon: Wind,
     accent: "#0E9F8B",
     bg: "#E6F6F3",
-    title: "Запишись на ближайший выезд",
-    body: "Покатушки выходного дня и многодневные туры. Регистрация в один клик.",
-  },
-  {
-    href: "/clubs",
-    icon: Users,
-    accent: "#7C5CFC",
-    bg: "#EFEAFE",
-    title: "Вступай в клуб",
-    body: "Гревел, шоссе, MTB или городские покатушки — найди свою команду.",
+    title: "Маршруты с попутным ветром",
+    body: "Выбираешь день — показываем маршруты, где ветер будет дуть в спину или где лучше поехать в обратную сторону. Прогноз пересчитывается автоматически, не надо самому вертеть карту по компасу.",
   },
   {
     href: "/profile/settings",
     icon: Send,
     accent: "#229ED9",
     bg: "#E5F4FB",
-    title: "Подключи Telegram",
-    body: "Уведомления о событиях и новых заездах прямо в мессенджер.",
+    title: "Telegram-бот и уведомления",
+    body: "Привяжи Telegram в настройках профиля — сможешь искать маршруты прямо в боте и получать уведомления, когда меняется маршрут или событие, на которое ты записан.",
+  },
+  {
+    href: "/clubs",
+    icon: Users,
+    accent: "#7C5CFC",
+    bg: "#EFEAFE",
+    title: "Клубы и события",
+    body: "Подпишись на клуб или запишись на ближайшую покатушку — будешь в курсе всех выездов команды.",
+  },
+] as const;
+
+const ORGANIZER_CARDS: readonly Card[] = [
+  {
+    href: "/routes/new",
+    icon: Map,
+    accent: "#F4632A",
+    bg: "#FFF0EB",
+    title: "Маршруты из любого планировщика",
+    body: "Komoot, Strava, RideWithGPS, MapMagic, Bikemap — добавляй маршрут одной ссылкой. Длину, набор и профиль подтянем сами. Свой планировщик строить не нужно — пользуйся тем, к которому привык.",
+  },
+  {
+    href: "/clubs/new",
+    icon: Flag,
+    accent: "#7C5CFC",
+    bg: "#EFEAFE",
+    title: "Клубы",
+    body: "Собирай команду в одном месте: участники, расписание выездов, лента обсуждений. Видна всем или только своим — решаешь ты.",
+  },
+  {
+    href: "/events/new",
+    icon: Calendar,
+    accent: "#0E9F8B",
+    bg: "#E6F6F3",
+    title: "Мероприятия — открытые или по ссылке",
+    body: "Открытая покатушка попадает в общую ленту и видна всем. Закрытая — доступна только по приватной ссылке-приглашению, удобно для своих и для коммерческих туров.",
+  },
+  {
+    href: "/profile/settings",
+    icon: Bell,
+    accent: "#229ED9",
+    bg: "#E5F4FB",
+    title: "Связь с участниками",
+    body: "Записавшимся автоматом летят напоминания и уведомления об изменениях — в приложение и в Telegram, если они его привязали.",
   },
 ] as const;
 
@@ -70,6 +125,9 @@ export default function OnboardingPage() {
 
     if (needsConsent && !consent) {
       setConsentError(true);
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
       return;
     }
 
@@ -122,8 +180,8 @@ export default function OnboardingPage() {
             Добро пожаловать!
           </h1>
           <p className="mt-2 text-sm text-[#71717A] leading-relaxed max-w-md mx-auto">
-            CycleConnect — место, где велосипедисты находят маршруты, собирают
-            заезды и встречают единомышленников. С чего начнёшь?
+            Что тебя сюда привело? CycleConnect полезен и тем, кто катается, и
+            тем, кто водит группы. Ниже — что ты получишь в каждой роли.
           </p>
         </div>
 
@@ -174,49 +232,34 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Action cards */}
-        <div className="grid gap-3 sm:grid-cols-2">
-          {ACTIONS.map(({ href, icon: Icon, accent, bg, title, body }) => {
-            const isBusy = busy === href;
-            return (
-              <button
-                key={href}
-                onClick={() => completeAndGo(href)}
-                disabled={!!busy || needsConsent === null}
-                className="group text-left rounded-2xl border border-[#E4E4E7] bg-white p-5 hover:border-[#F4632A] hover:shadow-sm transition-all disabled:opacity-60"
-                style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.04)" }}
-              >
-                <div className="flex items-start gap-3">
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: bg }}
-                  >
-                    <Icon size={20} style={{ color: accent }} strokeWidth={2.2} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-sm font-bold text-[#1C1C1E]">
-                        {title}
-                      </h3>
-                      <ArrowRight
-                        size={14}
-                        className={`text-[#A1A1AA] shrink-0 transition-transform ${
-                          isBusy ? "translate-x-0.5" : "group-hover:translate-x-0.5"
-                        }`}
-                      />
-                    </div>
-                    <p className="mt-1 text-xs text-[#71717A] leading-relaxed">
-                      {body}
-                    </p>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
+        {/* Section: Riders */}
+        <RoleSection
+          title="Я катаюсь и ищу маршруты"
+          subtitle="Чтобы каждый выезд был новым и в кайф"
+          cards={RIDER_CARDS}
+          busy={busy}
+          disabled={needsConsent === null}
+          onPick={completeAndGo}
+        />
+
+        {/* Section: Organizers */}
+        <div className="mt-8">
+          <RoleSection
+            title="Я вожу группы или веду клуб"
+            subtitle="Здесь вся инфраструктура для покатушек — без самописных таблиц и чатов"
+            cards={ORGANIZER_CARDS}
+            busy={busy}
+            disabled={needsConsent === null}
+            onPick={completeAndGo}
+          />
         </div>
 
+        <p className="mt-8 text-center text-xs text-[#71717A]">
+          Роли не взаимоисключающие — катайся сам и води группы из одного аккаунта.
+        </p>
+
         {/* Skip */}
-        <div className="mt-6 flex items-center justify-center">
+        <div className="mt-4 flex items-center justify-center">
           <Button
             variant="ghost"
             size="md"
@@ -232,5 +275,70 @@ export default function OnboardingPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+function RoleSection({
+  title,
+  subtitle,
+  cards,
+  busy,
+  disabled,
+  onPick,
+}: {
+  title: string;
+  subtitle: string;
+  cards: readonly Card[];
+  busy: string | null;
+  disabled: boolean;
+  onPick: (href: string) => void;
+}) {
+  return (
+    <section>
+      <div className="mb-4 px-1">
+        <h2 className="text-lg font-bold text-[#1C1C1E]">{title}</h2>
+        <p className="mt-1 text-sm text-[#71717A] leading-relaxed">{subtitle}</p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {cards.map(({ href, icon: Icon, accent, bg, title: cardTitle, body }, i) => {
+          const key = `${href}-${i}`;
+          const isBusy = busy === href;
+          return (
+            <button
+              key={key}
+              onClick={() => onPick(href)}
+              disabled={!!busy || disabled}
+              className="group text-left rounded-2xl border border-[#E4E4E7] bg-white p-5 hover:border-[#F4632A] hover:shadow-sm transition-all disabled:opacity-60"
+              style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.04)" }}
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: bg }}
+                >
+                  <Icon size={20} style={{ color: accent }} strokeWidth={2.2} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-bold text-[#1C1C1E]">
+                      {cardTitle}
+                    </h3>
+                    <ArrowRight
+                      size={14}
+                      className={`text-[#A1A1AA] shrink-0 transition-transform ${
+                        isBusy ? "translate-x-0.5" : "group-hover:translate-x-0.5"
+                      }`}
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-[#71717A] leading-relaxed">
+                    {body}
+                  </p>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
