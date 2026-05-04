@@ -364,6 +364,13 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
               {showRideMenu && (
                 <div className="absolute right-0 top-full mt-1 bg-white rounded-lg border border-[#E4E4E7] shadow-lg z-10 min-w-48"
                   style={{ boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)" }}>
+                  <Link
+                    href={`/routes/${route!.id}/report/new`}
+                    onClick={() => setShowRideMenu(false)}
+                    className="w-full px-4 py-2.5 text-left text-sm font-medium text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors first:rounded-t-lg last:rounded-b-lg flex items-center gap-2"
+                  >
+                    📝 Написать отчёт
+                  </Link>
                   <button
                     onClick={async () => {
                       setRemovingRide(true);
