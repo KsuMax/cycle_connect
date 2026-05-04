@@ -112,6 +112,11 @@ const nextConfig: NextConfig = {
         source: "/api/supabase/realtime/:path*",
         destination: `${supabaseUrl}/realtime/:path*`,
       },
+      // Proxy Supabase Edge Functions
+      {
+        source: "/api/supabase/functions/:path*",
+        destination: `${supabaseUrl}/functions/:path*`,
+      },
     ];
   },
   output: "standalone",
