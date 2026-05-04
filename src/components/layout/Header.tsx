@@ -68,6 +68,17 @@ export function Header() {
           })}
         </nav>
 
+        {/* Help icon — mobile only */}
+        {user && (
+          <button
+            onClick={() => navigate("/onboarding")}
+            title="Что я могу здесь делать?"
+            className="sm:hidden min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-[#A1A1AA] hover:text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors"
+          >
+            <HelpCircle size={18} />
+          </button>
+        )}
+
         {/* Auth area — hidden on mobile (BottomNav handles it) */}
         <div className="hidden sm:flex items-center gap-2 shrink-0">
           {user ? (
