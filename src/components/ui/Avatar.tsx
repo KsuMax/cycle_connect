@@ -40,13 +40,31 @@ export function Avatar({ user, size = "md", className, sticker }: AvatarProps) {
       title={user.name}
     >
       {user.avatar_url
-        ? <Image
-            src={proxyImageUrl(user.avatar_url) ?? user.avatar_url}
-            alt={user.name}
-            width={SIZE_PX[size]}
-            height={SIZE_PX[size]}
-            className="w-full h-full object-cover"
-          />
+        ? (() => {
+            const src = proxyImageUrl(user.avatar_url) ?? user.avatar_url;
+            // External avatars (e.g. Google `lh3.googleusercontent.com`) aren't
+            // in next.config remotePatterns — load them directly via <img>
+            // instead of next/image so they don't 400.
+            const isExternal = /^https?:\/\//.test(src);
+            return isExternal ? (
+              <img
+                src={src}
+                alt={user.name}
+                width={SIZE_PX[size]}
+                height={SIZE_PX[size]}
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <Image
+                src={src}
+                alt={user.name}
+                width={SIZE_PX[size]}
+                height={SIZE_PX[size]}
+                className="w-full h-full object-cover"
+              />
+            );
+          })()
         : user.initials
       }
     </div>
