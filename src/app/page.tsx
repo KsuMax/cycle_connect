@@ -10,9 +10,9 @@ export default async function FeedPage() {
 
   const [routesResult, eventsResult] = await Promise.all([
     supabase
-      .from("routes")
+      .from("routes_ranked")
       .select(ROUTE_LIST_SELECT)
-      .order("likes_count", { ascending: false })
+      .order("hot_score", { ascending: false })
       .limit(4),
     supabase
       .from("events")
