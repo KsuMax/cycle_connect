@@ -39,6 +39,8 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "*.supabase.co" },
       { protocol: "https", hostname: "*.supabase.in" },
       { protocol: "https", hostname: "api.cycleconnect.cc" },
+      // Google OAuth avatars
+      { protocol: "https", hostname: "*.googleusercontent.com" },
     ],
   },
   transpilePackages: [
