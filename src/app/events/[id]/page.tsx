@@ -16,6 +16,7 @@ import {
   ChevronLeft, Calendar, Bike, Heart,
   Share2, Users, MapPin, ExternalLink, Flag, ChevronRight, Pencil, Lock, Trash2, UserPlus, Search, X, Download, RefreshCw, Info, MessageCircle, Send, Bell,
 } from "lucide-react";
+import MarkdownIt from "markdown-it";
 import { formatDate } from "@/lib/utils";
 import { useAuthModal } from "@/components/ui/AuthModal";
 import { useToast } from "@/lib/context/ToastContext";
@@ -24,6 +25,8 @@ import { sanitizeHtml } from "@/lib/sanitize";
 import type { User, Route, EventDay, RouteType } from "@/types";
 import type { DbEvent, DbEventDay, DbProfile, DbRoute } from "@/lib/supabase";
 import { dbToRoute, dbToUser, gpxPathToUrl } from "@/lib/transforms";
+
+const md = new MarkdownIt({ html: false, linkify: true, breaks: true });
 
 interface EventData {
   id: string;
@@ -134,6 +137,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [annUrgent, setAnnUrgent] = useState(false);
   const [annSending, setAnnSending] = useState(false);
   const [annResult, setAnnResult] = useState<{ sent: number; no_tg: number } | null>(null);
+  const [annDeleting, setAnnDeleting] = useState<string | null>(null);
 
   // Organizer / admin: manage participants
   const [showAddParticipant, setShowAddParticipant] = useState(false);
@@ -208,6 +212,17 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       showToast("Не удалось отправить оповещение", "error");
     }
     setAnnSending(false);
+  };
+
+  const handleDeleteAnnouncement = async (annId: string) => {
+    setAnnDeleting(annId);
+    const { error } = await supabase.from("event_announcements").delete().eq("id", annId);
+    if (!error) {
+      setAnnouncements((prev) => prev.filter((a) => a.id !== annId));
+    } else {
+      showToast("Не удалось удалить оповещение", "error");
+    }
+    setAnnDeleting(null);
   };
 
   const handleShare = async () => {
@@ -532,10 +547,24 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     {announcements.map((a) => (
                       <div key={a.id} className="rounded-xl px-4 py-3 text-sm"
                         style={{ backgroundColor: a.is_urgent ? "#FFF7ED" : "#F5F4F1" }}>
-                        <div className="text-[#1C1C1E] whitespace-pre-wrap">{a.body}</div>
-                        <div className="text-xs text-[#A1A1AA] mt-1.5 flex items-center gap-1.5">
-                          {a.is_urgent && <span style={{ color: "#F4632A" }}>🔔 Срочно ·</span>}
-                          {new Date(a.created_at).toLocaleString("ru-RU", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}
+                        <div
+                          className="prose text-sm text-[#1C1C1E] max-w-none"
+                          dangerouslySetInnerHTML={{ __html: md.render(a.body) }}
+                        />
+                        <div className="text-xs text-[#A1A1AA] mt-1.5 flex items-center justify-between gap-1.5">
+                          <span className="flex items-center gap-1.5">
+                            {a.is_urgent && <span style={{ color: "#F4632A" }}>🔔 Срочно ·</span>}
+                            {new Date(a.created_at).toLocaleString("ru-RU", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                          {isOrganizer && (
+                            <button
+                              onClick={() => handleDeleteAnnouncement(a.id)}
+                              disabled={annDeleting === a.id}
+                              className="p-1 rounded-lg hover:bg-black/5 text-[#A1A1AA] hover:text-red-500 transition-colors disabled:opacity-40"
+                              title="Удалить оповещение">
+                              <Trash2 size={13} />
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}
