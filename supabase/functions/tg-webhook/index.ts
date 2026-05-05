@@ -18,8 +18,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN")!;
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY")!;
 const SITE_URL = Deno.env.get("SITE_URL") ?? "https://cycleconnect.cc";
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+// DB_URL / DB_SERVICE_KEY allow overriding the auto-injected Supabase vars —
+// used when the function runs on cloud Supabase but queries a self-hosted DB.
+const SUPABASE_URL = Deno.env.get("DB_URL") ?? Deno.env.get("SUPABASE_URL")!;
+const SERVICE_KEY = Deno.env.get("DB_SERVICE_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false },
