@@ -43,8 +43,6 @@ export default function SettingsPage() {
   const [website, setWebsite] = useState("");
   const [stravaUrl, setStravaUrl] = useState("");
   const [telegramUsername, setTelegramUsername] = useState("");
-  const [contactEmail, setContactEmail] = useState("");
-  const [emailPublic, setEmailPublic] = useState(false);
   const [tgLinked, setTgLinked] = useState(false);
   const [tgNotifyIntents, setTgNotifyIntents] = useState(true);
   const [tgLinking, setTgLinking] = useState(false);
@@ -71,8 +69,6 @@ export default function SettingsPage() {
       setWebsite(profile.website ?? "");
       setStravaUrl(profile.strava_url ?? "");
       setTelegramUsername(profile.telegram_username ?? "");
-      setContactEmail(profile.contact_email ?? "");
-      setEmailPublic(profile.email_public ?? false);
       setTgLinked(!!profile.telegram_chat_id);
       setTgNotifyIntents(profile.tg_notify_intents !== false);
     }
@@ -158,12 +154,6 @@ export default function SettingsPage() {
       setError("Telegram-никнейм: 5–32 латинских буквы, цифры или _");
       return;
     }
-    const contactEmailTrimmed = contactEmail.trim();
-    if (contactEmailTrimmed && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contactEmailTrimmed)) {
-      setError("Контактный e-mail: проверь формат");
-      return;
-    }
-
     // Update profile table
     const profileUpdate: Record<string, string | boolean | null> = {
       name: name.trim(),
@@ -171,8 +161,6 @@ export default function SettingsPage() {
       website: website.trim() || null,
       strava_url: stravaUrl.trim() || null,
       telegram_username: tgTrimmed || null,
-      contact_email: contactEmailTrimmed || null,
-      email_public: emailPublic && !!contactEmailTrimmed,
       tg_notify_intents: tgNotifyIntents,
     };
     const { error: profileError } = await supabase
@@ -289,28 +277,6 @@ export default function SettingsPage() {
                 />
               </div>
               <p className="text-[11px] text-[#A1A1AA] mt-1">Кнопка «Написать» откроет чат в Telegram</p>
-            </Field>
-            <Field label="Контактный e-mail" htmlFor="contact-email">
-              <input
-                id="contact-email"
-                type="email"
-                value={contactEmail}
-                onChange={(e) => setContactEmail(e.target.value)}
-                placeholder="rider@example.com"
-                className={INPUT_CLS}
-                autoCapitalize="none"
-                autoCorrect="off"
-              />
-              <label className="mt-2 flex items-center gap-2 text-xs text-[#71717A] cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={emailPublic}
-                  onChange={(e) => setEmailPublic(e.target.checked)}
-                  className="w-4 h-4 rounded border-[#E4E4E7] accent-[#F4632A]"
-                  disabled={!contactEmail.trim()}
-                />
-                Показывать другим участникам
-              </label>
             </Field>
           </Section>
 

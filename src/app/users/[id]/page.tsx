@@ -222,7 +222,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                       )}
                       {!isOwnProfile && (
                         <ContactButton
-                          user={{ name: profile.name, telegram_username: profile.telegram_username, contact_email: profile.contact_email }}
+                          user={{ name: profile.name, telegram_username: profile.telegram_username }}
                           variant="inline"
                           stopPropagation={false}
                         />

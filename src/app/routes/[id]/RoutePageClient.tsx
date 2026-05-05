@@ -182,7 +182,7 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
     const today = new Date().toISOString().split("T")[0];
     supabase
       .from("ride_intents")
-      .select("*, creator:profiles!creator_id(id, name, avatar_url, telegram_username, contact_email, email_public), participants:ride_intent_participants(user_id, joined_at, profile:profiles!user_id(id, name, avatar_url, telegram_username, contact_email, email_public))")
+      .select("*, creator:profiles!creator_id(id, name, avatar_url, telegram_username), participants:ride_intent_participants(user_id, joined_at, profile:profiles!user_id(id, name, avatar_url, telegram_username))")
       .eq("route_id", id)
       .gte("planned_date", today)
       .order("planned_date", { ascending: true })

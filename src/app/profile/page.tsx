@@ -211,7 +211,7 @@ export default function ProfilePage() {
 
   const initials = profile?.name
     ? profile.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
-    : user?.email?.[0].toUpperCase() ?? "?";
+    : "?";
 
   const TABS: { id: Tab; label: string; icon: React.ReactNode; count: number }[] = [
     { id: "routes",       label: "Мои маршруты", icon: <Map size={15} />,      count: myRoutes.length },
@@ -290,7 +290,6 @@ export default function ProfilePage() {
                 <div>
                   <h1 className="text-xl font-bold text-[#1C1C1E]">{profile?.name || "Участник"}</h1>
                   {profile?.username && <p className="text-sm font-medium mt-0.5" style={{ color: "#F4632A" }}>@{profile.username}</p>}
-                  <p className="text-sm text-[#71717A] mt-0.5">{user.email}</p>
                   {profile?.bio && <p className="text-sm text-[#71717A] mt-1">{profile.bio}</p>}
                   {(profile?.website || profile?.strava_url) && (
                     <div className="flex items-center gap-3 mt-2 flex-wrap">

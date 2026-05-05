@@ -40,8 +40,6 @@ export function dbToUser(p: DbProfile, color = "#7C5CFC"): User {
     routes_count: p.routes_count ?? 0,
     events_count: p.events_count ?? 0,
     telegram_username: p.telegram_username ?? null,
-    // Only surface the e-mail when the user opted in explicitly.
-    contact_email: p.email_public ? (p.contact_email ?? null) : null,
   };
 }
 

@@ -8,7 +8,7 @@
  */
 
 const PROFILE_FIELDS =
-  "id, name, avatar_url, km_total, routes_count, events_count, telegram_username, contact_email, email_public";
+  "id, name, avatar_url, km_total, routes_count, events_count, telegram_username";
 
 /** Use for route list pages (routes/page.tsx, RoutesPageClient load-more). */
 export const ROUTE_LIST_SELECT = [
