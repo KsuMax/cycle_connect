@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useFavorites } from "@/lib/context/FavoritesContext";
 import { useRides } from "@/lib/context/RidesContext";
 import { supabase, proxyImageUrl } from "@/lib/supabase";
-import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink, Trophy } from "lucide-react";
+import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink, Trophy, Eye, Link2, Check } from "lucide-react";
 import { getUserSticker } from "@/lib/stickers";
 import { useAchievements } from "@/lib/context/AchievementsContext";
 import { AchievementBadge } from "@/components/ui/AchievementBadge";
@@ -72,6 +72,7 @@ export default function ProfilePage() {
   const [clubsCount, setClubsCount] = useState(0);
   const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
   const [showShowcasePicker, setShowShowcasePicker] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/auth/login");
@@ -326,9 +327,34 @@ export default function ProfilePage() {
                     </div>
                   )}
                 </div>
-                <Link href="/profile/settings" className="flex items-center gap-1.5 text-sm text-[#71717A] hover:text-[#1C1C1E] transition-colors p-2 rounded-lg hover:bg-[#F5F4F1]">
-                  <Settings size={16} /><span className="hidden sm:inline">Настройки</span>
-                </Link>
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <Link
+                    href={`/users/${user.id}`}
+                    target="_blank"
+                    title="Посмотреть как гость"
+                    className="flex items-center justify-center w-9 h-9 rounded-lg text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors"
+                  >
+                    <Eye size={16} />
+                  </Link>
+                  <button
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(`${window.location.origin}/users/${user.id}`);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
+                    title="Скопировать ссылку на профиль"
+                    className="flex items-center justify-center w-9 h-9 rounded-lg text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors"
+                  >
+                    {copied ? <Check size={16} className="text-green-500" /> : <Link2 size={16} />}
+                  </button>
+                  <Link
+                    href="/profile/settings"
+                    title="Настройки"
+                    className="flex items-center gap-1.5 text-sm text-[#71717A] hover:text-[#1C1C1E] transition-colors h-9 px-2 rounded-lg hover:bg-[#F5F4F1]"
+                  >
+                    <Settings size={16} /><span className="hidden sm:inline">Настройки</span>
+                  </Link>
+                </div>
               </div>
               {/* Hero stats */}
               <div className="flex gap-6 mt-4">
