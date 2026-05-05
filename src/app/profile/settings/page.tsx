@@ -38,6 +38,7 @@ export default function SettingsPage() {
   const router = useRouter();
 
   const [name, setName] = useState("");
+  const [bio, setBio] = useState("");
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [website, setWebsite] = useState("");
@@ -65,6 +66,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (profile) {
       setName(profile.name ?? "");
+      setBio(profile.bio ?? "");
       setUsername(profile.username ?? "");
       setWebsite(profile.website ?? "");
       setStravaUrl(profile.strava_url ?? "");
@@ -157,6 +159,7 @@ export default function SettingsPage() {
     // Update profile table
     const profileUpdate: Record<string, string | boolean | null> = {
       name: name.trim(),
+      bio: bio.trim() || null,
       username: username.trim() || null,
       website: website.trim() || null,
       strava_url: stravaUrl.trim() || null,
@@ -240,6 +243,18 @@ export default function SettingsPage() {
                 className={INPUT_CLS}
                 required
               />
+            </Field>
+            <Field label="О себе" htmlFor="bio">
+              <textarea
+                id="bio"
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                placeholder="Расскажи пару слов о себе и своём стиле катания"
+                maxLength={300}
+                rows={3}
+                className={`${INPUT_CLS} resize-none`}
+              />
+              <p className="text-[11px] text-[#A1A1AA] mt-1 text-right">{bio.length}/300</p>
             </Field>
             <Field label="Никнейм" htmlFor="username">
               <div className="relative">
