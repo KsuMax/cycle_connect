@@ -519,7 +519,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                           onChange={(e) => setAnnUrgent(e.target.checked)}
                           className="w-4 h-4 rounded accent-[#F4632A]"
                         />
-                        Срочно (со звуком)
+                        Важно (со звуком)
                       </label>
                       <button
                         onClick={handleSendAnnouncement}
@@ -553,7 +553,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         />
                         <div className="text-xs text-[#A1A1AA] mt-1.5 flex items-center justify-between gap-1.5">
                           <span className="flex items-center gap-1.5">
-                            {a.is_urgent && <span style={{ color: "#F4632A" }}>🔔 Срочно ·</span>}
+                            {a.is_urgent && <span style={{ color: "#F4632A" }}>🔔 Важно ·</span>}
                             {new Date(a.created_at).toLocaleString("ru-RU", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}
                           </span>
                           {isOrganizer && (
