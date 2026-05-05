@@ -22,15 +22,20 @@ const adminDb = createClient(SUPABASE_URL, SERVICE_KEY, {
 });
 
 async function sendTg(chatId: number, text: string): Promise<boolean> {
-  const res = await fetch(
-    `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
-    }
-  );
-  return res.ok;
+  try {
+    const res = await fetch(
+      `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
+        signal: AbortSignal.timeout(5000),
+      }
+    );
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 async function sendTgWithOptout(
@@ -39,26 +44,31 @@ async function sendTgWithOptout(
   eventId: string,
   urgent: boolean,
 ): Promise<boolean> {
-  const res = await fetch(
-    `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text,
-        parse_mode: "HTML",
-        disable_notification: !urgent,
-        reply_markup: {
-          inline_keyboard: [[{
-            text: "🔕 Не получать уведомления от этого события",
-            callback_data: `optout_event_${eventId}`,
-          }]],
-        },
-      }),
-    }
-  );
-  return res.ok;
+  try {
+    const res = await fetch(
+      `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+          parse_mode: "HTML",
+          disable_notification: !urgent,
+          reply_markup: {
+            inline_keyboard: [[{
+              text: "🔕 Не получать уведомления от этого события",
+              callback_data: `optout_event_${eventId}`,
+            }]],
+          },
+        }),
+        signal: AbortSignal.timeout(5000),
+      }
+    );
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 Deno.serve(async (req: Request) => {
