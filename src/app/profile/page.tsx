@@ -250,14 +250,26 @@ export default function ProfilePage() {
                   : initials
                 }
               </div>
+              {/* Desktop: hover overlay */}
               <button
                 onClick={() => avatarInputRef.current?.click()}
                 disabled={uploadingAvatar}
-                className="absolute inset-0 rounded-2xl flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                className="absolute inset-0 rounded-2xl hidden sm:flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                 title="Загрузить фото">
                 {uploadingAvatar
                   ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   : <Camera size={18} className="text-white" />
+                }
+              </button>
+              {/* Mobile: always-visible camera badge */}
+              <button
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                className="absolute -bottom-1.5 -right-1.5 sm:hidden w-6 h-6 rounded-full bg-white border border-[#E4E4E7] flex items-center justify-center z-10 shadow-sm"
+                title="Загрузить фото">
+                {uploadingAvatar
+                  ? <div className="w-3 h-3 border-2 border-[#7C5CFC] border-t-transparent rounded-full animate-spin" />
+                  : <Camera size={12} className="text-[#71717A]" />
                 }
               </button>
               <input
@@ -271,7 +283,7 @@ export default function ProfilePage() {
                 const sticker = profile ? getUserSticker(profile) : null;
                 return sticker ? (
                   <div
-                    className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full flex items-center justify-center text-sm leading-none border-2 border-white cursor-help select-none z-10"
+                    className="absolute -top-1.5 -right-1.5 w-7 h-7 rounded-full flex items-center justify-center text-sm leading-none border-2 border-white cursor-help select-none z-10"
                     style={{ background: sticker.bg }}
                     title={sticker.tooltip}
                   >
