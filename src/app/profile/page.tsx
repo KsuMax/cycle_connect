@@ -9,13 +9,14 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useFavorites } from "@/lib/context/FavoritesContext";
 import { useRides } from "@/lib/context/RidesContext";
 import { supabase, proxyImageUrl } from "@/lib/supabase";
-import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink, Users, Shield, Trophy, Send } from "lucide-react";
+import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink, Users, Shield, Trophy } from "lucide-react";
 import { getUserSticker } from "@/lib/stickers";
 import { useAchievements } from "@/lib/context/AchievementsContext";
 import { AchievementBadge } from "@/components/ui/AchievementBadge";
 import { ProfileShowcase } from "@/components/ui/ProfileShowcase";
 import { ShowcasePicker } from "@/components/ui/ShowcasePicker";
 import { AvatarLightbox } from "@/components/ui/AvatarLightbox";
+import { SetupChecklist } from "@/components/ui/SetupChecklist";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
 import type { Route } from "@/types";
@@ -372,51 +373,14 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Profile completion hint */}
-        {!profile?.bio && !avatarUrl && myRoutes.length === 0 && !loadingRoutes && (
-          <div className="bg-gradient-to-r from-[#FFF0EB] to-[#F5F3FF] rounded-2xl p-5 border border-[#E4E4E7] mb-6" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-            <h3 className="font-semibold text-[#1C1C1E] text-sm mb-1">Заполни профиль</h3>
-            <p className="text-xs text-[#71717A] mb-3">Добавь фото и расскажи о себе, чтобы другие велосипедисты тебя узнали</p>
-            <div className="flex items-center gap-2 flex-wrap">
-              {!avatarUrl && (
-                <button
-                  onClick={() => avatarInputRef.current?.click()}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-[#E4E4E7] text-[#71717A] hover:bg-white transition-colors"
-                >
-                  <Camera size={12} /> Добавить фото
-                </button>
-              )}
-              <Link href="/profile/settings"
-                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-[#E4E4E7] text-[#71717A] hover:bg-white transition-colors"
-              >
-                <Settings size={12} /> Настроить профиль
-              </Link>
-            </div>
-          </div>
-        )}
-
-        {/* Telegram connect CTA */}
-        {profile && !profile.telegram_chat_id && (
-          <div className="rounded-2xl p-5 border mb-6 flex items-start gap-4"
-            style={{ backgroundColor: "#E6F4FB", borderColor: "#93D0F0", boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "#0088CC" }}>
-              <Send size={18} className="text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-[#1C1C1E] text-sm mb-1">Подключи Telegram-бота</h3>
-              <p className="text-xs text-[#4A7FA5] mb-1">
-                Твоя следующая покатушка найдётся сама — бот подскажет, кто хочет присоединиться или уже ищет компанию.
-              </p>
-              <p className="text-xs text-[#4A7FA5] mb-3">
-                А ещё подберёт маршруты прямо в Telegram по твоему описанию — открыл и поехал 🚴‍♀️
-              </p>
-              <Link href="/profile/settings"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg text-white transition-opacity hover:opacity-90"
-                style={{ backgroundColor: "#0088CC" }}>
-                <Send size={12} /> Привязать Telegram
-              </Link>
-            </div>
-          </div>
+        {/* Setup checklist — replaces separate "fill profile" and Telegram banners */}
+        {profile && (
+          <SetupChecklist
+            hasBio={!!profile.bio}
+            hasAvatar={!!avatarUrl}
+            hasTelegram={!!profile.telegram_chat_id}
+            onUploadAvatar={() => avatarInputRef.current?.click()}
+          />
         )}
 
         {/* Community section */}
