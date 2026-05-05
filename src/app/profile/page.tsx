@@ -204,9 +204,7 @@ export default function ProfilePage() {
     e.target.value = "";
   };
 
-  const ridesKm = loadingRides
-    ? (profile?.km_total ?? 0)
-    : ridesData.reduce((sum, r) => sum + r.distance_km, 0);
+  const ridesKm = profile?.km_total ?? 0;
   const tripsCount = ridesData.length + myEvents.length;
 
   const initials = profile?.name
@@ -216,7 +214,7 @@ export default function ProfilePage() {
   const TABS: { id: Tab; label: string; icon: React.ReactNode; count: number }[] = [
     { id: "routes",       label: "Мои маршруты", icon: <Map size={15} />,      count: myRoutes.length },
     { id: "favorites",    label: "Избранное",    icon: <Bookmark size={15} />, count: favoriteRoutes.length },
-    { id: "events",       label: "Поездки",      icon: <Calendar size={15} />, count: tripsCount },
+    { id: "events",       label: "Активность",   icon: <Calendar size={15} />, count: tripsCount },
     { id: "achievements", label: "Достижения",   icon: <Trophy size={15} />,   count: earnedIds.size },
   ];
 
@@ -335,7 +333,7 @@ export default function ProfilePage() {
                 {[
                   { value: Math.round(ridesKm).toLocaleString(), label: "км всего",    color: "#F4632A", href: null },
                   { value: myRoutes.length,                       label: "маршрутов",  color: "#7C5CFC", href: null },
-                  { value: loadingRides ? "..." : ridesData.length, label: "поездок", color: "#0BBFB5", href: null },
+                  { value: (loadingRides || loadingEvents) ? "..." : tripsCount, label: "активностей", color: "#0BBFB5", href: null },
                   { value: clubsCount,                            label: "клубов",     color: "#0BBFB5", href: "/clubs" },
                   { value: followersCount, label: "подписчиков",  color: "#A1A1AA",   href: user ? `/users/${user.id}/followers` : null },
                   { value: followingCount, label: "подписок",     color: "#A1A1AA",   href: user ? `/users/${user.id}/following` : null },
