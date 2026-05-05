@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Map, Newspaper, HelpCircle } from "lucide-react";
+import { Map, Newspaper, HelpCircle, Users, Shield } from "lucide-react";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useNavigation } from "@/lib/context/NavigationContext";
 import { proxyImageUrl } from "@/lib/supabase";
@@ -12,6 +12,8 @@ import { NotificationBell } from "@/components/ui/NotificationBell";
 const NAV_ITEMS = [
   { href: "/", label: "Лента", icon: Newspaper },
   { href: "/routes", label: "Маршруты", icon: Map },
+  { href: "/users", label: "Участники", icon: Users },
+  { href: "/clubs", label: "Клубы", icon: Shield },
 ];
 
 export function Header() {
