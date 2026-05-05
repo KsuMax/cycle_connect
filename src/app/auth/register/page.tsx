@@ -8,16 +8,13 @@ import {
   Eye,
   EyeOff,
   CheckCircle,
-  Bot,
-  Bell,
-  MapPin,
-  Users,
   ChevronDown,
   ChevronUp,
   RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { GoogleOAuthButton } from "@/components/ui/GoogleOAuthButton";
+import { TelegramAuthButton } from "@/components/ui/TelegramAuthButton";
 import { supabase } from "@/lib/supabase";
 
 function ResendButton({ email }: { email: string }) {
@@ -244,10 +241,11 @@ export default function RegisterPage() {
           className="bg-white rounded-2xl p-6 border border-[#E4E4E7]"
           style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}
         >
-          {/* Google OAuth */}
-          <div className="mb-5">
+          {/* OAuth buttons */}
+          <div className="mb-5 space-y-2">
+            <TelegramAuthButton />
             <GoogleOAuthButton />
-            <p className="text-xs text-[#A1A1AA] text-center mt-2 leading-relaxed">
+            <p className="text-xs text-[#A1A1AA] text-center mt-1 leading-relaxed">
               Регистрируясь, вы принимаете{" "}
               <Link href="/legal/consent" target="_blank" className="font-medium hover:underline" style={{ color: "#F4632A" }}>
                 согласие на обработку данных
@@ -257,9 +255,9 @@ export default function RegisterPage() {
                 Пользовательское соглашение
               </Link>
             </p>
-            <div className="flex items-center gap-3 mt-4">
+            <div className="flex items-center gap-3 mt-3">
               <div className="flex-1 h-px bg-[#E4E4E7]" />
-              <span className="text-xs text-[#A1A1AA]">или</span>
+              <span className="text-xs text-[#A1A1AA]">или через email</span>
               <div className="flex-1 h-px bg-[#E4E4E7]" />
             </div>
           </div>
@@ -349,44 +347,6 @@ export default function RegisterPage() {
                 >
                   {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
-              </div>
-            </div>
-
-            {/* ── Divider ── */}
-            <div className="border-t border-[#E4E4E7]" />
-
-            {/* ── Telegram Bot promo card ── */}
-            <div className="rounded-xl border border-[#E4E4E7] bg-[#FAFAF9] p-4">
-              <div className="flex items-start gap-3">
-                <div
-                  className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: "#F4632A1A" }}
-                >
-                  <Bot size={18} style={{ color: "#F4632A" }} />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-[#1C1C1E]">
-                    Привяжи Telegram‑бота
-                  </p>
-                  <p className="text-xs text-[#71717A] mt-0.5 leading-relaxed">
-                    Бот отправляет уведомления прямо в Telegram — не пропустишь ни одного события.
-                  </p>
-                  <ul className="mt-2 space-y-1">
-                    {[
-                      { icon: Bell, text: "Напоминания о заездах и событиях" },
-                      { icon: Users, text: "Новые участники на твоих маршрутах" },
-                      { icon: MapPin, text: "Изменения в маршрутах, которые ты отслеживаешь" },
-                    ].map(({ icon: Icon, text }) => (
-                      <li key={text} className="flex items-center gap-1.5 text-xs text-[#71717A]">
-                        <Icon size={12} style={{ color: "#F4632A" }} className="shrink-0" />
-                        {text}
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="text-xs text-[#A1A1AA] mt-2">
-                    Привязку можно завершить в настройках профиля после регистрации.
-                  </p>
-                </div>
               </div>
             </div>
 

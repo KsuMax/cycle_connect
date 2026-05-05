@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Bike, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { GoogleOAuthButton } from "@/components/ui/GoogleOAuthButton";
+import { TelegramAuthButton } from "@/components/ui/TelegramAuthButton";
 import { supabase } from "@/lib/supabase";
 
 function LoginForm() {
@@ -57,8 +58,9 @@ function LoginForm() {
         </div>
 
         <div className="bg-white rounded-2xl p-6 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-          {/* Google OAuth */}
-          <div className="mb-5">
+          {/* OAuth buttons */}
+          <div className="mb-5 space-y-2">
+            <TelegramAuthButton returnUrl={returnUrl} />
             <GoogleOAuthButton />
             <div className="flex items-center gap-3 mt-4">
               <div className="flex-1 h-px bg-[#E4E4E7]" />

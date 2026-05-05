@@ -81,6 +81,25 @@ function CallbackHandler() {
   useEffect(() => {
     const handle = async () => {
       const code = searchParams.get("code");
+      const tokenHash = searchParams.get("token_hash");
+      const type = searchParams.get("type");
+
+      if (tokenHash && type) {
+        // OTP / magiclink flow — used by Telegram login
+        const { data, error } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: type as "magiclink" | "email",
+        });
+        if (!error && data.session) {
+          await ensureProfile(
+            data.session.user.id,
+            data.session.user.user_metadata as Record<string, string>,
+            data.session.user.email,
+          );
+          router.replace("/");
+          return;
+        }
+      }
 
       if (code) {
         // PKCE flow: exchange the one-time code for a session

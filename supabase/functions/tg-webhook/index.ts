@@ -439,11 +439,11 @@ Deno.serve(async (req: Request) => {
 
   const text = message.text.trim();
 
-  // ── /start — account linking ──────────────────────────────────────────────
+  // ── /start — login or account linking ────────────────────────────────────
   if (text.startsWith("/start")) {
-    const code = text.split(" ")[1]?.trim();
+    const param = text.split(" ")[1]?.trim() ?? "";
 
-    if (!code) {
+    if (!param) {
       await sendMessage(
         chatId,
         "Привет! 👋 Я бот CycleConnect.\n\n" +
@@ -451,11 +451,88 @@ Deno.serve(async (req: Request) => {
           '• "маршрут 50 км несложный"\n' +
           '• "горный маршрут в Карелии"\n' +
           '• "городская покатушка на 2 часа"\n\n' +
-          "Чтобы привязать аккаунт и получать уведомления о поездках, " +
-          "перейди по ссылке из настроек профиля.",
+          `<a href="${SITE_URL}/auth/login">Войти или зарегистрироваться →</a>`,
       );
       return new Response("ok");
     }
+
+    // ── login_<nonce> — browser-initiated auth flow ───────────────────────
+    if (param.startsWith("login_")) {
+      const nonce = param.slice("login_".length);
+      const from = message.from;
+
+      const now = new Date().toISOString();
+      const { data: nonceRow } = await supabase
+        .from("tg_login_nonces")
+        .select("status, expires_at")
+        .eq("nonce", nonce)
+        .maybeSingle();
+
+      if (!nonceRow || nonceRow.status !== "pending" || nonceRow.expires_at < now) {
+        await sendMessage(chatId, "Ссылка устарела или уже использована. Попробуй войти заново.");
+        return new Response("ok");
+      }
+
+      const tgId = from?.id ?? chatId;
+      const tgUsername = from?.username ?? null;
+      const firstName = from?.first_name ?? "";
+      const lastName = (from as { last_name?: string } | undefined)?.last_name ?? "";
+      const fullName = [firstName, lastName].filter(Boolean).join(" ") || "Велосипедист";
+
+      // Look up existing profile by telegram_chat_id
+      let userId: string | null = null;
+      const { data: existingProfile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("telegram_chat_id", tgId)
+        .maybeSingle();
+
+      if (existingProfile) {
+        userId = existingProfile.id as string;
+      } else {
+        // Create a new auth user with a synthetic email
+        const syntheticEmail = `tg_${tgId}@cycleconnect.local`;
+        const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
+          email: syntheticEmail,
+          email_confirm: true,
+          user_metadata: { name: fullName },
+        });
+
+        if (createErr || !newUser.user) {
+          await sendMessage(chatId, "Не удалось создать аккаунт. Попробуй позже.");
+          return new Response("ok");
+        }
+
+        userId = newUser.user.id;
+
+        // Update profile created by trigger with Telegram fields
+        await supabase
+          .from("profiles")
+          .update({
+            name: fullName,
+            telegram_chat_id: tgId,
+            telegram_username: tgUsername,
+            tg_notify_intents: true,
+          })
+          .eq("id", userId);
+      }
+
+      // Mark nonce ready
+      await supabase
+        .from("tg_login_nonces")
+        .update({ status: "ready", user_id: userId })
+        .eq("nonce", nonce);
+
+      await sendMessage(
+        chatId,
+        `✅ Готово, ${escapeHtml(fullName)}! Вернись в браузер — вход выполнится автоматически.\n\n` +
+          "🔍 Кстати, умею искать маршруты — просто напиши, что ищешь!",
+      );
+      return new Response("ok");
+    }
+
+    // ── link_<code> — legacy account linking for existing users ──────────
+    const code = param.startsWith("link_") ? param.slice("link_".length) : param;
 
     const now = new Date().toISOString();
     const { data: profile, error } = await supabase
