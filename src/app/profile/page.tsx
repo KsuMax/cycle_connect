@@ -329,27 +329,32 @@ export default function ProfilePage() {
                   <Settings size={16} /><span className="hidden sm:inline">Настройки</span>
                 </Link>
               </div>
-              <div className="flex gap-6 mt-4 flex-wrap">
+              {/* Hero stats */}
+              <div className="flex gap-6 mt-4">
                 {[
-                  { value: Math.round(ridesKm).toLocaleString(), label: "км всего",    color: "#F4632A", href: null },
-                  { value: myRoutes.length,                       label: "маршрутов",  color: "#7C5CFC", href: null },
-                  { value: (loadingRides || loadingEvents) ? "..." : tripsCount, label: "активностей", color: "#0BBFB5", href: null },
-                  { value: clubsCount,                            label: "клубов",     color: "#0BBFB5", href: "/clubs" },
-                  { value: followersCount, label: "подписчиков",  color: "#A1A1AA",   href: user ? `/users/${user.id}/followers` : null },
-                  { value: followingCount, label: "подписок",     color: "#A1A1AA",   href: user ? `/users/${user.id}/following` : null },
-                ].map(({ value, label, color, href }) => (
-                  href ? (
-                    <Link key={label} href={href} className="text-center group">
-                      <div className="text-xl font-bold group-hover:underline" style={{ color }}>{value}</div>
-                      <div className="text-xs text-[#71717A]">{label}</div>
-                    </Link>
-                  ) : (
-                    <div key={label} className="text-center">
-                      <div className="text-xl font-bold" style={{ color }}>{value}</div>
-                      <div className="text-xs text-[#71717A]">{label}</div>
-                    </div>
-                  )
+                  { value: Math.round(ridesKm).toLocaleString(), label: "км" },
+                  { value: (loadingRides || loadingEvents) ? "..." : tripsCount, label: "активностей" },
+                  { value: myRoutes.length, label: "маршрутов" },
+                ].map(({ value, label }) => (
+                  <div key={label} className="text-center">
+                    <div className="text-2xl font-bold" style={{ color: "#F4632A" }}>{value}</div>
+                    <div className="text-xs text-[#71717A]">{label}</div>
+                  </div>
                 ))}
+              </div>
+              {/* Social row */}
+              <div className="flex items-center gap-2 mt-2.5 text-xs text-[#A1A1AA] flex-wrap">
+                <Link href={`/users/${user.id}/followers`} className="hover:text-[#71717A] hover:underline transition-colors">
+                  {followersCount} {followersCount === 1 ? "подписчик" : followersCount < 5 ? "подписчика" : "подписчиков"}
+                </Link>
+                <span>·</span>
+                <Link href={`/users/${user.id}/following`} className="hover:text-[#71717A] hover:underline transition-colors">
+                  {followingCount} {followingCount === 1 ? "подписка" : followingCount < 5 ? "подписки" : "подписок"}
+                </Link>
+                <span>·</span>
+                <Link href="/clubs" className="hover:text-[#71717A] hover:underline transition-colors">
+                  {clubsCount} {clubsCount === 1 ? "клуб" : clubsCount < 5 ? "клуба" : "клубов"}
+                </Link>
               </div>
             </div>
           </div>
