@@ -326,6 +326,7 @@ export function AiSearchWidget() {
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [error, setError] = useState("");
   const [isRefinement, setIsRefinement] = useState(false);
+  const [isPersonalized, setIsPersonalized] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -350,6 +351,7 @@ export function AiSearchWidget() {
       setQuery("");
       setError("");
       setIsRefinement(false);
+      setIsPersonalized(false);
       setPhase("idle");
       setDetectedRegion(null);
       setActiveFilters(null);
@@ -373,6 +375,7 @@ export function AiSearchWidget() {
     setRelaxedReason(null);
     setActiveFilters(null);
     setIsRefinement(false);
+    setIsPersonalized(false);
     setError("");
     setPhase("idle");
     setQuery("");
@@ -394,6 +397,7 @@ export function AiSearchWidget() {
     setQuery(trimmed);
     setPhase("parsing");
     setIsRefinement(refining);
+    setIsPersonalized(false);
     setError("");
     setRoutes(null);
     setEvents(null);
@@ -469,7 +473,7 @@ export function AiSearchWidget() {
               clubs?: ClubResult[];
               reason?: string;
               relaxedReason?: string | null;
-              hint?: string;
+              hint?: "wind" | "personal" | "refine";
             };
 
             if (event.type === "parsing") {
@@ -478,6 +482,7 @@ export function AiSearchWidget() {
               setActiveFilters(event.filters);
               setPhase("searching");
               if (event.filters.region) setDetectedRegion(event.filters.region);
+              if (event.hint === "personal") setIsPersonalized(true);
             } else if (event.type === "searching") {
               setPhase(event.hint === "wind" ? "wind" : "searching");
             } else if (event.type === "relaxing") {
@@ -828,6 +833,14 @@ export function AiSearchWidget() {
           {/* Route results */}
           {phase === "done" && entityType === "routes" && routes !== null && routes.length > 0 && (
             <div className="space-y-2.5 pt-1">
+              {/* Personalized banner */}
+              {isPersonalized && !relaxedReason && (
+                <div className="flex items-center gap-1.5 text-xs text-[#7C5CFC] font-medium mb-1 bg-[#F5F3FF] px-3 py-1.5 rounded-xl border border-[#EDE9FF]">
+                  <Sparkles size={12} />
+                  Подобрано на основе твоих поездок
+                </div>
+              )}
+
               {/* Wind search banner */}
               {activeFilters?.wind_intent && !relaxedReason && (
                 <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-medium mb-1 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100">

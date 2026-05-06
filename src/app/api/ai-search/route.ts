@@ -51,6 +51,8 @@ interface RouteFilters {
   wind_intent?: boolean;
   /** When true, attach regional weather comfort to each result. */
   weather_intent?: boolean;
+  /** When true, personalize filters from user ride history. */
+  personal_intent?: boolean;
   /** What the user is searching for — defaults to "routes". */
   entity_type?: EntityType;
 }
@@ -298,6 +300,11 @@ function extractFromText(query: string): RouteFilters {
     out.weather_intent = true;
   }
 
+  // Personal intent — user wants recommendations based on their history
+  if (/для\s+меня|посовет|рекомендуй|рекомендац|по\s+моей|исходя\s+из|на\s+основ\w*\s+мо|что\s+мне|мой\s+уровень|под\s+меня|персонал/.test(q)) {
+    out.personal_intent = true;
+  }
+
   // Entity type
   const entityType = detectEntityType(q);
   if (entityType !== "routes") out.entity_type = entityType;
@@ -438,6 +445,9 @@ function mergeFilters(ai: RouteFilters, regex: RouteFilters): RouteFilters {
 
   // Regex wins for entity type (more reliable pattern matching)
   if (regex.entity_type) merged.entity_type = regex.entity_type;
+
+  // Either source can flag personal intent
+  if (regex.personal_intent || ai.personal_intent) merged.personal_intent = true;
 
   return merged;
 }
@@ -969,6 +979,63 @@ async function searchRoutes(
   return runMatchRoutes(filters, query, 6);
 }
 
+// ─── Personal profile ────────────────────────────────────────────────────────
+
+function modeOf<T>(arr: (T | null | undefined)[]): T | null {
+  const counts = new Map<T, number>();
+  for (const v of arr) {
+    if (v == null) continue;
+    counts.set(v, (counts.get(v) ?? 0) + 1);
+  }
+  let best: T | null = null; let bestN = 0;
+  for (const [k, n] of counts) { if (n > bestN) { best = k; bestN = n; } }
+  return best;
+}
+
+function avgOf(nums: (number | null | undefined)[]): number | null {
+  const valid = nums.filter((n): n is number => n != null);
+  if (!valid.length) return null;
+  return valid.reduce((a, b) => a + b, 0) / valid.length;
+}
+
+/**
+ * Fetches the user's recent rides and builds a RouteFilters object
+ * representing their riding preferences.
+ * Returns null when there's not enough data (fewer than 3 rides).
+ */
+async function buildUserProfile(userId: string): Promise<RouteFilters | null> {
+  const { data: rows } = await getSupabase()
+    .from("route_rides")
+    .select("routes(distance_km, elevation_m, difficulty, region, surface, bike_types)")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(30);
+
+  const ridden = (rows ?? [])
+    .map((r: { routes: { distance_km: number | null; elevation_m: number | null; difficulty: string | null; region: string | null; surface: string[] | null; bike_types: string[] | null } | null }) => r.routes)
+    .filter((r): r is NonNullable<typeof r> => r != null);
+
+  if (ridden.length < 3) return null;
+
+  const avgDist = avgOf(ridden.map((r) => r.distance_km));
+  const topDifficulty = modeOf(ridden.map((r) => r.difficulty));
+  const topRegion = modeOf(ridden.map((r) => r.region));
+  const allSurfaces = ridden.flatMap((r) => r.surface ?? []);
+  const topSurface = modeOf(allSurfaces);
+
+  const profile: RouteFilters = {};
+  if (avgDist != null) {
+    profile.distance_target = Math.round(avgDist / 5) * 5;
+    profile.distance_min = Math.max(1, Math.round(avgDist * 0.7));
+    profile.distance_max = Math.round(avgDist * 1.3);
+  }
+  if (topDifficulty) profile.difficulty = topDifficulty;
+  if (topRegion) profile.region = topRegion;
+  if (topSurface && topSurface !== "mixed") profile.surface = [topSurface];
+
+  return profile;
+}
+
 // ─── SSE helpers ──────────────────────────────────────────────────────────────
 
 function sseEvent(data: unknown): Uint8Array {
@@ -1027,9 +1094,12 @@ export async function POST(req: NextRequest) {
           // ── 1. Parse in parallel ──────────────────────────────────────────
           controller.enqueue(sseEvent({ type: "parsing" }));
 
-          const [aiFilters, regexFilters] = await Promise.all([
+          const regexFilters = extractFromText(query);
+          const isPersonal = regexFilters.personal_intent;
+
+          const [aiFilters, personalProfile] = await Promise.all([
             parseAI(query),
-            Promise.resolve(extractFromText(query)),
+            isPersonal ? buildUserProfile(user.id) : Promise.resolve(null),
           ]);
           filters = mergeFilters(aiFilters, regexFilters);
 
@@ -1038,7 +1108,23 @@ export async function POST(req: NextRequest) {
             filters.region = closestRegion(lat, lng);
           }
 
-          controller.enqueue(sseEvent({ type: "parsed", filters }));
+          // Merge personal profile as defaults (explicit query values win)
+          if (personalProfile) {
+            if (!filters.distance_target && personalProfile.distance_target) {
+              filters.distance_target = personalProfile.distance_target;
+              filters.distance_min = personalProfile.distance_min;
+              filters.distance_max = personalProfile.distance_max;
+            }
+            if (!filters.difficulty && personalProfile.difficulty) filters.difficulty = personalProfile.difficulty;
+            if (!filters.region && personalProfile.region) filters.region = personalProfile.region;
+            if (!filters.surface?.length && personalProfile.surface?.length) filters.surface = personalProfile.surface;
+          }
+
+          controller.enqueue(sseEvent({
+            type: "parsed",
+            filters,
+            ...(personalProfile ? { hint: "personal" } : {}),
+          }));
         }
 
         // ── 2. Search ─────────────────────────────────────────────────────
