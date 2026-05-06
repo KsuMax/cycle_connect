@@ -1,28 +1,39 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Map, Newspaper, HelpCircle, Users, Shield } from "lucide-react";
+import { Map, Newspaper, HelpCircle, Users, Shield, Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useNavigation } from "@/lib/context/NavigationContext";
 import { proxyImageUrl } from "@/lib/supabase";
 import { NotificationBell } from "@/components/ui/NotificationBell";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Лента", icon: Newspaper },
-  { href: "/routes", label: "Маршруты", icon: Map },
+  { href: "/",       label: "Лента",      icon: Newspaper },
+  { href: "/routes", label: "Маршруты",   icon: Map },
+  { href: "/users",  label: "Участники",  icon: Users },
+  { href: "/clubs",  label: "Клубы",      icon: Shield },
+];
+
+// Items not covered by BottomNav — shown in the mobile burger dropdown
+const BURGER_ITEMS = [
   { href: "/users", label: "Участники", icon: Users },
-  { href: "/clubs", label: "Клубы", icon: Shield },
+  { href: "/clubs", label: "Клубы",     icon: Shield },
 ];
 
 export function Header() {
   const pathname = usePathname();
   const { user, profile } = useAuth();
   const { navigate, pendingHref } = useNavigation();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => { setMenuOpen(false); }, [pathname]);
 
   const handleClick = (href: string) => (e: React.MouseEvent) => {
     e.preventDefault();
+    setMenuOpen(false);
     if (pathname === href) return;
     navigate(href);
   };
@@ -32,59 +43,45 @@ export function Header() {
     : user?.email?.[0].toUpperCase() ?? "?";
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-      <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-        {/* Logo */}
-        <a
-          href="/"
-          onClick={handleClick("/")}
-          className="shrink-0 select-none"
-        >
-          <span className="text-[1.35rem] font-extrabold tracking-tight">
-            <span style={{ color: "#1C1C1E" }}>Cycle</span><span style={{ color: "#F4632A" }}>Connect</span>
-          </span>
-        </a>
+    <>
+      <header className="sticky top-0 z-50 bg-white border-b border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
 
-        {/* Navigation */}
-        <nav className="flex items-center gap-1">
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-            const isActive = href === "/"
-              ? pathname === "/" || pendingHref === "/"
-              : (pathname.startsWith(href) && href !== "/") || pendingHref === href;
-            const isPending = pendingHref === href;
-            return (
-              <a
-                key={href}
-                href={href}
-                onClick={handleClick(href)}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 min-h-[44px] rounded-lg text-sm font-medium transition-colors",
-                  isActive ? "text-[#F4632A] bg-[#FFF0EB]" : "text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1]",
-                  isPending && "opacity-70"
-                )}
-              >
-                <Icon size={16} strokeWidth={isActive ? 2.5 : 2} />
-                <span>{label}</span>
-              </a>
-            );
-          })}
-        </nav>
+          {/* Logo */}
+          <a href="/" onClick={handleClick("/")} className="shrink-0 select-none">
+            <span className="text-[1.35rem] font-extrabold tracking-tight">
+              <span style={{ color: "#1C1C1E" }}>Cycle</span><span style={{ color: "#F4632A" }}>Connect</span>
+            </span>
+          </a>
 
-        {/* Help icon — mobile only */}
-        {user && (
-          <button
-            onClick={() => navigate("/onboarding")}
-            title="Что я могу здесь делать?"
-            className="sm:hidden min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-[#A1A1AA] hover:text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors"
-          >
-            <HelpCircle size={18} />
-          </button>
-        )}
+          {/* Desktop navigation */}
+          <nav className="hidden sm:flex items-center gap-1">
+            {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+              const isActive = href === "/"
+                ? pathname === "/" || pendingHref === "/"
+                : (pathname.startsWith(href) && href !== "/") || pendingHref === href;
+              const isPending = pendingHref === href;
+              return (
+                <a
+                  key={href}
+                  href={href}
+                  onClick={handleClick(href)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 min-h-[44px] rounded-lg text-sm font-medium transition-colors",
+                    isActive ? "text-[#F4632A] bg-[#FFF0EB]" : "text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1]",
+                    isPending && "opacity-70"
+                  )}
+                >
+                  <Icon size={16} strokeWidth={isActive ? 2.5 : 2} />
+                  <span>{label}</span>
+                </a>
+              );
+            })}
+          </nav>
 
-        {/* Auth area — hidden on mobile (BottomNav handles it) */}
-        <div className="hidden sm:flex items-center gap-2 shrink-0">
-          {user ? (
-            <>
+          {/* Mobile right: help + burger */}
+          <div className="sm:hidden flex items-center gap-0.5">
+            {user && (
               <button
                 onClick={() => navigate("/onboarding")}
                 title="Что я могу здесь делать?"
@@ -92,48 +89,112 @@ export function Header() {
               >
                 <HelpCircle size={18} />
               </button>
-              <NotificationBell />
-              <a
-                href="/profile"
-                onClick={handleClick("/profile")}
-                className={cn(
-                  "flex items-center gap-2 px-3 min-h-[44px] rounded-lg text-sm font-medium transition-colors",
-                  pathname === "/profile" || pendingHref === "/profile" ? "text-[#F4632A] bg-[#FFF0EB]" : "text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1]",
-                  pendingHref === "/profile" && "opacity-70"
-                )}
-              >
-                <div className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center text-xs font-bold text-white shrink-0"
-                  style={{ backgroundColor: "#7C5CFC" }}>
-                  {profile?.avatar_url
-                    ? <Image src={proxyImageUrl(profile.avatar_url) ?? profile.avatar_url} alt="" width={28} height={28} className="w-full h-full object-cover" />
-                    : initials
-                  }
-                </div>
-                <span>{profile?.name ?? "Профиль"}</span>
-              </a>
-            </>
-          ) : (
-            <>
-              <a
-                href="/auth/login"
-                onClick={handleClick("/auth/login")}
-                className="text-sm font-medium px-4 min-h-[44px] flex items-center rounded-lg transition-colors"
-                style={{ color: "#71717A" }}
-              >
-                Войти
-              </a>
-              <a
-                href="/auth/register"
-                onClick={handleClick("/auth/register")}
-                className="text-sm font-medium px-4 min-h-[44px] flex items-center rounded-lg transition-colors text-white"
-                style={{ backgroundColor: "#1C1C1E" }}
-              >
-                Регистрация
-              </a>
-            </>
-          )}
+            )}
+            <button
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-label={menuOpen ? "Закрыть меню" : "Открыть меню"}
+              className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors"
+            >
+              {menuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          </div>
+
+          {/* Desktop right: help + bell + profile */}
+          <div className="hidden sm:flex items-center gap-2 shrink-0">
+            {user ? (
+              <>
+                <button
+                  onClick={() => navigate("/onboarding")}
+                  title="Что я могу здесь делать?"
+                  className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-[#A1A1AA] hover:text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors"
+                >
+                  <HelpCircle size={18} />
+                </button>
+                <NotificationBell />
+                <a
+                  href="/profile"
+                  onClick={handleClick("/profile")}
+                  className={cn(
+                    "flex items-center gap-2 px-3 min-h-[44px] rounded-lg text-sm font-medium transition-colors",
+                    pathname === "/profile" || pendingHref === "/profile"
+                      ? "text-[#F4632A] bg-[#FFF0EB]"
+                      : "text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1]",
+                    pendingHref === "/profile" && "opacity-70"
+                  )}
+                >
+                  <div
+                    className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center text-xs font-bold text-white shrink-0"
+                    style={{ backgroundColor: "#7C5CFC" }}
+                  >
+                    {profile?.avatar_url
+                      ? <Image src={proxyImageUrl(profile.avatar_url) ?? profile.avatar_url} alt="" width={28} height={28} className="w-full h-full object-cover" />
+                      : initials}
+                  </div>
+                  <span>{profile?.name ?? "Профиль"}</span>
+                </a>
+              </>
+            ) : (
+              <>
+                <a
+                  href="/auth/login"
+                  onClick={handleClick("/auth/login")}
+                  className="text-sm font-medium px-4 min-h-[44px] flex items-center rounded-lg transition-colors"
+                  style={{ color: "#71717A" }}
+                >
+                  Войти
+                </a>
+                <a
+                  href="/auth/register"
+                  onClick={handleClick("/auth/register")}
+                  className="text-sm font-medium px-4 min-h-[44px] flex items-center rounded-lg transition-colors text-white"
+                  style={{ backgroundColor: "#1C1C1E" }}
+                >
+                  Регистрация
+                </a>
+              </>
+            )}
+          </div>
+
         </div>
-      </div>
-    </header>
+      </header>
+
+      {/* Mobile burger dropdown */}
+      {menuOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="sm:hidden fixed inset-0 z-40"
+            onClick={() => setMenuOpen(false)}
+          />
+          {/* Menu panel */}
+          <div
+            className="sm:hidden fixed top-16 left-0 right-0 z-50 bg-white border-b border-[#E4E4E7]"
+            style={{ boxShadow: "0 6px 20px 0 rgb(0 0 0 / 0.08)" }}
+          >
+            <nav className="max-w-6xl mx-auto px-4 py-2 flex flex-col gap-0.5">
+              {BURGER_ITEMS.map(({ href, label, icon: Icon }) => {
+                const isActive = pathname.startsWith(href) || pendingHref === href;
+                return (
+                  <a
+                    key={href}
+                    href={href}
+                    onClick={handleClick(href)}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-3.5 rounded-xl text-sm font-medium transition-colors",
+                      isActive
+                        ? "text-[#F4632A] bg-[#FFF0EB]"
+                        : "text-[#1C1C1E] hover:bg-[#F5F4F1]"
+                    )}
+                  >
+                    <Icon size={18} strokeWidth={isActive ? 2.5 : 2} style={{ color: isActive ? "#F4632A" : "#71717A" }} />
+                    {label}
+                  </a>
+                );
+              })}
+            </nav>
+          </div>
+        </>
+      )}
+    </>
   );
 }
