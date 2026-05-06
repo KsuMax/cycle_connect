@@ -30,6 +30,8 @@ function getSupabase() {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+type EntityType = "routes" | "events" | "clubs";
+
 interface RouteFilters {
   difficulty?: string;
   distance_min?: number;
@@ -47,6 +49,8 @@ interface RouteFilters {
   sort_by?: "relevance" | "popular";
   /** When true, re-rank candidates by wind favorability for the target window. */
   wind_intent?: boolean;
+  /** What the user is searching for — defaults to "routes". */
+  entity_type?: EntityType;
 }
 
 export interface RouteResult {
@@ -67,6 +71,40 @@ export interface RouteResult {
   best_wind_hour?: string;
   /** LLM-generated one-liner: why this route matches the user's query. */
   why?: string;
+}
+
+export interface EventResult {
+  id: string;
+  title: string;
+  start_date: string;
+  cover_url: string | null;
+  description_short: string;
+}
+
+export interface ClubResult {
+  id: string;
+  slug: string;
+  name: string;
+  city: string | null;
+  avatar_url: string | null;
+  members_count: number;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/** Detects when the query is about events or clubs rather than routes. */
+function detectEntityType(q: string): EntityType {
+  if (/событи|мероприяти|покатушк|групповой\s+выезд|ближайш.*выезд|расписани|афиш|участвовать|поучаствовать/.test(q)) {
+    return "events";
+  }
+  if (/клуб|сообщество\s+велосипед/.test(q)) {
+    return "clubs";
+  }
+  return "routes";
 }
 
 // ─── Geolocation: nearest region ─────────────────────────────────────────────
@@ -245,6 +283,10 @@ function extractFromText(query: string): RouteFilters {
     out.wind_intent = true;
   }
 
+  // Entity type
+  const entityType = detectEntityType(q);
+  if (entityType !== "routes") out.entity_type = entityType;
+
   // Region — matched against all inflected forms (genitive, prepositional, etc.)
   const REGIONS: Array<[RegExp, string]> = [
     [/карел/i,                          "Карелия"],
@@ -337,6 +379,9 @@ function mergeFilters(ai: RouteFilters, regex: RouteFilters): RouteFilters {
   // Either source can flag wind intent
   if (regex.wind_intent || ai.wind_intent) merged.wind_intent = true;
 
+  // Regex wins for entity type (more reliable pattern matching)
+  if (regex.entity_type) merged.entity_type = regex.entity_type;
+
   return merged;
 }
 
@@ -424,6 +469,73 @@ async function generateWhys(
     console.warn("[ai-search] generateWhys failed:", err instanceof Error ? err.message : String(err));
     return new Map();
   }
+}
+
+// ─── Events & Clubs search ────────────────────────────────────────────────────
+
+async function searchEvents(query: string): Promise<EventResult[]> {
+  const today = new Date().toISOString().split("T")[0];
+  const { data, error } = await getSupabase()
+    .from("events")
+    .select("id, title, start_date, cover_url, description")
+    .gte("start_date", today)
+    .order("start_date")
+    .limit(8);
+
+  if (error || !data) {
+    console.error("[ai-search] searchEvents error:", error);
+    return [];
+  }
+
+  const qLower = query.toLowerCase();
+  const terms = qLower.split(/\s+/).filter((w) => w.length > 3 && !/событи|мероприят/.test(w));
+
+  return data
+    .filter((e) => {
+      if (!terms.length) return true;
+      const haystack = (e.title + " " + stripHtml(e.description ?? "")).toLowerCase();
+      return terms.some((t) => haystack.includes(t));
+    })
+    .slice(0, 5)
+    .map((e) => ({
+      id: e.id as string,
+      title: e.title as string,
+      start_date: e.start_date as string,
+      cover_url: (e.cover_url ?? null) as string | null,
+      description_short: stripHtml(e.description ?? "").slice(0, 120),
+    }));
+}
+
+async function searchClubs(query: string): Promise<ClubResult[]> {
+  const { data, error } = await getSupabase()
+    .from("clubs")
+    .select("id, slug, name, city, avatar_url, members_count")
+    .order("members_count", { ascending: false })
+    .limit(8);
+
+  if (error || !data) {
+    console.error("[ai-search] searchClubs error:", error);
+    return [];
+  }
+
+  const qLower = query.toLowerCase();
+  const terms = qLower.split(/\s+/).filter((w) => w.length > 3 && !/клуб|сообщество/.test(w));
+
+  return data
+    .filter((c) => {
+      if (!terms.length) return true;
+      const haystack = (c.name + " " + (c.city ?? "")).toLowerCase();
+      return terms.some((t) => haystack.includes(t));
+    })
+    .slice(0, 5)
+    .map((c) => ({
+      id: c.id as string,
+      slug: c.slug as string,
+      name: c.name as string,
+      city: (c.city ?? null) as string | null,
+      avatar_url: (c.avatar_url ?? null) as string | null,
+      members_count: (c.members_count ?? 0) as number,
+    }));
 }
 
 // ─── Supabase query ───────────────────────────────────────────────────────────
@@ -768,40 +880,51 @@ export async function POST(req: NextRequest) {
         }
 
         // ── 2. Search ─────────────────────────────────────────────────────
-        const searchingEvent = filters.wind_intent
-          ? { type: "searching", hint: "wind" }
-          : { type: "searching" };
-        controller.enqueue(sseEvent(searchingEvent));
+        const entityType: EntityType = filters.entity_type ?? "routes";
 
-        let routes = await searchRoutes(filters, query);
+        if (entityType === "events") {
+          controller.enqueue(sseEvent({ type: "searching" }));
+          const events = await searchEvents(query);
+          controller.enqueue(sseEvent({ type: "result", entity_type: "events", events, filters }));
+        } else if (entityType === "clubs") {
+          controller.enqueue(sseEvent({ type: "searching" }));
+          const clubs = await searchClubs(query);
+          controller.enqueue(sseEvent({ type: "result", entity_type: "clubs", clubs, filters }));
+        } else {
+          // ── routes (default) ───────────────────────────────────────────
+          const searchingEvent = filters.wind_intent
+            ? { type: "searching", hint: "wind" }
+            : { type: "searching" };
+          controller.enqueue(sseEvent(searchingEvent));
 
-        // ── 3. Smart fallback: relax tightest filter once if empty ────────
-        let relaxedReason: string | null = null;
-        if (routes.length === 0 && !body.filters) {
-          const relaxed = relaxFilters(filters);
-          if (relaxed) {
-            controller.enqueue(sseEvent({ type: "relaxing", reason: relaxed.reason }));
-            const fallback = await searchRoutes(relaxed.filters, query);
-            if (fallback.length > 0) {
-              routes = fallback;
-              filters = relaxed.filters;
-              relaxedReason = relaxed.reason;
+          let routes = await searchRoutes(filters, query);
+
+          // ── 3. Smart fallback: relax tightest filter once if empty ──────
+          let relaxedReason: string | null = null;
+          if (routes.length === 0 && !body.filters) {
+            const relaxed = relaxFilters(filters);
+            if (relaxed) {
+              controller.enqueue(sseEvent({ type: "relaxing", reason: relaxed.reason }));
+              const fallback = await searchRoutes(relaxed.filters, query);
+              if (fallback.length > 0) {
+                routes = fallback;
+                filters = relaxed.filters;
+                relaxedReason = relaxed.reason;
+              }
             }
           }
-        }
 
-        // ── 4. Generate explanations (LLM reranker) ───────────────────────
-        // Skip when chip refinement or no results — user already knows why chips matched.
-        if (routes.length > 0 && !body.filters) {
-          controller.enqueue(sseEvent({ type: "reranking" }));
-          const whys = await generateWhys(routes, query);
-          if (whys.size > 0) {
-            routes = routes.map((r) => whys.has(r.id) ? { ...r, why: whys.get(r.id) } : r);
+          // ── 4. LLM reranker with explanations ──────────────────────────
+          if (routes.length > 0 && !body.filters) {
+            controller.enqueue(sseEvent({ type: "reranking" }));
+            const whys = await generateWhys(routes, query);
+            if (whys.size > 0) {
+              routes = routes.map((r) => whys.has(r.id) ? { ...r, why: whys.get(r.id) } : r);
+            }
           }
-        }
 
-        // ── 5. Done ───────────────────────────────────────────────────────
-        controller.enqueue(sseEvent({ type: "result", routes, filters, relaxedReason }));
+          controller.enqueue(sseEvent({ type: "result", entity_type: "routes", routes, filters, relaxedReason }));
+        }
       } catch (err) {
         console.error("[ai-search] stream error:", err instanceof Error ? err.message : String(err));
         controller.enqueue(sseEvent({ type: "error", message: "Не удалось выполнить поиск" }));

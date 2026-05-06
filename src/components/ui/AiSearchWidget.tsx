@@ -3,8 +3,8 @@
 import { useState, useRef, useEffect, FormEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Sparkles, X, ArrowUp, MapPin, Mountain, LocateFixed, Wind } from "lucide-react";
-import type { RouteResult } from "@/app/api/ai-search/route";
+import { Sparkles, X, ArrowUp, MapPin, Mountain, LocateFixed, Wind, Calendar, Users } from "lucide-react";
+import type { RouteResult, EventResult, ClubResult } from "@/app/api/ai-search/route";
 import { proxyImageUrl } from "@/lib/supabase";
 
 // ─── Filters type (mirrors server RouteFilters) ───────────────────────────────
@@ -316,6 +316,9 @@ export function AiSearchWidget() {
   const [phase, setPhase] = useState<SearchPhase>("idle");
   const [locating, setLocating] = useState(false);
   const [routes, setRoutes] = useState<RouteResult[] | null>(null);
+  const [events, setEvents] = useState<EventResult[] | null>(null);
+  const [clubs, setClubs] = useState<ClubResult[] | null>(null);
+  const [entityType, setEntityType] = useState<"routes" | "events" | "clubs">("routes");
   const [detectedRegion, setDetectedRegion] = useState<string | null>(null);
   const [activeFilters, setActiveFilters] = useState<RouteFilters | null>(null);
   const [relaxedReason, setRelaxedReason] = useState<string | null>(null);
@@ -340,6 +343,9 @@ export function AiSearchWidget() {
     } else {
       abortRef.current?.abort();
       setRoutes(null);
+      setEvents(null);
+      setClubs(null);
+      setEntityType("routes");
       setQuery("");
       setError("");
       setPhase("idle");
@@ -368,6 +374,9 @@ export function AiSearchWidget() {
     setPhase("parsing");
     setError("");
     setRoutes(null);
+    setEvents(null);
+    setClubs(null);
+    setEntityType("routes");
     setDetectedRegion(null);
     setRelaxedReason(null);
     setActiveFilters(overrideFilters ?? null);
@@ -429,8 +438,11 @@ export function AiSearchWidget() {
           try {
             const event = JSON.parse(line.slice(6)) as {
               type: string;
+              entity_type?: "routes" | "events" | "clubs";
               filters?: RouteFilters;
               routes?: RouteResult[];
+              events?: EventResult[];
+              clubs?: ClubResult[];
               reason?: string;
               relaxedReason?: string | null;
               hint?: string;
@@ -447,7 +459,15 @@ export function AiSearchWidget() {
             } else if (event.type === "relaxing") {
               setPhase("relaxing");
             } else if (event.type === "result") {
-              setRoutes(event.routes ?? []);
+              const et = event.entity_type ?? "routes";
+              setEntityType(et);
+              if (et === "events") {
+                setEvents(event.events ?? []);
+              } else if (et === "clubs") {
+                setClubs(event.clubs ?? []);
+              } else {
+                setRoutes(event.routes ?? []);
+              }
               if (event.filters) {
                 setActiveFilters(event.filters);
                 if (event.filters.region) setDetectedRegion(event.filters.region);
@@ -488,7 +508,7 @@ export function AiSearchWidget() {
     handleSearch(query, newFilters);
   }
 
-  const visibleChips = phase === "done" && activeFilters && routes !== null && routes.length > 0
+  const visibleChips = phase === "done" && entityType === "routes" && activeFilters && routes !== null && routes.length > 0
     ? CHIPS.filter((c) => c.apply(activeFilters, routes) !== null).slice(0, 5)
     : [];
 
@@ -653,18 +673,119 @@ export function AiSearchWidget() {
           {error && <p className="text-sm text-red-500 pt-2">{error}</p>}
 
           {/* No results */}
-          {phase === "done" && routes !== null && routes.length === 0 && (
+          {phase === "done" && (
+            (entityType === "routes" && routes !== null && routes.length === 0) ||
+            (entityType === "events" && events !== null && events.length === 0) ||
+            (entityType === "clubs" && clubs !== null && clubs.length === 0)
+          ) && (
             <div className="text-center py-8">
               <p className="text-2xl mb-2">🔍</p>
               <p className="text-sm font-medium text-[#1C1C1E]">Ничего не нашлось</p>
               <p className="text-xs text-[#71717A] mt-1 max-w-xs mx-auto">
-                Попробуй убрать часть условий или описать маршрут по-другому
+                {entityType === "events"
+                  ? "Нет предстоящих событий по этому запросу"
+                  : entityType === "clubs"
+                    ? "Клубы не найдены — попробуй другой запрос"
+                    : "Попробуй убрать часть условий или описать маршрут по-другому"}
               </p>
             </div>
           )}
 
-          {/* Results */}
-          {phase === "done" && routes !== null && routes.length > 0 && (
+          {/* Event results */}
+          {phase === "done" && entityType === "events" && events !== null && events.length > 0 && (
+            <div className="space-y-2.5 pt-1">
+              <p className="text-xs text-[#71717A]">
+                📅 Найдено {events.length} {events.length === 1 ? "событие" : events.length < 5 ? "события" : "событий"}
+              </p>
+              {events.map((e) => (
+                <Link
+                  key={e.id}
+                  href={`/events/${e.id}`}
+                  onClick={() => setOpen(false)}
+                  className="flex items-start gap-3 rounded-2xl border border-[#E4E4E7] p-4 hover:border-[#7C5CFC]/40 hover:bg-[#FAFAFF] transition-colors group"
+                >
+                  {e.cover_url ? (
+                    <Image src={proxyImageUrl(e.cover_url) ?? e.cover_url} alt="" width={56} height={56} className="rounded-xl object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-14 h-14 rounded-xl bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
+                      <Calendar size={20} className="text-[#7C5CFC]" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[#1C1C1E] truncate group-hover:text-[#7C5CFC] transition-colors">
+                      {e.title}
+                    </p>
+                    <p className="text-xs text-[#7C5CFC] font-medium mt-0.5 flex items-center gap-1">
+                      <Calendar size={11} />
+                      {new Date(e.start_date).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}
+                    </p>
+                    {e.description_short && (
+                      <p className="text-xs text-[#71717A] mt-1 line-clamp-2 leading-snug">{e.description_short}</p>
+                    )}
+                  </div>
+                </Link>
+              ))}
+              <Link
+                href="/events"
+                onClick={() => setOpen(false)}
+                className="block text-center text-xs text-[#7C5CFC] font-medium py-3 hover:underline"
+              >
+                Все события →
+              </Link>
+            </div>
+          )}
+
+          {/* Club results */}
+          {phase === "done" && entityType === "clubs" && clubs !== null && clubs.length > 0 && (
+            <div className="space-y-2.5 pt-1">
+              <p className="text-xs text-[#71717A]">
+                👥 Найдено {clubs.length} {clubs.length === 1 ? "клуб" : clubs.length < 5 ? "клуба" : "клубов"}
+              </p>
+              {clubs.map((c) => (
+                <Link
+                  key={c.id}
+                  href={`/clubs/${c.slug}`}
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 rounded-2xl border border-[#E4E4E7] p-4 hover:border-[#7C5CFC]/40 hover:bg-[#FAFAFF] transition-colors group"
+                >
+                  {c.avatar_url ? (
+                    <Image src={proxyImageUrl(c.avatar_url) ?? c.avatar_url} alt="" width={48} height={48} className="rounded-xl object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl bg-[#FFF0F6] flex items-center justify-center flex-shrink-0">
+                      <Users size={18} className="text-[#E879A3]" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[#1C1C1E] truncate group-hover:text-[#7C5CFC] transition-colors">
+                      {c.name}
+                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {c.city && (
+                        <span className="text-xs text-[#71717A] flex items-center gap-1">
+                          <MapPin size={10} />
+                          {c.city}
+                        </span>
+                      )}
+                      <span className="text-xs text-[#A1A1AA] flex items-center gap-1">
+                        <Users size={10} />
+                        {c.members_count} {c.members_count === 1 ? "участник" : c.members_count < 5 ? "участника" : "участников"}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+              <Link
+                href="/clubs"
+                onClick={() => setOpen(false)}
+                className="block text-center text-xs text-[#7C5CFC] font-medium py-3 hover:underline"
+              >
+                Все клубы →
+              </Link>
+            </div>
+          )}
+
+          {/* Route results */}
+          {phase === "done" && entityType === "routes" && routes !== null && routes.length > 0 && (
             <div className="space-y-2.5 pt-1">
               {/* Wind search banner */}
               {activeFilters?.wind_intent && !relaxedReason && (
