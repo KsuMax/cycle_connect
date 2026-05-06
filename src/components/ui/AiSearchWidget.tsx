@@ -883,6 +883,17 @@ export function AiSearchWidget() {
                       );
                     })()}
 
+                    {/* Comfort badge (weather_intent without wind) */}
+                    {r.comfort != null && r.wind_score == null && (
+                      <p className="text-xs font-medium mt-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-sky-50 text-sky-700">
+                        <span>{r.comfort.label.split(" ")[0]}</span>
+                        <span>{r.comfort.temp_c}°C</span>
+                        {r.comfort.precip_pct > 0 && (
+                          <span className="text-sky-500">· {r.comfort.precip_pct}% дождь</span>
+                        )}
+                      </p>
+                    )}
+
                     {/* Match explanation: LLM why (preferred) or template fallback */}
                     {r.why ? (
                       <p className="text-xs text-[#52525B] mt-1.5 flex items-start gap-1 leading-snug">

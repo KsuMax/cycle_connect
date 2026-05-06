@@ -49,6 +49,8 @@ interface RouteFilters {
   sort_by?: "relevance" | "popular";
   /** When true, re-rank candidates by wind favorability for the target window. */
   wind_intent?: boolean;
+  /** When true, attach regional weather comfort to each result. */
+  weather_intent?: boolean;
   /** What the user is searching for — defaults to "routes". */
   entity_type?: EntityType;
 }
@@ -71,6 +73,14 @@ export interface RouteResult {
   best_wind_hour?: string;
   /** LLM-generated one-liner: why this route matches the user's query. */
   why?: string;
+  /** Regional weather comfort at the target ride time. */
+  comfort?: {
+    temp_c: number;
+    precip_pct: number;
+    /** Human-readable label with emoji, e.g. "🌤 Отлично" or "🌧 Дождь". */
+    label: string;
+    hour_iso: string;
+  };
 }
 
 export interface EventResult {
@@ -283,6 +293,11 @@ function extractFromText(query: string): RouteFilters {
     out.wind_intent = true;
   }
 
+  // Weather intent — user references a specific time → show comfort score on results
+  if (/сегодня|завтра|утром|вечером|сейчас|в\s+выходные|в\s+субботу|в\s+воскресенье|погод|комфортн|хорош\w*\s+погод/.test(q)) {
+    out.weather_intent = true;
+  }
+
   // Entity type
   const entityType = detectEntityType(q);
   if (entityType !== "routes") out.entity_type = entityType;
@@ -378,6 +393,8 @@ function mergeFilters(ai: RouteFilters, regex: RouteFilters): RouteFilters {
 
   // Either source can flag wind intent
   if (regex.wind_intent || ai.wind_intent) merged.wind_intent = true;
+  // Either source can flag weather intent (wind_intent implies weather_intent)
+  if (regex.weather_intent || ai.weather_intent || merged.wind_intent) merged.weather_intent = true;
 
   // Regex wins for entity type (more reliable pattern matching)
   if (regex.entity_type) merged.entity_type = regex.entity_type;
@@ -651,14 +668,16 @@ interface WindPoint {
   ts: string;      // UTC ISO
   dir_deg: number;
   speed_ms: number;
+  temp_c: number;
+  precip_pct: number;
 }
 
-/** Fetches 2-day hourly wind forecast from Open-Meteo for a single lat/lng. */
+/** Fetches 2-day hourly forecast from Open-Meteo: wind + temperature + precipitation. */
 async function fetchWindForecastForPoint(lat: number, lng: number): Promise<WindPoint[]> {
   const url = new URL("https://api.open-meteo.com/v1/forecast");
   url.searchParams.set("latitude", lat.toFixed(4));
   url.searchParams.set("longitude", lng.toFixed(4));
-  url.searchParams.set("hourly", "wind_speed_10m,wind_direction_10m");
+  url.searchParams.set("hourly", "wind_speed_10m,wind_direction_10m,temperature_2m,precipitation_probability");
   url.searchParams.set("forecast_days", "2");
   url.searchParams.set("timezone", "UTC");
   url.searchParams.set("wind_speed_unit", "ms");
@@ -669,19 +688,41 @@ async function fetchWindForecastForPoint(lat: number, lng: number): Promise<Wind
     const res = await fetch(url.toString(), { signal: controller.signal });
     if (!res.ok) throw new Error(`open-meteo ${res.status}`);
     const body = await res.json() as {
-      hourly?: { time?: string[]; wind_speed_10m?: number[]; wind_direction_10m?: number[] };
+      hourly?: {
+        time?: string[];
+        wind_speed_10m?: number[];
+        wind_direction_10m?: number[];
+        temperature_2m?: number[];
+        precipitation_probability?: number[];
+      };
     };
     const time = body.hourly?.time ?? [];
     const speeds = body.hourly?.wind_speed_10m ?? [];
     const dirs = body.hourly?.wind_direction_10m ?? [];
+    const temps = body.hourly?.temperature_2m ?? [];
+    const precips = body.hourly?.precipitation_probability ?? [];
     return time.map((t, i) => ({
       ts: (t.endsWith("Z") ? t : `${t}:00Z`).replace(/:00:00Z$/, ":00:00.000Z"),
       dir_deg: Math.round(((dirs[i] % 360) + 360) % 360),
       speed_ms: Number(speeds[i]?.toFixed(1) ?? 0),
+      temp_c: Math.round(temps[i] ?? 15),
+      precip_pct: Math.round(precips[i] ?? 0),
     }));
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** Builds a human-readable comfort label from temperature and precipitation. */
+function comfortLabel(temp_c: number, precip_pct: number): string {
+  if (precip_pct >= 60) return "🌧 Дождь";
+  if (precip_pct >= 35) return "🌦 Возможен дождь";
+  if (temp_c <= 2) return "🥶 Очень холодно";
+  if (temp_c <= 8) return "🧤 Холодно";
+  if (temp_c >= 33) return "🥵 Жарко";
+  if (temp_c >= 24 && precip_pct < 20) return "🌤 Отлично";
+  if (temp_c >= 14 && precip_pct < 20) return "🌤 Хорошая погода";
+  return "☁️ Пасмурно, сухо";
 }
 
 /**
@@ -728,12 +769,26 @@ function applyWindScoring(
     // Only surface routes where wind is at least slightly favorable
     if (bestScore < 0.1) continue;
 
+    const bestWind = forecastByHour.get(
+      new Date(Date.UTC(
+        new Date(bestHour).getUTCFullYear(), new Date(bestHour).getUTCMonth(),
+        new Date(bestHour).getUTCDate(), new Date(bestHour).getUTCHours(),
+      )).toISOString(),
+    );
     scored.push({
       ...route,
       wind_score: Math.round(bestScore * 100) / 100,
       wind_speed_ms: bestSpeed,
       best_wind_hour: bestHour,
       _wScore: bestScore,
+      ...(bestWind ? {
+        comfort: {
+          temp_c: bestWind.temp_c,
+          precip_pct: bestWind.precip_pct,
+          label: comfortLabel(bestWind.temp_c, bestWind.precip_pct),
+          hour_iso: bestHour,
+        },
+      } : {}),
     });
   }
 
@@ -809,6 +864,59 @@ async function searchRoutesWind(
 
   // If scoring yielded nothing (calm day, no bearing data, etc.) fall back to plain results
   return windResults.length > 0 ? windResults : candidates.slice(0, 6);
+}
+
+/**
+ * Fetches regional weather for the target time slot and attaches comfort
+ * to each route in-place. Silent on failure — routes are returned as-is.
+ */
+async function attachWeatherComfort(
+  routes: RouteResult[],
+  filters: RouteFilters,
+  query: string,
+): Promise<RouteResult[]> {
+  if (routes.length === 0) return routes;
+
+  const regionName = filters.region ?? "Москва";
+  const regionEntry =
+    REGION_CENTERS.find(([name]) => name === regionName) ??
+    REGION_CENTERS.find(([name]) => name === "Москва")!;
+  const [, lat, lng] = regionEntry;
+
+  try {
+    const forecast = await fetchWindForecastForPoint(lat, lng);
+    const forecastByHour = new Map<string, WindPoint>();
+    for (const w of forecast) {
+      const d = new Date(w.ts);
+      const key = new Date(Date.UTC(
+        d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(),
+      )).toISOString();
+      forecastByHour.set(key, w);
+    }
+
+    const targetSlots = getWindTargetSlots(query);
+    // Pick the first matching slot for regional comfort
+    let bestPoint: WindPoint | null = null;
+    for (const slot of targetSlots) {
+      const key = new Date(Date.UTC(
+        slot.getUTCFullYear(), slot.getUTCMonth(), slot.getUTCDate(), slot.getUTCHours(),
+      )).toISOString();
+      const w = forecastByHour.get(key);
+      if (w) { bestPoint = w; break; }
+    }
+    if (!bestPoint) return routes;
+
+    const comfort = {
+      temp_c: bestPoint.temp_c,
+      precip_pct: bestPoint.precip_pct,
+      label: comfortLabel(bestPoint.temp_c, bestPoint.precip_pct),
+      hour_iso: bestPoint.ts,
+    };
+    return routes.map((r) => ({ ...r, comfort }));
+  } catch (err) {
+    console.warn("[ai-search] attachWeatherComfort failed:", err instanceof Error ? err.message : String(err));
+    return routes;
+  }
 }
 
 async function searchRoutes(
@@ -914,7 +1022,12 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          // ── 4. LLM reranker with explanations ──────────────────────────
+          // ── 4. Weather comfort (when time reference in query, no wind) ──
+          if (routes.length > 0 && filters.weather_intent && !filters.wind_intent) {
+            routes = await attachWeatherComfort(routes, filters, query);
+          }
+
+          // ── 5. LLM reranker with explanations ──────────────────────────
           if (routes.length > 0 && !body.filters) {
             controller.enqueue(sseEvent({ type: "reranking" }));
             const whys = await generateWhys(routes, query);
