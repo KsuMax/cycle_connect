@@ -786,66 +786,61 @@ function applyWindScoring(
   forecastByHour: Map<string, WindPoint>,
   targetSlots: Date[],
 ): RouteResult[] {
-  const scored: Array<RouteResult & { _wScore: number }> = [];
+  const scored: Array<RouteResult & { _wRank: number }> = [];
 
   for (const route of candidates) {
     const profile = profiles.get(route.id);
     if (!profile || profile.total_m <= 0) continue;
 
-    let bestScore = -Infinity;
-    let bestHour = "";
-    let bestSpeed = 0;
+    // Rank by `tailwindMs` (= score · speed): a 0.7 score in 1 m/s wind is
+    // imperceptible while 0.3 in 8 m/s is a real assist. Picking the slot
+    // by raw `score` would systematically prefer the former.
+    let bestTailMs = -Infinity;
+    let bestScore = 0;
+    let bestKey: string | null = null;
 
     for (const slot of targetSlots) {
-      // Build the same UTC-floored key used throughout the wind system
       const key = new Date(Date.UTC(
         slot.getUTCFullYear(), slot.getUTCMonth(), slot.getUTCDate(), slot.getUTCHours(),
       )).toISOString();
       const wind = forecastByHour.get(key);
       if (!wind) continue;
 
-      const { score } = scoreWind(
+      const { score, tailwindMs } = scoreWind(
         { buckets: profile.buckets, total_m: profile.total_m },
         { ts: wind.ts, dir_deg: wind.dir_deg, speed_ms: wind.speed_ms },
       );
 
-      if (score > bestScore) {
+      if (tailwindMs > bestTailMs) {
+        bestTailMs = tailwindMs;
         bestScore = score;
-        bestHour = wind.ts;
-        bestSpeed = wind.speed_ms;
+        bestKey = key;
       }
     }
 
-    // Only surface routes where wind is at least slightly favorable
-    if (bestScore < 0.1) continue;
+    // ≥0.4 m/s of felt tailwind at cyclist height — minimum noticeable assist
+    if (bestKey === null || bestTailMs < 0.4) continue;
 
-    const bestWind = forecastByHour.get(
-      new Date(Date.UTC(
-        new Date(bestHour).getUTCFullYear(), new Date(bestHour).getUTCMonth(),
-        new Date(bestHour).getUTCDate(), new Date(bestHour).getUTCHours(),
-      )).toISOString(),
-    );
+    const bestWind = forecastByHour.get(bestKey)!;
     scored.push({
       ...route,
       wind_score: Math.round(bestScore * 100) / 100,
-      wind_speed_ms: bestSpeed,
-      best_wind_hour: bestHour,
-      _wScore: bestScore,
-      ...(bestWind ? {
-        comfort: {
-          temp_c: bestWind.temp_c,
-          precip_pct: bestWind.precip_pct,
-          label: comfortLabel(bestWind.temp_c, bestWind.precip_pct),
-          hour_iso: bestHour,
-        },
-      } : {}),
+      wind_speed_ms: bestWind.speed_ms,
+      best_wind_hour: bestWind.ts,
+      _wRank: bestTailMs,
+      comfort: {
+        temp_c: bestWind.temp_c,
+        precip_pct: bestWind.precip_pct,
+        label: comfortLabel(bestWind.temp_c, bestWind.precip_pct),
+        hour_iso: bestWind.ts,
+      },
     });
   }
 
   return scored
-    .sort((a, b) => b._wScore - a._wScore)
+    .sort((a, b) => b._wRank - a._wRank)
     .slice(0, 6)
-    .map(({ _wScore: _, ...rest }) => rest);
+    .map(({ _wRank: _, ...rest }) => rest);
 }
 
 /** Full wind-aware search: broader candidate fetch → bearing profiles → forecast → re-rank. */

@@ -16,7 +16,9 @@ describe("scoreWind", () => {
     const profile = singleBucketProfile(9);
     const r = scoreWind(profile, { ts: "", dir_deg: 270, speed_ms: 5 });
     expect(r.score).toBeGreaterThan(0.99);
-    expect(r.tailwindMs).toBeGreaterThan(4.95);
+    // 5 m/s × ~1.0 score × 0.7 cyclist-height factor ≈ 3.5 m/s felt
+    expect(r.tailwindMs).toBeGreaterThan(3.45);
+    expect(r.tailwindMs).toBeLessThan(3.55);
     expect(r.reverseBetter).toBe(false);
   });
 
@@ -24,7 +26,8 @@ describe("scoreWind", () => {
     const profile = singleBucketProfile(9); // east
     const r = scoreWind(profile, { ts: "", dir_deg: 90, speed_ms: 5 });
     expect(r.score).toBeLessThan(-0.99);
-    expect(r.tailwindMs).toBeLessThan(-4.95);
+    expect(r.tailwindMs).toBeLessThan(-3.45);
+    expect(r.tailwindMs).toBeGreaterThan(-3.55);
     expect(r.reverseBetter).toBe(true);
   });
 

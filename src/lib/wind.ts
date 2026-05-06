@@ -17,9 +17,9 @@
  * and 0 for pure crosswind.
  *
  * Identity: reversing the route negates the score (each segment's bearing
- * shifts by 180°, and -cos(x−180°) = cos(x) = -(-cos(x))). So we always
- * compute the forward score and report the absolute value plus a "reverse?"
- * hint when it's negative.
+ * shifts by 180°, and -cos(x−180°) = cos(x) = -(-cos(x))). The forward
+ * score is returned as-is (signed); `reverseBetter` flags meaningfully
+ * negative results so the UI can suggest flipping the route.
  */
 
 export interface BearingProfile {
@@ -40,7 +40,11 @@ export interface HourlyWind {
 export interface WindScore {
   /** Directional alignment in [-1, +1]: +1 = full tailwind, -1 = full headwind. */
   score: number;
-  /** Tailwind component in m/s (score · speed). Negative = headwind. */
+  /**
+   * Tailwind component in m/s, corrected from 10 m forecast height down to
+   * cyclist height (≈1.5 m) via a log-profile factor. Negative = headwind.
+   * This is what the rider actually feels.
+   */
   tailwindMs: number;
   /** Length share where the wind clearly helps (score > 0.3). */
   tailwindShare: number;
@@ -52,22 +56,51 @@ export interface WindScore {
 
 const DEG_TO_RAD = Math.PI / 180;
 
+// Pre-compute trig at the centre of each 10° bucket. Lets scoreWind expand
+// cos(wind − seg) = cos(wind)·cos(seg) + sin(wind)·sin(seg) and use only
+// two trig calls per invocation instead of one per non-empty bucket.
+const BUCKET_COS = new Float64Array(36);
+const BUCKET_SIN = new Float64Array(36);
+for (let i = 0; i < 36; i++) {
+  const a = (i * 10 + 5) * DEG_TO_RAD;
+  BUCKET_COS[i] = Math.cos(a);
+  BUCKET_SIN[i] = Math.sin(a);
+}
+
+// Threshold below which `reverseBetter` stays false: a tiny negative score
+// is essentially crosswind, not a reason to flip the route.
+const REVERSE_THRESHOLD = -0.1;
+
+// Open-Meteo reports wind at 10 m. A cyclist's torso/handlebar sits near
+// 1.5 m, where the wind is slower because of the log boundary layer.
+// Using the log profile v(h) = v10·ln(h/z0)/ln(10/z0) with a typical
+// mixed-terrain roughness z0 ≈ 0.1 m gives ≈ 0.6; over open fields
+// (z0 ≈ 0.03) it's ≈ 0.67. We use 0.7 as a slightly optimistic but honest
+// constant — `tailwindMs` (and bands derived from it) report what the
+// rider actually feels, not the 10 m number.
+const CYCLIST_HEIGHT_FACTOR = 0.7;
+
 export function scoreWind(profile: BearingProfile, wind: HourlyWind): WindScore {
   const total = profile.total_m;
   if (total <= 0 || wind.speed_ms < 0.3) {
     return { score: 0, tailwindMs: 0, tailwindShare: 0, headwindShare: 0, reverseBetter: false };
   }
 
+  const wRad = wind.dir_deg * DEG_TO_RAD;
+  const cosW = Math.cos(wRad);
+  const sinW = Math.sin(wRad);
+
+  const buckets = profile.buckets;
   let weighted = 0;
   let tailwindM = 0;
   let headwindM = 0;
 
   for (let i = 0; i < 36; i++) {
-    const segLen = profile.buckets[i] ?? 0;
-    if (segLen === 0) continue;
+    const segLen = buckets[i];
+    if (!segLen) continue;
 
-    const segBearing = i * 10 + 5; // bucket center
-    const tailComponent = -Math.cos((wind.dir_deg - segBearing) * DEG_TO_RAD);
+    // tailComponent = -cos(wind - seg) = -(cosW·cosS + sinW·sinS)
+    const tailComponent = -(cosW * BUCKET_COS[i] + sinW * BUCKET_SIN[i]);
 
     weighted += tailComponent * segLen;
     if (tailComponent > 0.3) tailwindM += segLen;
@@ -77,10 +110,10 @@ export function scoreWind(profile: BearingProfile, wind: HourlyWind): WindScore 
   const score = weighted / total;
   return {
     score,
-    tailwindMs: score * wind.speed_ms,
+    tailwindMs: score * wind.speed_ms * CYCLIST_HEIGHT_FACTOR,
     tailwindShare: tailwindM / total,
     headwindShare: headwindM / total,
-    reverseBetter: score < 0,
+    reverseBetter: score < REVERSE_THRESHOLD,
   };
 }
 
@@ -121,25 +154,25 @@ export function bandOf(score: number): WindBand {
  *
  * Pure directional score is dimensionless and ignores wind magnitude — a 0.4
  * score at 1 m/s is imperceptible while the same score at 8 m/s is a real
- * assist. We use `tailwindMs` (= score × speed in m/s) so bands reflect
- * what the cyclist will actually feel.
+ * assist. We use `tailwindMs` (= score × speed × cyclist-height factor) so
+ * bands reflect what the rider actually feels at handlebar height.
  *
- * Thresholds (m/s of effective tailwind component):
- *   tailwind    ≥  2.0   — clearly pushed forward
- *   favorable   ≥  0.8   — noticeable help
- *   neutral    -0.8..0.8 — minimal effect
- *   unfavorable ≤ -0.8   — noticeable drag
- *   headwind    ≤ -2.0   — clearly working against you
+ * Thresholds (m/s of felt tailwind component, ≈1.5 m above ground):
+ *   tailwind    ≥  1.5   — clearly pushed forward
+ *   favorable   ≥  0.6   — noticeable help
+ *   neutral    -0.6..0.6 — minimal effect
+ *   unfavorable ≤ -0.6   — noticeable drag
+ *   headwind    ≤ -1.5   — clearly working against you
  *
- * Wind < 1 m/s overall → always neutral regardless of direction.
+ * Forecast wind < 1 m/s at 10 m → always neutral regardless of direction.
  */
 export function bandOfSlot(slot: WindScore, speedMs: number): WindBand {
   if (speedMs < 1.0) return "neutral";
   const ms = slot.tailwindMs;
-  if (ms >= 2.0) return "tailwind";
-  if (ms >= 0.8) return "favorable";
-  if (ms > -0.8) return "neutral";
-  if (ms > -2.0) return "unfavorable";
+  if (ms >= 1.5) return "tailwind";
+  if (ms >= 0.6) return "favorable";
+  if (ms > -0.6) return "neutral";
+  if (ms > -1.5) return "unfavorable";
   return "headwind";
 }
 
