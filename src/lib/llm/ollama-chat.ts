@@ -30,7 +30,7 @@ export interface ChatMessage {
  */
 export async function chatJSON(
   messages: ChatMessage[],
-  timeoutMs = 8_000,
+  timeoutMs = 5_000,
 ): Promise<Record<string, unknown>> {
   // ── Primary: Ollama local ──────────────────────────────────────────────────
   const controller = new AbortController();
@@ -106,19 +106,19 @@ export async function chatJSON(
   }
 }
 
-/** Fire-and-forget warm-up: loads the model into memory so the first real request is fast. */
+/**
+ * Fire-and-forget warm-up: loads the model into memory so the first real request is fast.
+ * Only beneficial when running on a machine with a GPU or sufficient free RAM.
+ * On a CPU-only VPS with limited RAM this is a no-op (model won't stay warm anyway).
+ */
 export function warmUpOllama(): void {
-  fetch(`${OLLAMA_URL}/api/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: OLLAMA_CHAT_MODEL,
-      messages: [{ role: "user", content: "ping" }],
-      stream: false,
-      keep_alive: "10m",
-      options: { num_predict: 1 },
-    }),
-  }).catch((err) =>
-    console.warn("[ollama-chat] warm-up failed (non-fatal):", err instanceof Error ? err.message : String(err)),
-  );
+  fetch(`${OLLAMA_URL}/api/tags`)
+    .then((r) => r.json())
+    .then((d) => {
+      const models: string[] = (d as { models?: Array<{ name: string }> }).models?.map((m) => m.name) ?? [];
+      console.log("[ollama-chat] available models:", models.join(", ") || "none");
+    })
+    .catch((err) =>
+      console.warn("[ollama-chat] Ollama ping failed (non-fatal):", err instanceof Error ? err.message : String(err)),
+    );
 }

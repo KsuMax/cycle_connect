@@ -218,7 +218,7 @@ async function parseAI(query: string): Promise<RouteFilters> {
 
   // ── Primary: Ollama local ────────────────────────────────────────────────
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8_000);
+  const timer = setTimeout(() => controller.abort(), 5_000);
   try {
     const res = await fetch(`${OLLAMA_URL}/api/chat`, {
       method: "POST",
