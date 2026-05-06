@@ -106,38 +106,6 @@ function matchReasons(route: RouteResult, filters: RouteFilters): string[] {
   return out.slice(0, 3);
 }
 
-// ─── Smart fallback: relax the most restrictive filter ───────────────────────
-
-interface RelaxResult {
-  filters: RouteFilters;
-  reason: string;
-}
-
-function relaxFilters(f: RouteFilters): RelaxResult | null {
-  if (f.elevation_min != null && f.elevation_min > 0) {
-    return { filters: { ...f, elevation_min: undefined }, reason: "убрали минимальный набор высот" };
-  }
-  if (f.elevation_max != null && f.elevation_max < 400) {
-    return { filters: { ...f, elevation_max: undefined }, reason: "убрали ограничение по набору высот" };
-  }
-  if (f.difficulty) {
-    return { filters: { ...f, difficulty: undefined }, reason: "убрали фильтр по сложности" };
-  }
-  if (f.surface?.length) {
-    return { filters: { ...f, surface: undefined }, reason: "убрали фильтр по покрытию" };
-  }
-  if (f.distance_min != null || f.distance_max != null) {
-    return {
-      filters: { ...f, distance_min: undefined, distance_max: undefined, distance_target: undefined },
-      reason: "расширили диапазон дистанции",
-    };
-  }
-  if (f.region) {
-    return { filters: { ...f, region: undefined }, reason: "убрали фильтр по региону" };
-  }
-  return null;
-}
-
 // ─── Chip definitions ─────────────────────────────────────────────────────────
 
 const CHIPS: Chip[] = [
@@ -314,10 +282,37 @@ async function requestCoords(): Promise<{ lat: number; lng: number; approximate?
   }
 }
 
+// ─── Search phase for SSE trace ───────────────────────────────────────────────
+
+type SearchPhase = "idle" | "parsing" | "searching" | "wind" | "relaxing" | "done";
+
+function parseTraceLabel(phase: SearchPhase, filters: RouteFilters | null): string {
+  if (phase === "parsing") return "Разбираю запрос...";
+  if (phase === "relaxing") return "Нет точных совпадений, расширяю...";
+  if (phase === "wind") return "Считаю попутный ветер...";
+  if (phase === "searching") {
+    if (!filters || Object.keys(filters).length === 0) return "Ищу маршруты...";
+    const parts: string[] = [];
+    if (filters.distance_target) parts.push(`${filters.distance_target} км`);
+    else if (filters.distance_max && !filters.distance_min) parts.push(`до ${filters.distance_max} км`);
+    else if (filters.distance_min && filters.distance_max) parts.push(`${filters.distance_min}–${filters.distance_max} км`);
+    if (filters.difficulty === "easy") parts.push("лёгкий");
+    else if (filters.difficulty === "medium") parts.push("средний");
+    else if (filters.difficulty === "hard") parts.push("сложный");
+    if (filters.region) parts.push(filters.region);
+    if (filters.surface?.includes("asphalt")) parts.push("асфальт");
+    else if (filters.surface?.includes("gravel")) parts.push("гравий");
+    if (filters.wind_intent) parts.push("🌬 попутный ветер");
+    if (parts.length === 0) return "Ищу по смыслу...";
+    return `Понял: ${parts.join(" · ")}`;
+  }
+  return "";
+}
+
 export function AiSearchWidget() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [phase, setPhase] = useState<SearchPhase>("idle");
   const [locating, setLocating] = useState(false);
   const [routes, setRoutes] = useState<RouteResult[] | null>(null);
   const [detectedRegion, setDetectedRegion] = useState<string | null>(null);
@@ -327,6 +322,9 @@ export function AiSearchWidget() {
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const loading = phase !== "idle" && phase !== "done";
 
   useEffect(() => {
     if (open) {
@@ -339,9 +337,11 @@ export function AiSearchWidget() {
         .catch(() => {})
         .finally(() => setSuggestionsLoading(false));
     } else {
+      abortRef.current?.abort();
       setRoutes(null);
       setQuery("");
       setError("");
+      setPhase("idle");
       setDetectedRegion(null);
       setActiveFilters(null);
       setRelaxedReason(null);
@@ -357,12 +357,19 @@ export function AiSearchWidget() {
   async function handleSearch(q: string, overrideFilters?: RouteFilters) {
     const trimmed = q.trim();
     if (!trimmed) return;
+
+    // Cancel any in-flight request
+    abortRef.current?.abort();
+    const abort = new AbortController();
+    abortRef.current = abort;
+
     setQuery(trimmed);
-    setLoading(true);
+    setPhase("parsing");
     setError("");
     setRoutes(null);
     setDetectedRegion(null);
     setRelaxedReason(null);
+    setActiveFilters(overrideFilters ?? null);
 
     let lat: number | undefined;
     let lng: number | undefined;
@@ -380,7 +387,7 @@ export function AiSearchWidget() {
             ? "Доступ к геолокации запрещён. Разреши в настройках браузера или укажи регион вручную."
             : "Не удалось определить местоположение. Укажи город или регион в запросе.",
         );
-        setLoading(false);
+        setPhase("idle");
         setLocating(false);
         return;
       }
@@ -388,49 +395,77 @@ export function AiSearchWidget() {
     }
 
     try {
-      const body = overrideFilters
+      const reqBody = overrideFilters
         ? { query: trimmed, filters: overrideFilters }
         : { query: trimmed, lat, lng };
 
       const res = await fetch("/api/ai-search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(reqBody),
+        signal: abort.signal,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Ошибка поиска");
 
-      const resultRoutes: RouteResult[] = data.routes ?? [];
-      const resultFilters: RouteFilters = data.filters ?? {};
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error ?? "Ошибка поиска");
+      }
 
-      // Smart fallback: if empty results, try relaxing the tightest filter once.
-      if (resultRoutes.length === 0 && !overrideFilters) {
-        const relaxed = relaxFilters(resultFilters);
-        if (relaxed) {
-          const r2 = await fetch("/api/ai-search", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ query: trimmed, filters: relaxed.filters }),
-          });
-          const d2 = await r2.json();
-          const fallbackRoutes: RouteResult[] = d2.routes ?? [];
-          if (fallbackRoutes.length > 0) {
-            setRoutes(fallbackRoutes);
-            setActiveFilters(relaxed.filters);
-            setRelaxedReason(relaxed.reason);
-            if (relaxed.filters.region) setDetectedRegion(relaxed.filters.region);
-            return;
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const event = JSON.parse(line.slice(6)) as {
+              type: string;
+              filters?: RouteFilters;
+              routes?: RouteResult[];
+              reason?: string;
+              relaxedReason?: string | null;
+              hint?: string;
+            };
+
+            if (event.type === "parsing") {
+              setPhase("parsing");
+            } else if (event.type === "parsed" && event.filters) {
+              setActiveFilters(event.filters);
+              setPhase("searching");
+              if (event.filters.region) setDetectedRegion(event.filters.region);
+            } else if (event.type === "searching") {
+              setPhase(event.hint === "wind" ? "wind" : "searching");
+            } else if (event.type === "relaxing") {
+              setPhase("relaxing");
+            } else if (event.type === "result") {
+              setRoutes(event.routes ?? []);
+              if (event.filters) {
+                setActiveFilters(event.filters);
+                if (event.filters.region) setDetectedRegion(event.filters.region);
+              }
+              if (event.relaxedReason) setRelaxedReason(event.relaxedReason);
+              setPhase("done");
+            } else if (event.type === "error") {
+              setError("Не удалось выполнить поиск. Попробуй ещё раз.");
+              setPhase("done");
+            }
+          } catch {
+            // malformed SSE line — skip
           }
         }
       }
-
-      setRoutes(resultRoutes);
-      setActiveFilters(resultFilters);
-      if (resultFilters.region) setDetectedRegion(resultFilters.region);
-    } catch {
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
       setError("Не удалось выполнить поиск. Попробуй ещё раз.");
-    } finally {
-      setLoading(false);
+      setPhase("done");
     }
   }
 
@@ -452,7 +487,7 @@ export function AiSearchWidget() {
     handleSearch(query, newFilters);
   }
 
-  const visibleChips = activeFilters && routes !== null && routes.length > 0
+  const visibleChips = phase === "done" && activeFilters && routes !== null && routes.length > 0
     ? CHIPS.filter((c) => c.apply(activeFilters, routes) !== null).slice(0, 5)
     : [];
 
@@ -551,7 +586,7 @@ export function AiSearchWidget() {
         <div className="flex-1 overflow-y-auto px-5 pb-6" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 24px)" }}>
 
           {/* Suggestions */}
-          {!loading && routes === null && !error && (
+          {phase === "idle" && routes === null && !error && (
             <div className="flex flex-col gap-2 pt-1">
               {suggestionsLoading ? (
                 <div className="flex flex-wrap gap-2">
@@ -592,9 +627,18 @@ export function AiSearchWidget() {
             </div>
           )}
 
-          {/* Loading skeleton */}
+          {/* SSE trace + skeleton */}
           {loading && !locating && (
             <div className="space-y-3 pt-1">
+              {/* Trace label */}
+              <div className="flex items-center gap-2 text-xs text-[#7C5CFC] font-medium px-1">
+                <svg className="animate-spin w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                <span className="truncate">{parseTraceLabel(phase, activeFilters)}</span>
+              </div>
+              {/* Cards skeleton */}
               {[1, 2, 3].map((i) => (
                 <div key={i} className="rounded-2xl border border-[#E4E4E7] p-4 animate-pulse">
                   <div className="h-4 bg-[#F5F4F1] rounded w-3/4 mb-2" />
@@ -608,7 +652,7 @@ export function AiSearchWidget() {
           {error && <p className="text-sm text-red-500 pt-2">{error}</p>}
 
           {/* No results */}
-          {!loading && routes !== null && routes.length === 0 && (
+          {phase === "done" && routes !== null && routes.length === 0 && (
             <div className="text-center py-8">
               <p className="text-2xl mb-2">🔍</p>
               <p className="text-sm font-medium text-[#1C1C1E]">Ничего не нашлось</p>
@@ -619,7 +663,7 @@ export function AiSearchWidget() {
           )}
 
           {/* Results */}
-          {!loading && routes !== null && routes.length > 0 && (
+          {phase === "done" && routes !== null && routes.length > 0 && (
             <div className="space-y-2.5 pt-1">
               {/* Wind search banner */}
               {activeFilters?.wind_intent && !relaxedReason && (

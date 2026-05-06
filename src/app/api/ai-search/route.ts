@@ -338,6 +338,38 @@ function mergeFilters(ai: RouteFilters, regex: RouteFilters): RouteFilters {
   return merged;
 }
 
+// ─── Smart fallback: relax the most restrictive filter ───────────────────────
+
+interface RelaxResult {
+  filters: RouteFilters;
+  reason: string;
+}
+
+function relaxFilters(f: RouteFilters): RelaxResult | null {
+  if (f.elevation_min != null && f.elevation_min > 0) {
+    return { filters: { ...f, elevation_min: undefined }, reason: "убрали минимальный набор высот" };
+  }
+  if (f.elevation_max != null && f.elevation_max < 400) {
+    return { filters: { ...f, elevation_max: undefined }, reason: "убрали ограничение по набору высот" };
+  }
+  if (f.difficulty) {
+    return { filters: { ...f, difficulty: undefined }, reason: "убрали фильтр по сложности" };
+  }
+  if (f.surface?.length) {
+    return { filters: { ...f, surface: undefined }, reason: "убрали фильтр по покрытию" };
+  }
+  if (f.distance_min != null || f.distance_max != null) {
+    return {
+      filters: { ...f, distance_min: undefined, distance_max: undefined, distance_target: undefined },
+      reason: "расширили диапазон дистанции",
+    };
+  }
+  if (f.region) {
+    return { filters: { ...f, region: undefined }, reason: "убрали фильтр по региону" };
+  }
+  return null;
+}
+
 // ─── Supabase query ───────────────────────────────────────────────────────────
 
 /** Low-level wrapper around the match_routes RPC. */
@@ -621,6 +653,12 @@ async function searchRoutes(
   return runMatchRoutes(filters, query, 6);
 }
 
+// ─── SSE helpers ──────────────────────────────────────────────────────────────
+
+function sseEvent(data: unknown): Uint8Array {
+  return new TextEncoder().encode(`data: ${JSON.stringify(data)}\n\n`);
+}
+
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -645,25 +683,74 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "query required" }, { status: 400 });
   }
 
-  let filters: RouteFilters;
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        let filters: RouteFilters;
 
-  // Chip refinement: client sends pre-built filters, skip LLM parsing entirely.
-  if (body.filters && typeof body.filters === "object") {
-    filters = body.filters as RouteFilters;
-  } else {
-    const [aiFilters, regexFilters] = await Promise.all([
-      parseAI(query),
-      Promise.resolve(extractFromText(query)),
-    ]);
-    filters = mergeFilters(aiFilters, regexFilters);
-  }
+        // Chip refinement: client sends pre-built filters, skip LLM parsing entirely.
+        if (body.filters && typeof body.filters === "object") {
+          filters = body.filters as RouteFilters;
+          // Still emit parsed event so client shows the active filter summary
+          controller.enqueue(sseEvent({ type: "parsed", filters }));
+        } else {
+          // ── 1. Parse in parallel ──────────────────────────────────────────
+          controller.enqueue(sseEvent({ type: "parsing" }));
 
-  // If coordinates provided and no region extracted from text — use nearest region
-  if (lat !== undefined && lng !== undefined && !filters.region) {
-    filters.region = closestRegion(lat, lng);
-  }
+          const [aiFilters, regexFilters] = await Promise.all([
+            parseAI(query),
+            Promise.resolve(extractFromText(query)),
+          ]);
+          filters = mergeFilters(aiFilters, regexFilters);
 
-  const routes = await searchRoutes(filters, query);
+          // If coordinates provided and no region extracted — use nearest region
+          if (lat !== undefined && lng !== undefined && !filters.region) {
+            filters.region = closestRegion(lat, lng);
+          }
 
-  return NextResponse.json({ routes, filters });
+          controller.enqueue(sseEvent({ type: "parsed", filters }));
+        }
+
+        // ── 2. Search ─────────────────────────────────────────────────────
+        const searchingEvent = filters.wind_intent
+          ? { type: "searching", hint: "wind" }
+          : { type: "searching" };
+        controller.enqueue(sseEvent(searchingEvent));
+
+        let routes = await searchRoutes(filters, query);
+
+        // ── 3. Smart fallback: relax tightest filter once if empty ────────
+        let relaxedReason: string | null = null;
+        if (routes.length === 0 && !body.filters) {
+          const relaxed = relaxFilters(filters);
+          if (relaxed) {
+            controller.enqueue(sseEvent({ type: "relaxing", reason: relaxed.reason }));
+            const fallback = await searchRoutes(relaxed.filters, query);
+            if (fallback.length > 0) {
+              routes = fallback;
+              filters = relaxed.filters;
+              relaxedReason = relaxed.reason;
+            }
+          }
+        }
+
+        // ── 4. Done ───────────────────────────────────────────────────────
+        controller.enqueue(sseEvent({ type: "result", routes, filters, relaxedReason }));
+      } catch (err) {
+        console.error("[ai-search] stream error:", err instanceof Error ? err.message : String(err));
+        controller.enqueue(sseEvent({ type: "error", message: "Не удалось выполнить поиск" }));
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive",
+      "X-Accel-Buffering": "no",
+    },
+  });
 }
