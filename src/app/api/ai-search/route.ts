@@ -65,6 +65,8 @@ export interface RouteResult {
   wind_speed_ms?: number;
   /** UTC ISO timestamp of the best wind window found. */
   best_wind_hour?: string;
+  /** LLM-generated one-liner: why this route matches the user's query. */
+  why?: string;
 }
 
 // ─── Geolocation: nearest region ─────────────────────────────────────────────
@@ -368,6 +370,60 @@ function relaxFilters(f: RouteFilters): RelaxResult | null {
     return { filters: { ...f, region: undefined }, reason: "убрали фильтр по региону" };
   }
   return null;
+}
+
+// ─── LLM explanations ────────────────────────────────────────────────────────
+
+const DIFFICULTY_LABEL: Record<string, string> = { easy: "лёгкий", medium: "средний", hard: "сложный" };
+
+/**
+ * Asks the LLM to write a one-liner "why" for each route.
+ * Returns a map of route id → explanation string.
+ * Silently returns an empty map on any failure.
+ */
+async function generateWhys(
+  routes: RouteResult[],
+  query: string,
+): Promise<Map<string, string>> {
+  if (routes.length === 0) return new Map();
+
+  const routeList = routes
+    .map((r, i) =>
+      `${i + 1}. id:${r.id} "${r.title}" ` +
+      `${r.distance_km}км подъём:${r.elevation_m}м ` +
+      `${DIFFICULTY_LABEL[r.difficulty] ?? r.difficulty} ` +
+      `${r.region}` +
+      (r.tags?.length ? ` [${r.tags.slice(0, 3).join(",")}]` : ""),
+    )
+    .join("\n");
+
+  const userMsg =
+    `Запрос: "${query}"\n\nМаршруты:\n${routeList}\n\n` +
+    `Напиши для каждого маршрута ОДНО короткое предложение (8-12 слов) на русском — ` +
+    `чем конкретно он подходит для этого запроса. ` +
+    `Отвечай в формате {"items":[{"id":"...","why":"..."},...]}`;
+
+  try {
+    const raw = await chatJSON(
+      [
+        { role: "system", content: "Ты — помощник велосипедиста. Возвращай только JSON." },
+        { role: "user", content: userMsg },
+      ],
+      6_000,
+    );
+
+    const arr = Array.isArray(raw.items) ? raw.items : [];
+    const map = new Map<string, string>();
+    for (const item of arr as Array<{ id?: string; why?: string }>) {
+      if (typeof item.id === "string" && typeof item.why === "string") {
+        map.set(item.id, item.why);
+      }
+    }
+    return map;
+  } catch (err) {
+    console.warn("[ai-search] generateWhys failed:", err instanceof Error ? err.message : String(err));
+    return new Map();
+  }
 }
 
 // ─── Supabase query ───────────────────────────────────────────────────────────
@@ -734,7 +790,17 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // ── 4. Done ───────────────────────────────────────────────────────
+        // ── 4. Generate explanations (LLM reranker) ───────────────────────
+        // Skip when chip refinement or no results — user already knows why chips matched.
+        if (routes.length > 0 && !body.filters) {
+          controller.enqueue(sseEvent({ type: "reranking" }));
+          const whys = await generateWhys(routes, query);
+          if (whys.size > 0) {
+            routes = routes.map((r) => whys.has(r.id) ? { ...r, why: whys.get(r.id) } : r);
+          }
+        }
+
+        // ── 5. Done ───────────────────────────────────────────────────────
         controller.enqueue(sseEvent({ type: "result", routes, filters, relaxedReason }));
       } catch (err) {
         console.error("[ai-search] stream error:", err instanceof Error ? err.message : String(err));

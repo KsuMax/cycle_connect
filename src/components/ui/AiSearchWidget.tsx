@@ -284,12 +284,13 @@ async function requestCoords(): Promise<{ lat: number; lng: number; approximate?
 
 // ─── Search phase for SSE trace ───────────────────────────────────────────────
 
-type SearchPhase = "idle" | "parsing" | "searching" | "wind" | "relaxing" | "done";
+type SearchPhase = "idle" | "parsing" | "searching" | "wind" | "relaxing" | "reranking" | "done";
 
 function parseTraceLabel(phase: SearchPhase, filters: RouteFilters | null): string {
   if (phase === "parsing") return "Разбираю запрос...";
   if (phase === "relaxing") return "Нет точных совпадений, расширяю...";
   if (phase === "wind") return "Считаю попутный ветер...";
+  if (phase === "reranking") return "Подбираю объяснения...";
   if (phase === "searching") {
     if (!filters || Object.keys(filters).length === 0) return "Ищу маршруты...";
     const parts: string[] = [];
@@ -761,8 +762,13 @@ export function AiSearchWidget() {
                       );
                     })()}
 
-                    {/* Match explanation */}
-                    {activeFilters && (() => {
+                    {/* Match explanation: LLM why (preferred) or template fallback */}
+                    {r.why ? (
+                      <p className="text-xs text-[#52525B] mt-1.5 flex items-start gap-1 leading-snug">
+                        <Sparkles size={10} className="flex-shrink-0 mt-0.5 text-[#7C5CFC]" />
+                        {r.why}
+                      </p>
+                    ) : activeFilters && (() => {
                       const reasons = matchReasons(r, activeFilters);
                       if (reasons.length === 0) return null;
                       return (
