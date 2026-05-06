@@ -20,7 +20,8 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /opt/cycleconnect
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
             docker build -t cycleconnect:latest .
             docker stop cycleconnect-app 2>/dev/null || true
             docker rm cycleconnect-app 2>/dev/null || true
