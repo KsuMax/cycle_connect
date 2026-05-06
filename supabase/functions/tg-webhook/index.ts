@@ -3,11 +3,12 @@
  *
  * Handles:
  *  1. /start <code>  — links chat_id to a CycleConnect profile.
- *  2. Any text       — AI-powered route search via OpenRouter (Gemma 4 31B).
+ *  2. Any text       — AI-powered route search via Ollama (llama3.2:3b).
  *
  * Secrets (set via `supabase secrets set`):
  *   TELEGRAM_BOT_TOKEN
- *   OPENROUTER_API_KEY
+ *   OLLAMA_URL             (e.g. http://host.docker.internal:11434)
+ *   OPENROUTER_API_KEY     (fallback when Ollama is unavailable)
  *   SITE_URL               (e.g. https://cycleconnect.cc)
  *   SUPABASE_SERVICE_ROLE_KEY  — auto-injected
  *   SUPABASE_URL               — auto-injected
@@ -16,8 +17,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN")!;
-const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY")!;
+const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY") ?? "";
 const SITE_URL = Deno.env.get("SITE_URL") ?? "https://cycleconnect.cc";
+const OLLAMA_URL = (Deno.env.get("OLLAMA_URL") ?? "http://host.docker.internal:11434").replace(/\/$/, "");
+const OLLAMA_CHAT_MODEL = Deno.env.get("OLLAMA_CHAT_MODEL") ?? "llama3.2:3b";
 // DB_URL / DB_SERVICE_KEY allow overriding the auto-injected Supabase vars —
 // used when the function runs on cloud Supabase but queries a self-hosted DB.
 const SUPABASE_URL = Deno.env.get("DB_URL") ?? Deno.env.get("SUPABASE_URL")!;
@@ -205,9 +208,45 @@ Rules (apply all that match):
 9. Nature words (море, озеро, лес) → search_text
 10. Return {} only if truly nothing can be extracted`;
 
-// ─── AI filter parsing ────────────────────────────────────────────────────────
+// ─── AI filter parsing: Ollama primary, OpenRouter fallback ──────────────────
 
 async function parseAI(query: string): Promise<RouteFilters> {
+  const messages = [
+    { role: "system", content: SYSTEM_PROMPT },
+    { role: "user", content: query },
+  ];
+
+  // ── Primary: Ollama local ────────────────────────────────────────────────
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8_000);
+  try {
+    const res = await fetch(`${OLLAMA_URL}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: OLLAMA_CHAT_MODEL,
+        messages,
+        stream: false,
+        format: "json",
+        options: { temperature: 0, num_ctx: 1024 },
+        keep_alive: "10m",
+      }),
+    });
+    if (!res.ok) throw new Error(`ollama HTTP ${res.status}`);
+    // deno-lint-ignore no-explicit-any
+    const data = await res.json() as any;
+    if (data.error) throw new Error(`ollama: ${data.error}`);
+    const content: string = data.message?.content ?? "{}";
+    return JSON.parse(content) as RouteFilters;
+  } catch (err) {
+    console.warn("[tg-webhook] Ollama unavailable, trying OpenRouter:", (err as Error).message);
+  } finally {
+    clearTimeout(timer);
+  }
+
+  // ── Fallback: OpenRouter ─────────────────────────────────────────────────
+  if (!OPENROUTER_API_KEY) return {};
   try {
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -218,22 +257,22 @@ async function parseAI(query: string): Promise<RouteFilters> {
         "X-Title": "CycleConnect",
       },
       body: JSON.stringify({
-        model: "google/gemma-4-31b-it:free",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: query },
-        ],
-        max_tokens: 200,
+        model: "meta-llama/llama-3.2-3b-instruct:free",
+        messages,
+        max_tokens: 256,
         temperature: 0.1,
+        response_format: { type: "json_object" },
       }),
     });
-    const data = await res.json();
+    // deno-lint-ignore no-explicit-any
+    const data = await res.json() as any;
+    if (data.error) throw new Error(`openrouter: ${data.error?.message}`);
     const raw: string = data.choices?.[0]?.message?.content ?? "";
-    // Extract JSON object even if model wraps it in text/markdown
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) return {};
     return JSON.parse(match[0]) as RouteFilters;
-  } catch {
+  } catch (err) {
+    console.error("[tg-webhook] OpenRouter fallback also failed:", (err as Error).message);
     return {};
   }
 }

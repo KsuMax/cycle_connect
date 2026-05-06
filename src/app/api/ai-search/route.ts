@@ -5,7 +5,8 @@
  * Response: { routes: RouteResult[], filters: object }
  *
  * Env vars required:
- *   OPENROUTER_API_KEY
+ *   OLLAMA_URL             — base URL for Ollama (default: http://localhost:11434)
+ *   OPENROUTER_API_KEY     — fallback when Ollama is unavailable
  *   NEXT_PUBLIC_SUPABASE_URL
  *   SUPABASE_SERVICE_ROLE_KEY
  */
@@ -16,11 +17,9 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { embedQuery, toPgVector } from "@/lib/embeddings/jina";
 import { scoreWind } from "@/lib/wind";
+import { chatJSON } from "@/lib/llm/ollama-chat";
 
 export const dynamic = "force-dynamic";
-
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY ?? "";
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://cycleconnect.cc";
 
 function getSupabase() {
   return createClient(
@@ -291,33 +290,14 @@ Rules (apply all that match):
 // ─── AI filter parsing ────────────────────────────────────────────────────────
 
 async function parseAI(query: string): Promise<RouteFilters> {
-  if (!OPENROUTER_API_KEY) return {};
   try {
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": SITE_URL,
-        "X-Title": "CycleConnect",
-      },
-      body: JSON.stringify({
-        model: "google/gemma-4-31b-it:free",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: query },
-        ],
-        max_tokens: 200,
-        temperature: 0.1,
-      }),
-    });
-    const data = await res.json();
-    const raw: string = data.choices?.[0]?.message?.content ?? "";
-    // Extract JSON object even if model wraps it in text/markdown
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) return {};
-    return JSON.parse(match[0]) as RouteFilters;
-  } catch {
+    const result = await chatJSON([
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: query },
+    ]);
+    return result as RouteFilters;
+  } catch (err) {
+    console.error("[ai-search] parseAI failed:", err instanceof Error ? err.message : String(err));
     return {};
   }
 }
