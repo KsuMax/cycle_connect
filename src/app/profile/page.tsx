@@ -213,11 +213,11 @@ export default function ProfilePage() {
     ? profile.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
     : "?";
 
-  const TABS: { id: Tab; label: string; icon: React.ReactNode; count: number }[] = [
-    { id: "routes",       label: "Мои маршруты", icon: <Map size={15} />,      count: myRoutes.length },
-    { id: "favorites",    label: "Избранное",    icon: <Bookmark size={15} />, count: favoriteRoutes.length },
-    { id: "events",       label: "Активность",   icon: <Calendar size={15} />, count: tripsCount },
-    { id: "achievements", label: "Достижения",   icon: <Trophy size={15} />,   count: earnedIds.size },
+  const TABS: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode; count: number }[] = [
+    { id: "routes",       label: "Мои маршруты", shortLabel: "Маршруты",   icon: <Map size={15} />,      count: myRoutes.length },
+    { id: "favorites",    label: "Избранное",    shortLabel: "Избранное",  icon: <Bookmark size={15} />, count: favoriteRoutes.length },
+    { id: "events",       label: "Активность",   shortLabel: "Активность", icon: <Calendar size={15} />, count: tripsCount },
+    { id: "achievements", label: "Достижения",   shortLabel: "Достижения", icon: <Trophy size={15} />,   count: earnedIds.size },
   ];
 
   if (authLoading) {
@@ -298,9 +298,9 @@ export default function ProfilePage() {
               )}
             </div>
             <div className="flex-1">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h1 className="text-xl font-bold text-[#1C1C1E]">{profile?.name || "Участник"}</h1>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-xl font-bold text-[#1C1C1E] truncate">{profile?.name || "Участник"}</h1>
                   {profile?.username && <p className="text-sm font-medium mt-0.5" style={{ color: "#F4632A" }}>@{profile.username}</p>}
                   {profile?.bio && <p className="text-sm text-[#71717A] mt-1">{profile.bio}</p>}
                   {(profile?.website || profile?.strava_url) && (
@@ -414,18 +414,31 @@ export default function ProfilePage() {
         <div className="flex gap-1 bg-white rounded-2xl p-1.5 border border-[#E4E4E7] mb-6" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
           {TABS.map((tab) => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-medium transition-all"
+              className="flex-1 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 py-2 sm:py-2.5 px-1 sm:px-3 rounded-xl text-sm font-medium transition-all"
               style={activeTab === tab.id ? { backgroundColor: "#1C1C1E", color: "white" } : { color: "#71717A" }}>
-              {tab.icon}
+              <div className="flex items-center gap-1.5 sm:gap-0">
+                {tab.icon}
+                {tab.count > 0 && (
+                  <span className="sm:hidden text-[10px] font-bold px-1 py-0 rounded-full min-w-[16px] text-center leading-4"
+                    style={activeTab === tab.id
+                      ? { backgroundColor: "rgba(255,255,255,0.2)", color: "white" }
+                      : { backgroundColor: "#F5F4F1", color: "#71717A" }}>
+                    {tab.count}
+                  </span>
+                )}
+              </div>
+              {/* Desktop: full label + badge в строку */}
               <span className="hidden sm:inline">{tab.label}</span>
               {tab.count > 0 && (
-                <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center"
+                <span className="hidden sm:inline text-[11px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center"
                   style={activeTab === tab.id
                     ? { backgroundColor: "rgba(255,255,255,0.2)", color: "white" }
                     : { backgroundColor: "#F5F4F1", color: "#71717A" }}>
                   {tab.count}
                 </span>
               )}
+              {/* Mobile: short label под иконкой */}
+              <span className="sm:hidden text-[10px] font-medium leading-tight">{tab.shortLabel}</span>
             </button>
           ))}
         </div>
