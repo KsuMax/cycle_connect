@@ -286,8 +286,8 @@ async function requestCoords(): Promise<{ lat: number; lng: number; approximate?
 
 type SearchPhase = "idle" | "parsing" | "searching" | "wind" | "relaxing" | "reranking" | "done";
 
-function parseTraceLabel(phase: SearchPhase, filters: RouteFilters | null): string {
-  if (phase === "parsing") return "Разбираю запрос...";
+function parseTraceLabel(phase: SearchPhase, filters: RouteFilters | null, isRefinement?: boolean): string {
+  if (phase === "parsing") return isRefinement ? "Уточняю параметры..." : "Разбираю запрос...";
   if (phase === "relaxing") return "Нет точных совпадений, расширяю...";
   if (phase === "wind") return "Считаю попутный ветер...";
   if (phase === "reranking") return "Подбираю объяснения...";
@@ -325,6 +325,7 @@ export function AiSearchWidget() {
   const [suggestions, setSuggestions] = useState<string[]>(FALLBACK_SUGGESTIONS);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isRefinement, setIsRefinement] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -348,6 +349,7 @@ export function AiSearchWidget() {
       setEntityType("routes");
       setQuery("");
       setError("");
+      setIsRefinement(false);
       setPhase("idle");
       setDetectedRegion(null);
       setActiveFilters(null);
@@ -361,9 +363,28 @@ export function AiSearchWidget() {
     return () => document.removeEventListener("keydown", handler);
   }, []);
 
+  function resetToFreshSearch() {
+    abortRef.current?.abort();
+    setRoutes(null);
+    setEvents(null);
+    setClubs(null);
+    setEntityType("routes");
+    setDetectedRegion(null);
+    setRelaxedReason(null);
+    setActiveFilters(null);
+    setIsRefinement(false);
+    setError("");
+    setPhase("idle");
+    setQuery("");
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }
+
   async function handleSearch(q: string, overrideFilters?: RouteFilters) {
     const trimmed = q.trim();
     if (!trimmed) return;
+
+    // Detect conversational refinement: results already showing, no explicit override
+    const refining = !overrideFilters && activeFilters !== null && routes !== null && routes.length > 0;
 
     // Cancel any in-flight request
     abortRef.current?.abort();
@@ -372,6 +393,7 @@ export function AiSearchWidget() {
 
     setQuery(trimmed);
     setPhase("parsing");
+    setIsRefinement(refining);
     setError("");
     setRoutes(null);
     setEvents(null);
@@ -379,7 +401,7 @@ export function AiSearchWidget() {
     setEntityType("routes");
     setDetectedRegion(null);
     setRelaxedReason(null);
-    setActiveFilters(overrideFilters ?? null);
+    if (!refining) setActiveFilters(overrideFilters ?? null);
 
     let lat: number | undefined;
     let lng: number | undefined;
@@ -407,7 +429,9 @@ export function AiSearchWidget() {
     try {
       const reqBody = overrideFilters
         ? { query: trimmed, filters: overrideFilters }
-        : { query: trimmed, lat, lng };
+        : refining && activeFilters
+          ? { query: trimmed, baseFilters: activeFilters }
+          : { query: trimmed, lat, lng };
 
       const res = await fetch("/api/ai-search", {
         method: "POST",
@@ -572,6 +596,19 @@ export function AiSearchWidget() {
 
         {/* Search form */}
         <form onSubmit={onSubmit} className="px-5 pb-3 flex-shrink-0">
+          {/* Refinement hint */}
+          {phase === "done" && routes !== null && routes.length > 0 && activeFilters && (
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-[#A1A1AA]">Уточни запрос или</p>
+              <button
+                type="button"
+                onClick={resetToFreshSearch}
+                className="text-xs text-[#7C5CFC] hover:underline"
+              >
+                ← Новый поиск
+              </button>
+            </div>
+          )}
           <div className="relative flex items-end gap-2">
             <textarea
               ref={inputRef}
@@ -580,7 +617,11 @@ export function AiSearchWidget() {
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSearch(query); }
               }}
-              placeholder='Например: "маршруты рядом со мной" или "60 км несложный"'
+              placeholder={
+                phase === "done" && routes !== null && routes.length > 0 && activeFilters
+                  ? 'Уточни: "покороче", "без асфальта", "другой регион"...'
+                  : 'Например: "маршруты рядом со мной" или "60 км несложный"'
+              }
               rows={2}
               className="flex-1 resize-none rounded-2xl border border-[#E4E4E7] px-4 py-3 text-sm text-[#1C1C1E] placeholder-[#A1A1AA] focus:outline-none focus:border-[#7C5CFC] focus:ring-2 focus:ring-[#7C5CFC]/20 transition-colors"
               style={{ maxHeight: 120 }}
@@ -657,7 +698,7 @@ export function AiSearchWidget() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                <span className="truncate">{parseTraceLabel(phase, activeFilters)}</span>
+                <span className="truncate">{parseTraceLabel(phase, activeFilters, isRefinement)}</span>
               </div>
               {/* Cards skeleton */}
               {[1, 2, 3].map((i) => (

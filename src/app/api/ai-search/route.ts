@@ -361,6 +361,46 @@ async function parseAI(query: string): Promise<RouteFilters> {
   }
 }
 
+/**
+ * Parses a conversational refinement (e.g. "покороче", "без асфальта", "другой регион")
+ * as a DELTA on top of existing filters. Returns only the changed fields.
+ */
+async function parseRefinement(
+  query: string,
+  baseFilters: RouteFilters,
+): Promise<RouteFilters> {
+  const baseJson = JSON.stringify(baseFilters, null, 0);
+  const refinementPrompt =
+    `Current search filters: ${baseJson}\n\n` +
+    `User refinement: "${query}"\n\n` +
+    `Return a JSON with ONLY the fields the user wants to change. ` +
+    `If a filter should be removed, set its value to null. ` +
+    `Return {} if nothing needs to change. Same field names as the original schema.`;
+  try {
+    const delta = await chatJSON([
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: refinementPrompt },
+    ]);
+    return delta as RouteFilters;
+  } catch (err) {
+    console.error("[ai-search] parseRefinement failed:", err instanceof Error ? err.message : String(err));
+    return {};
+  }
+}
+
+/** Merges a refinement delta into base filters. Null values remove the field. */
+function applyRefinementDelta(base: RouteFilters, delta: RouteFilters): RouteFilters {
+  const result = { ...base };
+  for (const [key, value] of Object.entries(delta)) {
+    if (value === null) {
+      delete result[key as keyof RouteFilters];
+    } else {
+      (result as Record<string, unknown>)[key] = value;
+    }
+  }
+  return result;
+}
+
 // ─── Merge: regex is authoritative for explicit values ────────────────────────
 
 function mergeFilters(ai: RouteFilters, regex: RouteFilters): RouteFilters {
@@ -969,6 +1009,20 @@ export async function POST(req: NextRequest) {
           filters = body.filters as RouteFilters;
           // Still emit parsed event so client shows the active filter summary
           controller.enqueue(sseEvent({ type: "parsed", filters }));
+
+        } else if (body.baseFilters && typeof body.baseFilters === "object") {
+          // ── Conversational refinement: parse only the delta ───────────────
+          controller.enqueue(sseEvent({ type: "parsing", hint: "refine" }));
+          const base = body.baseFilters as RouteFilters;
+          const [delta, regexDelta] = await Promise.all([
+            parseRefinement(query, base),
+            Promise.resolve(extractFromText(query)),
+          ]);
+          // Regex delta wins for explicit values; LLM delta fills the rest
+          const merged = applyRefinementDelta(base, mergeFilters(delta, regexDelta));
+          filters = merged;
+          controller.enqueue(sseEvent({ type: "parsed", filters, hint: "refine" }));
+
         } else {
           // ── 1. Parse in parallel ──────────────────────────────────────────
           controller.enqueue(sseEvent({ type: "parsing" }));
