@@ -17,6 +17,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN")!;
+const WEBHOOK_SECRET = Deno.env.get("TG_WEBHOOK_SECRET") ?? "";
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY") ?? "";
 const SITE_URL = Deno.env.get("SITE_URL") ?? "https://cycleconnect.cc";
 const OLLAMA_URL = (Deno.env.get("OLLAMA_URL") ?? "http://host.docker.internal:11434").replace(/\/$/, "");
@@ -417,6 +418,20 @@ async function sendLocationRequest(chatId: number): Promise<void> {
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return new Response("ok", { status: 200 });
 
+  // Authenticate via Telegram secret-token header. Set with
+  //   curl -F "url=https://…/tg-webhook" -F "secret_token=$TG_WEBHOOK_SECRET" \
+  //        https://api.telegram.org/bot$TOKEN/setWebhook
+  // Without this, anyone could POST a forged "Telegram update" to this URL
+  // and (combined with the /start login_<nonce> flow) hijack any account
+  // that has a linked Telegram chat_id.
+  if (!WEBHOOK_SECRET) {
+    console.error("[tg-webhook] TG_WEBHOOK_SECRET not configured — refusing all requests");
+    return new Response("forbidden", { status: 403 });
+  }
+  if (req.headers.get("X-Telegram-Bot-Api-Secret-Token") !== WEBHOOK_SECRET) {
+    return new Response("forbidden", { status: 403 });
+  }
+
   let update: TelegramUpdate;
   try {
     update = await req.json();
@@ -498,6 +513,14 @@ Deno.serve(async (req: Request) => {
     }
 
     // ── login_<nonce> — browser-initiated auth flow ───────────────────────
+    // Login via Telegram works ONLY for profiles that have already linked
+    // a telegram_chat_id (via /start link_<code> from the settings page).
+    // We do NOT silently create an account here: that path is the lever for
+    // the takeover attack — an attacker who learns a victim's nonce could
+    // present a fresh Telegram identity, get a new auth.user minted, and
+    // poison the victim's browser into adopting the attacker's session.
+    // Account creation must originate from the website auth flow, never
+    // from a Telegram message.
     if (param.startsWith("login_")) {
       const nonce = param.slice("login_".length);
       const from = message.from;
@@ -515,50 +538,30 @@ Deno.serve(async (req: Request) => {
       }
 
       const tgId = from?.id ?? chatId;
-      const tgUsername = from?.username ?? null;
       const firstName = from?.first_name ?? "";
       const lastName = (from as { last_name?: string } | undefined)?.last_name ?? "";
       const fullName = [firstName, lastName].filter(Boolean).join(" ") || "Велосипедист";
 
-      // Look up existing profile by telegram_chat_id
-      let userId: string | null = null;
+      // Look up existing profile by telegram_chat_id — must already be linked.
       const { data: existingProfile } = await supabase
         .from("profiles")
         .select("id")
         .eq("telegram_chat_id", tgId)
         .maybeSingle();
 
-      if (existingProfile) {
-        userId = existingProfile.id as string;
-      } else {
-        // Create a new auth user with a synthetic email
-        const syntheticEmail = `tg_${tgId}@cycleconnect.local`;
-        const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
-          email: syntheticEmail,
-          email_confirm: true,
-          user_metadata: { name: fullName },
-        });
-
-        if (createErr || !newUser.user) {
-          await sendMessage(chatId, "Не удалось создать аккаунт. Попробуй позже.");
-          return new Response("ok");
-        }
-
-        userId = newUser.user.id;
-
-        // Update profile created by trigger with Telegram fields
-        await supabase
-          .from("profiles")
-          .update({
-            name: fullName,
-            telegram_chat_id: tgId,
-            telegram_username: tgUsername,
-            tg_notify_intents: true,
-          })
-          .eq("id", userId);
+      if (!existingProfile) {
+        await sendMessage(
+          chatId,
+          "Этот Telegram-аккаунт ещё не привязан к CycleConnect.\n\n" +
+            `Сначала зарегистрируйся на <a href="${SITE_URL}/auth/login">сайте</a> ` +
+            "и привяжи Telegram в настройках профиля.",
+        );
+        return new Response("ok");
       }
 
-      // Mark nonce ready
+      const userId = existingProfile.id as string;
+
+      // Mark nonce ready — the originating browser will pick it up via /poll.
       await supabase
         .from("tg_login_nonces")
         .update({ status: "ready", user_id: userId })

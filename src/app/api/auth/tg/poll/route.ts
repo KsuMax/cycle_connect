@@ -8,10 +8,15 @@
  *              hands the token to /auth/callback, which calls verifyOtp to set the session.
  *   expired  → { status: "expired" }
  *   missing  → { status: "missing" }
+ *
+ * Security: the polling client must match the fingerprint that requested
+ * the nonce (set in /api/auth/tg/start). Mismatch → "expired" and the row
+ * is consumed so it can't be retried.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { clientFingerprint } from "../start/route";
 
 export async function GET(req: NextRequest) {
   const nonce = req.nextUrl.searchParams.get("nonce");
@@ -25,7 +30,7 @@ export async function GET(req: NextRequest) {
 
   const { data: row } = await admin
     .from("tg_login_nonces")
-    .select("status, user_id, expires_at")
+    .select("status, user_id, expires_at, client_fp")
     .eq("nonce", nonce)
     .maybeSingle();
 
@@ -36,6 +41,14 @@ export async function GET(req: NextRequest) {
   }
 
   if (row.status === "consumed") {
+    return NextResponse.json({ status: "expired" });
+  }
+
+  // Bind: only the originating browser may consume the nonce.
+  // Mismatched fingerprint → burn the row and return "expired".
+  const fp = clientFingerprint(req);
+  if (row.client_fp && row.client_fp !== fp) {
+    await admin.from("tg_login_nonces").update({ status: "consumed" }).eq("nonce", nonce);
     return NextResponse.json({ status: "expired" });
   }
 
