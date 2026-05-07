@@ -49,7 +49,9 @@ export async function chatJSON(
           temperature: 0,
           num_ctx: 1024,
         },
-        keep_alive: "10m",
+        // 24h keeps the model resident; otherwise the first request after a
+        // quiet period pays a multi-second reload cost.
+        keep_alive: "24h",
       }),
     });
     if (!res.ok) throw new Error(`ollama HTTP ${res.status}`);
@@ -107,18 +109,29 @@ export async function chatJSON(
 }
 
 /**
- * Fire-and-forget warm-up: loads the model into memory so the first real request is fast.
- * Only beneficial when running on a machine with a GPU or sufficient free RAM.
- * On a CPU-only VPS with limited RAM this is a no-op (model won't stay warm anyway).
+ * Fire-and-forget warm-up: actually loads the chat model into Ollama memory so
+ * the first real request is fast. Sends an empty `messages` array which Ollama
+ * accepts as a load-only signal when paired with keep_alive.
+ *
+ * Only beneficial when the host has enough free RAM. On a CPU-only VPS with
+ * limited RAM the model may still get evicted between requests.
  */
 export function warmUpOllama(): void {
-  fetch(`${OLLAMA_URL}/api/tags`)
-    .then((r) => r.json())
-    .then((d) => {
-      const models: string[] = (d as { models?: Array<{ name: string }> }).models?.map((m) => m.name) ?? [];
-      console.log("[ollama-chat] available models:", models.join(", ") || "none");
+  fetch(`${OLLAMA_URL}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: OLLAMA_CHAT_MODEL,
+      messages: [],
+      stream: false,
+      keep_alive: "24h",
+    }),
+  })
+    .then((r) => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      console.log(`[ollama-chat] warm-up ok: ${OLLAMA_CHAT_MODEL} loaded`);
     })
     .catch((err) =>
-      console.warn("[ollama-chat] Ollama ping failed (non-fatal):", err instanceof Error ? err.message : String(err)),
+      console.warn("[ollama-chat] warm-up failed (non-fatal):", err instanceof Error ? err.message : String(err)),
     );
 }

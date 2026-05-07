@@ -342,6 +342,9 @@ export function AiSearchWidget() {
         .then((d) => { if (d.suggestions?.length) setSuggestions(d.suggestions); })
         .catch(() => {})
         .finally(() => setSuggestionsLoading(false));
+      // Pre-warm Ollama models (bge-m3 + llama3.2:3b) so the first search
+      // doesn't pay the cold-load tax. Fire-and-forget — user never sees this.
+      fetch("/api/ai-search/warmup").catch(() => {});
     } else {
       abortRef.current?.abort();
       setRoutes(null);
