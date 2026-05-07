@@ -3,22 +3,34 @@ import type { NextConfig } from "next";
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
-  { key: "X-XSS-Protection", value: "1; mode=block" },
+  // X-XSS-Protection: legacy, can introduce XS-Leaks in older Chromium.
+  // Modern browsers ignore it; explicitly disable instead of "1; mode=block".
+  { key: "X-XSS-Protection", value: "0" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self)" },
+  // Lock down browser APIs we never use; payment/usb/etc. inherit deny.
+  {
+    key: "Permissions-Policy",
+    value:
+      "camera=(), microphone=(), geolocation=(self), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=(), interest-cohort=()",
+  },
   {
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      // 'unsafe-eval' removed — Next.js + production webpack chunks don't need it.
+      // 'unsafe-inline' is still in place for next/script + Tiptap; the next
+      // hardening step is to switch inline scripts to a per-request nonce.
+      "script-src 'self' 'unsafe-inline' https://mc.yandex.ru",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
-      "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://api.cycleconnect.cc wss://api.cycleconnect.cc",
+      // Self-hosted Supabase only — supabase.co/in wildcards removed.
+      "connect-src 'self' https://api.cycleconnect.cc wss://api.cycleconnect.cc https://mc.yandex.ru",
       "frame-src 'self' https://mapmagic.app https://*.mapmagic.app",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
+      "frame-ancestors 'none'",
     ].join("; "),
   },
 ];

@@ -322,9 +322,18 @@ async function searchRoutes(filters: RouteFilters): Promise<DbRoute[]> {
   if (filters.route_types?.length) q = q.overlaps("route_types", filters.route_types);
   if (filters.bike_types?.length) q = q.overlaps("bike_types", filters.bike_types);
   if (filters.search_text) {
-    q = q.or(
-      `title.ilike.%${filters.search_text}%,description.ilike.%${filters.search_text}%`,
-    );
+    // PostgREST `.or()` is a string DSL — commas, parens, dots, percent
+    // signs in user input would change the filter structure (PostgREST-side
+    // filter injection). Strip everything that has special meaning before
+    // interpolating. Final string still goes through ilike, so wildcards
+    // come from us, not the user.
+    const safe = String(filters.search_text)
+      .replace(/[(),.*%]/g, " ")
+      .trim()
+      .slice(0, 64);
+    if (safe) {
+      q = q.or(`title.ilike.%${safe}%,description.ilike.%${safe}%`);
+    }
   }
 
   const { data } = await q;
