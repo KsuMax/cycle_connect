@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? "";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://cycleconnect.cc";
@@ -74,6 +75,12 @@ export async function POST(req: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return json({ error: "unauthorized" }, 401);
+
+  // 10 notifications per user per minute. Spam-prevention; legitimate use
+  // is on the order of 1/day.
+  if (!(await checkRateLimit(rateLimitKey("tg-notify", req, user.id), 10, 60))) {
+    return json({ error: "rate_limited" }, 429);
+  }
 
   let body: { mode?: string; intentId?: string };
   try { body = await req.json(); }

@@ -18,6 +18,7 @@ import { cookies } from "next/headers";
 import { embedQuery, toPgVector } from "@/lib/embeddings/jina";
 import { scoreWind } from "@/lib/wind";
 import { chatJSON } from "@/lib/llm/ollama-chat";
+import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -1050,6 +1051,12 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await authClient.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  // 30 searches per user per minute. Each call hits Ollama + Open-Meteo +
+  // OpenRouter — without a cap a single client can drain budgets.
+  if (!(await checkRateLimit(rateLimitKey("ai-search", req, user.id), 30, 60))) {
+    return NextResponse.json({ error: "rate_limited" }, { status: 429 });
   }
 
   const body = await req.json().catch(() => ({}));

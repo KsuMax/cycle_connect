@@ -11,13 +11,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { randomBytes } from "crypto";
+import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 
 function makeCode(): string {
   // 16 url-safe bytes → 22 base64url chars, no ambiguous characters
   return randomBytes(16).toString("base64url");
 }
 
-export async function POST(_req: NextRequest) {
+export async function POST(req: NextRequest) {
   const cookieStore = await cookies();
 
   const supabase = createServerClient(
@@ -38,6 +39,11 @@ export async function POST(_req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  // 5 link codes per user per 10 minutes — well above legitimate use.
+  if (!(await checkRateLimit(rateLimitKey("tg-link", req, user.id), 5, 600))) {
+    return NextResponse.json({ error: "rate_limited" }, { status: 429 });
   }
 
   const code = makeCode();

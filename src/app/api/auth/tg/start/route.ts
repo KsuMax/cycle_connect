@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createHash, randomBytes } from "crypto";
+import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 
 const NONCE_TTL_MS = 5 * 60 * 1000;
 
@@ -33,6 +34,12 @@ export async function POST(req: NextRequest) {
   const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ?? "";
   if (!botUsername) {
     return NextResponse.json({ error: "bot not configured" }, { status: 500 });
+  }
+
+  // 10 nonces per IP per hour — far above any legitimate use, low enough to
+  // make it unfun to flood tg_login_nonces.
+  if (!(await checkRateLimit(rateLimitKey("tg-start", req), 10, 3600))) {
+    return NextResponse.json({ error: "rate_limited" }, { status: 429 });
   }
 
   const admin = createClient(
