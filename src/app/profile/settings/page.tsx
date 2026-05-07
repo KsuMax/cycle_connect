@@ -57,6 +57,7 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleteText, setDeleteText] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -520,25 +521,62 @@ export default function SettingsPage() {
                 autoCapitalize="characters"
                 autoCorrect="off"
               />
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                placeholder="Введите ваш пароль"
+                className={INPUT_CLS}
+                autoComplete="current-password"
+              />
+              <p className="text-[11px] text-[#71717A]">
+                Пароль нужен для подтверждения, что аккаунт удаляешь именно ты,
+                а не кто-то с украденной сессией.
+              </p>
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => { setDeleteConfirm(false); setDeleteText(""); setError(null); }}
+                  onClick={() => {
+                    setDeleteConfirm(false);
+                    setDeleteText("");
+                    setDeletePassword("");
+                    setError(null);
+                  }}
                   disabled={deleting}
                   className="flex-1 py-2.5 rounded-xl border border-[#E4E4E7] bg-white text-sm font-semibold text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors disabled:opacity-60">
                   Отмена
                 </button>
                 <button
                   type="button"
-                  disabled={deleteText.trim() !== "УДАЛИТЬ" || deleting}
+                  disabled={
+                    deleteText.trim() !== "УДАЛИТЬ" ||
+                    deletePassword.length === 0 ||
+                    deleting
+                  }
                   onClick={async () => {
                     setError(null);
                     setDeleting(true);
                     try {
-                      const res = await fetch("/api/account/delete", { method: "POST" });
+                      const res = await fetch("/api/account/delete", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ password: deletePassword }),
+                      });
                       if (!res.ok) {
-                        const { error: err } = await res.json().catch(() => ({ error: "Не удалось удалить аккаунт" }));
-                        setError(err ?? "Не удалось удалить аккаунт");
+                        const { error: err } = await res
+                          .json()
+                          .catch(() => ({ error: "Не удалось удалить аккаунт" }));
+                        const friendly =
+                          err === "wrong_password"
+                            ? "Неверный пароль"
+                            : err === "password_required"
+                              ? "Введите пароль"
+                              : err === "rate_limited"
+                                ? "Слишком много попыток, попробуйте позже"
+                                : err === "reauth_required"
+                                  ? "Сессия устарела, войдите заново"
+                                  : (err ?? "Не удалось удалить аккаунт");
+                        setError(friendly);
                         setDeleting(false);
                         return;
                       }
