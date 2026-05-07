@@ -1,8 +1,14 @@
-import DOMPurify from "dompurify";
+// IMPORTANT: must be the isomorphic build, not bare `dompurify`.
+// `dompurify` requires `window` and silently no-ops in Node — meaning Server
+// Components would render unsanitized HTML straight into the page. The
+// isomorphic shim provides a JSDOM-backed instance on the server while
+// delegating to the native one in the browser.
+import DOMPurify from "isomorphic-dompurify";
 
 /**
  * Sanitize HTML from rich-text editors (Tiptap) before rendering.
  * Strips dangerous tags/attributes while keeping safe formatting.
+ * Safe to call from both Server Components and the browser.
  */
 export function sanitizeHtml(dirty: string): string {
   return DOMPurify.sanitize(dirty, {

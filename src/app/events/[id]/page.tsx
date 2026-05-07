@@ -549,7 +549,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         style={{ backgroundColor: a.is_urgent ? "#FFF7ED" : "#F5F4F1" }}>
                         <div
                           className="prose text-sm text-[#1C1C1E] max-w-none"
-                          dangerouslySetInnerHTML={{ __html: md.render(a.body) }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeHtml(md.render(a.body)) }}
                         />
                         <div className="text-xs text-[#A1A1AA] mt-1.5 flex items-center justify-between gap-1.5">
                           <span className="flex items-center gap-1.5">

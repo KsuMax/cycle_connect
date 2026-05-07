@@ -37,6 +37,19 @@ function formatDate(iso: string): string {
   });
 }
 
+/**
+ * Escape user-supplied text before injecting into a Telegram HTML message.
+ * Without this, names like `<a href="evil">click</a>` render as live links
+ * inside the bot's notifications.
+ */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function json(data: unknown, status = 200) {
   return NextResponse.json(data, { status });
 }
@@ -88,11 +101,24 @@ export async function POST(req: NextRequest) {
   const date = formatDate(intent.planned_date as string);
   const routeUrl = `${SITE_URL}/routes/${intent.route_id}`;
 
+  const safeRouteTitle = escapeHtml(routeTitle);
+  const safeNote = intent.note ? escapeHtml(intent.note as string) : "";
+
   // ── MODE: joined — notify the creator ──────────────────────────────────────
   if (mode === "joined") {
-    // Load joiner name
+    // Verify caller actually joined this intent — without this, any
+    // authenticated user could spam join-notifications to any creator.
+    const { data: membership } = await admin
+      .from("ride_intent_participants")
+      .select("user_id")
+      .eq("intent_id", intentId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!membership) return json({ error: "not a participant" }, 403);
+
+    // Load joiner name (always from session — no body.joinerId spoofing)
     const { data: joiner } = await admin.from("profiles").select("name").eq("id", user.id).single();
-    const joinerName = (joiner?.name as string) ?? "Участник";
+    const joinerName = escapeHtml((joiner?.name as string) ?? "Участник");
 
     // Load creator TG chat_id
     const { data: creator } = await admin
@@ -107,7 +133,7 @@ export async function POST(req: NextRequest) {
 
     const text =
       `🚴 <b>${joinerName}</b> хочет поехать вместе!\n\n` +
-      `📍 <b>${routeTitle}</b>\n` +
+      `📍 <b>${safeRouteTitle}</b>\n` +
       `📅 ${date}\n` +
       `\n<a href="${routeUrl}">Открыть маршрут</a>`;
 
@@ -119,7 +145,7 @@ export async function POST(req: NextRequest) {
   if (intent.creator_id !== user.id) return json({ error: "forbidden" }, 403);
 
   const { data: creatorProfile } = await admin.from("profiles").select("name").eq("id", user.id).single();
-  const creatorName = (creatorProfile?.name as string) ?? "Организатор";
+  const creatorName = escapeHtml((creatorProfile?.name as string) ?? "Организатор");
 
   const { data: participants } = await admin
     .from("ride_intent_participants")
@@ -129,9 +155,9 @@ export async function POST(req: NextRequest) {
 
   const text =
     `🚴 <b>${creatorName}</b> зовёт на покатушку!\n\n` +
-    `📍 <b>${routeTitle}</b>\n` +
+    `📍 <b>${safeRouteTitle}</b>\n` +
     `📅 ${date}\n` +
-    (intent.note ? `💬 ${intent.note as string}\n` : "") +
+    (safeNote ? `💬 ${safeNote}\n` : "") +
     `\n<a href="${routeUrl}">Открыть маршрут</a>`;
 
   let sent = 0, skipped = 0;

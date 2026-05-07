@@ -82,10 +82,11 @@ Deno.serve(async (req: Request) => {
   const { data: { user }, error: authErr } = await adminDb.auth.getUser(jwt);
   if (authErr || !user) return json({ error: "unauthorized" }, 401);
 
-  let body: { mode?: string; intentId?: string; joinerId?: string; eventId?: string; body?: string; isUrgent?: boolean };
+  // joinerId is intentionally NOT read from the body anymore — see joined mode below.
+  let body: { mode?: string; intentId?: string; eventId?: string; body?: string; isUrgent?: boolean };
   try { body = await req.json(); } catch { return json({ error: "invalid json" }, 400); }
 
-  const { mode = "broadcast", intentId, joinerId, eventId } = body;
+  const { mode = "broadcast", intentId, eventId } = body;
 
   // ── MODE: club_event — post announcement to club's Telegram channel ────────
   if (mode === "club_event") {
@@ -93,11 +94,19 @@ Deno.serve(async (req: Request) => {
 
     const { data: event } = await adminDb
       .from("events")
-      .select("id, title, start_date, description, club_id, organizer:profiles!organizer_id(name), club:clubs!club_id(name, telegram_channel)")
+      .select("id, title, start_date, description, club_id, organizer_id, organizer:profiles!organizer_id(name), club:clubs!club_id(name, telegram_channel)")
       .eq("id", eventId)
       .single();
 
     if (!event) return json({ error: "event not found" }, 404);
+
+    // Authz: only the event organizer (or, in future, a club admin) may
+    // broadcast to the club channel. Without this check any authenticated
+    // user could spam any club's Telegram channel by passing an arbitrary
+    // eventId.
+    if (event.organizer_id !== user.id) {
+      return json({ error: "forbidden" }, 403);
+    }
 
     const club = event.club as { name?: string; telegram_channel?: string | null } | null;
     const channel = club?.telegram_channel?.trim();
@@ -211,17 +220,29 @@ Deno.serve(async (req: Request) => {
   const routeId = intent.route_id as string;
   const date = formatDate(intent.planned_date as string);
   const routeUrl = `${SITE_URL}/routes/${routeId}`;
+  const safeRouteTitle = escapeHtml(routeTitle);
+  const safeNote = intent.note ? escapeHtml(intent.note as string) : "";
 
   // ── MODE: joined ──────────────────────────────────────────────────────────
   if (mode === "joined") {
-    // Load joiner's profile
-    const joinerId_ = joinerId ?? user.id;
+    // Verify caller actually joined this intent. Without this check any
+    // authenticated user could pass any intentId and trigger a join
+    // notification to the creator (spam / harassment vector).
+    const { data: membership } = await adminDb
+      .from("ride_intent_participants")
+      .select("user_id")
+      .eq("intent_id", intentId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!membership) return json({ error: "not a participant" }, 403);
+
+    // Joiner identity comes from the session — never from the body.
     const { data: joiner } = await adminDb
       .from("profiles")
       .select("name")
-      .eq("id", joinerId_)
+      .eq("id", user.id)
       .single();
-    const joinerName = (joiner?.name as string | null) ?? "Участник";
+    const joinerName = escapeHtml((joiner?.name as string | null) ?? "Участник");
 
     // Load creator's chat_id
     const { data: creator } = await adminDb
@@ -236,7 +257,7 @@ Deno.serve(async (req: Request) => {
 
     const text =
       `🚴 <b>${joinerName}</b> хочет поехать вместе!\n\n` +
-      `📍 <b>${routeTitle}</b>\n` +
+      `📍 <b>${safeRouteTitle}</b>\n` +
       `📅 ${date}\n` +
       `\n<a href="${routeUrl}">Открыть маршрут</a>`;
 
@@ -253,7 +274,7 @@ Deno.serve(async (req: Request) => {
     .select("name")
     .eq("id", user.id)
     .single();
-  const creatorName = (creatorProfile?.name as string | null) ?? "Организатор";
+  const creatorName = escapeHtml((creatorProfile?.name as string | null) ?? "Организатор");
 
   const { data: participants } = await adminDb
     .from("ride_intent_participants")
@@ -263,9 +284,9 @@ Deno.serve(async (req: Request) => {
 
   const text =
     `🚴 <b>${creatorName}</b> зовёт на покатушку!\n\n` +
-    `📍 <b>${routeTitle}</b>\n` +
+    `📍 <b>${safeRouteTitle}</b>\n` +
     `📅 ${date}\n` +
-    (intent.note ? `💬 ${intent.note as string}\n` : "") +
+    (safeNote ? `💬 ${safeNote}\n` : "") +
     `\n<a href="${routeUrl}">Открыть маршрут</a>`;
 
   let sent = 0, skipped = 0;
