@@ -46,9 +46,11 @@ async function ollamaEmbed(inputs: string[]): Promise<number[][]> {
   return out;
 }
 
-// In-process LRU cache for query embeddings. Repeats and chip-refinements re-use
-// the same `query` string, so we save a network round-trip and a model call.
-const QUERY_CACHE = new Map<string, { v: number[]; expires: number }>();
+// In-process LRU cache: stores Promises so concurrent calls for the same query
+// share one in-flight Ollama request (deduplication, not just result caching).
+// Calling embedQuery() early in the SSE handler means the second call inside
+// runMatchRoutes() awaits the same promise — no duplicate Ollama requests.
+const QUERY_CACHE = new Map<string, { p: Promise<number[]>; expires: number }>();
 const QUERY_CACHE_TTL_MS = 60 * 60 * 1000;
 const QUERY_CACHE_MAX = 200;
 
@@ -58,18 +60,19 @@ export async function embedQuery(text: string): Promise<number[]> {
   const now = Date.now();
   const hit = QUERY_CACHE.get(key);
   if (hit && hit.expires > now) {
-    // Touch: move to most-recently-used by reinserting.
     QUERY_CACHE.delete(key);
-    QUERY_CACHE.set(key, hit);
-    return hit.v;
+    QUERY_CACHE.set(key, hit); // LRU touch
+    return hit.p;
   }
-  const [v] = await ollamaEmbed([text]);
   if (QUERY_CACHE.size >= QUERY_CACHE_MAX) {
     const oldest = QUERY_CACHE.keys().next().value;
     if (oldest !== undefined) QUERY_CACHE.delete(oldest);
   }
-  QUERY_CACHE.set(key, { v, expires: now + QUERY_CACHE_TTL_MS });
-  return v;
+  const p = ollamaEmbed([text]).then(([v]) => v);
+  QUERY_CACHE.set(key, { p, expires: now + QUERY_CACHE_TTL_MS });
+  // Remove on failure so retries get a fresh attempt
+  p.catch(() => QUERY_CACHE.delete(key));
+  return p;
 }
 
 /** Embed route documents in a single batch. */

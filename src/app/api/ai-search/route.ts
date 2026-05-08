@@ -852,6 +852,21 @@ async function fetchWindForecastForPoint(lat: number, lng: number): Promise<Wind
   }
 }
 
+// Cache Open-Meteo regional forecasts for 15 minutes — avoids repeated API calls
+// when many users search with weather/wind intent at the same time.
+const FORECAST_CACHE = new Map<string, { data: WindPoint[]; expires: number }>();
+const FORECAST_TTL_MS = 15 * 60 * 1000;
+
+async function fetchForecastCached(lat: number, lng: number): Promise<WindPoint[]> {
+  const key = `${lat.toFixed(2)},${lng.toFixed(2)}`;
+  const now = Date.now();
+  const hit = FORECAST_CACHE.get(key);
+  if (hit && hit.expires > now) return hit.data;
+  const data = await fetchWindForecastForPoint(lat, lng);
+  FORECAST_CACHE.set(key, { data, expires: now + FORECAST_TTL_MS });
+  return data;
+}
+
 /** Builds a human-readable comfort label from temperature and precipitation. */
 function comfortLabel(temp_c: number, precip_pct: number): string {
   if (precip_pct >= 60) return "🌧 Дождь";
@@ -974,7 +989,7 @@ async function searchRoutesWind(
   // 4. Fetch regional wind forecast (one Open-Meteo call)
   let forecast: WindPoint[] = [];
   try {
-    forecast = await fetchWindForecastForPoint(lat, lng);
+    forecast = await fetchForecastCached(lat, lng);
   } catch (err) {
     console.warn("[ai-search wind] Open-Meteo unavailable:", err);
     return candidates.slice(0, 6);
@@ -1018,7 +1033,7 @@ async function attachWeatherComfort(
   const [, lat, lng] = regionEntry;
 
   try {
-    const forecast = await fetchWindForecastForPoint(lat, lng);
+    const forecast = await fetchForecastCached(lat, lng);
     const forecastByHour = new Map<string, WindPoint>();
     for (const w of forecast) {
       const d = new Date(w.ts);
@@ -1188,6 +1203,11 @@ export async function POST(req: NextRequest) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      // Start embedding immediately — runs in parallel with LLM filter parsing.
+      // The promise-based cache in embedQuery deduplicates the second call
+      // inside runMatchRoutes, so no extra Ollama request is made.
+      void embedQuery(query);
+
       try {
         let filters: RouteFilters;
 
