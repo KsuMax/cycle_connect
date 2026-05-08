@@ -27,6 +27,10 @@ interface RouteFilters {
   near_km?: number;
   near_lat?: number;
   near_lng?: number;
+  /** POI tags the route must contain at least one of */
+  poi_tags?: string[];
+  /** Month (1–12) the route must be recommended for */
+  season_month?: number;
 }
 
 // ─── Chip definitions ─────────────────────────────────────────────────────────
@@ -179,6 +183,46 @@ const CHIPS: Chip[] = [
     },
   },
   {
+    label: "Весенний",
+    emoji: "🌸",
+    apply: (f) => {
+      if (f.season_month === 5) return null;
+      return { ...f, season_month: 5 };
+    },
+  },
+  {
+    label: "Летний",
+    emoji: "☀️",
+    apply: (f) => {
+      if (f.season_month === 7) return null;
+      return { ...f, season_month: 7 };
+    },
+  },
+  {
+    label: "Осенний",
+    emoji: "🍂",
+    apply: (f) => {
+      if (f.season_month === 9) return null;
+      return { ...f, season_month: 9 };
+    },
+  },
+  {
+    label: "Зимний",
+    emoji: "❄️",
+    apply: (f) => {
+      if (f.season_month === 1) return null;
+      return { ...f, season_month: 1 };
+    },
+  },
+  {
+    label: "Убрать сезон",
+    emoji: "📅",
+    apply: (f) => {
+      if (f.season_month == null) return null;
+      return { ...f, season_month: undefined };
+    },
+  },
+  {
     label: "Расширить радиус",
     emoji: "📍",
     apply: (f) => {
@@ -210,6 +254,14 @@ const CHIPS: Chip[] = [
     apply: (f) => {
       if (f.sort_by !== "popular") return null;
       return { ...f, sort_by: "relevance" };
+    },
+  },
+  {
+    label: "Без фильтра мест",
+    emoji: "🗺️",
+    apply: (f) => {
+      if (!f.poi_tags?.length) return null;
+      return { ...f, poi_tags: undefined };
     },
   },
   {
@@ -319,6 +371,22 @@ function parseTraceLabel(phase: SearchPhase, filters: RouteFilters | null, isRef
     else if (filters.surface?.includes("gravel")) parts.push("гравий");
     if (filters.wind_intent) parts.push("🌬 попутный ветер");
     if (filters.near_km) parts.push(`📍 в ${filters.near_km} км от тебя`);
+    if (filters.poi_tags?.length) {
+      const POI_EMOJI: Record<string, string> = {
+        lake: "🏞 озеро", river: "🌊 река", sea: "🌊 море", forest: "🌲 лес",
+        viewpoint: "🔭 виды", waterfall: "💧 водопад", cafe: "☕ кафе",
+        water_source: "💧 родник", monastery: "⛪ монастырь", station: "🚂 электричка",
+        park: "🌳 парк", beach: "🏖 пляж", mountain: "⛰️ горы",
+        bridge: "🌉 мост", field: "🌾 поля", castle: "🏰 замок",
+      };
+      parts.push(filters.poi_tags.map((t) => POI_EMOJI[t] ?? t).join(", "));
+    }
+    if (filters.season_month != null) {
+      const SEASON_LABEL: Record<number, string> = {
+        1: "❄️ зима", 5: "🌸 весна", 7: "☀️ лето", 9: "🍂 осень",
+      };
+      parts.push(SEASON_LABEL[filters.season_month] ?? `месяц ${filters.season_month}`);
+    }
     if (parts.length === 0) return "Ищу по смыслу...";
     return `Понял: ${parts.join(" · ")}`;
   }

@@ -65,6 +65,18 @@ interface RouteFilters {
   near_km?: number;
   near_lat?: number;
   near_lng?: number;
+  /**
+   * POI filter: route must have at least one matching tag.
+   * Values: lake | river | sea | forest | viewpoint | waterfall | cafe |
+   *         water_source | monastery | station | park | beach | mountain |
+   *         bridge | field | castle
+   */
+  poi_tags?: string[];
+  /**
+   * Season filter: route must be recommended for this month (1–12), or have
+   * no season restriction (season_months IS NULL = year-round).
+   */
+  season_month?: number;
 }
 
 export interface RouteResult {
@@ -284,6 +296,28 @@ function extractFromText(query: string): RouteFilters {
     out.near_km = 15;
   }
 
+  // POI tags — build array from any matching patterns
+  const poi: string[] = [];
+  if (/озер|водохранилищ|пруд/.test(q))                             poi.push("lake");
+  if (/\bрек[аеуи]|\bручей|\bречк/.test(q))                        poi.push("river");
+  if (/\bмор[еяю]|\bзалив|\bбухт/.test(q))                         poi.push("sea");
+  if (/\bлес[аеу]?|\bлесн|\bбор\b|\bтайг/.test(q))                 poi.push("forest");
+  if (/вид[ыа]?\b|панорам|смотров|обзорн|видовой/.test(q))          poi.push("viewpoint");
+  if (/водопад/.test(q))                                            poi.push("waterfall");
+  if (/\bкафе|\bкофейн|\bкофе\b|перекус/.test(q))                  poi.push("cafe");
+  if (/родник|источник|питьевая вод/.test(q))                       poi.push("water_source");
+  if (/монастыр|монастырь|храм|церков|собор/.test(q))               poi.push("monastery");
+  if (/электричк|жд\s*стан|ж\/д\s*стан|станци[яю]/.test(q))        poi.push("station");
+  if (/\bпляж/.test(q))                                             poi.push("beach");
+  if (/замок|крепость|форт/.test(q))                                poi.push("castle");
+  if (poi.length) out.poi_tags = poi;
+
+  // Season: map common phrases to a representative month for the DB filter
+  if (/весн|весенн|март|апрел|май/.test(q))      out.season_month = 5;
+  else if (/лет[оа]|летн|июн|июл|август/.test(q)) out.season_month = 7;
+  else if (/осен|осенн|сентябр|октябр|ноябр/.test(q)) out.season_month = 9;
+  else if (/зим[аоу]|зимн|январ|феврал|декабр/.test(q)) out.season_month = 1;
+
   // Difficulty
   if (/несложн|лёгк|легк|начинающ|для новичк|простой/.test(q)) {
     out.difficulty = "easy";
@@ -355,7 +389,7 @@ const SYSTEM_PROMPT = `You are a cycling route search assistant for CycleConnect
 Extract search filters from the user message. Return ONLY raw JSON, no markdown, no explanation.
 
 Output schema (all fields optional):
-{"difficulty":"easy"|"medium"|"hard","distance_min":number,"distance_max":number,"distance_target":number,"elevation_min":number,"elevation_max":number,"surface":["asphalt"|"gravel"|"dirt"|"mixed"],"route_types":["road"|"gravel"|"mtb"|"urban"],"bike_types":["road"|"mountain"|"gravel"],"region":"Карелия"|"Санкт-Петербург"|"Ленинградская область"|"Москва"|"Подмосковье"|"Краснодарский край"|"Крым"|"Алтай"|"Байкал"|"Урал","search_text":"string","sort_by":"relevance"|"popular","wind_intent":true,"near_km":number}
+{"difficulty":"easy"|"medium"|"hard","distance_min":number,"distance_max":number,"distance_target":number,"elevation_min":number,"elevation_max":number,"surface":["asphalt"|"gravel"|"dirt"|"mixed"],"route_types":["road"|"gravel"|"mtb"|"urban"],"bike_types":["road"|"mountain"|"gravel"],"region":"Карелия"|"Санкт-Петербург"|"Ленинградская область"|"Москва"|"Подмосковье"|"Краснодарский край"|"Крым"|"Алтай"|"Байкал"|"Урал","search_text":"string","sort_by":"relevance"|"popular","wind_intent":true,"near_km":number,"poi_tags":["lake"|"river"|"sea"|"forest"|"viewpoint"|"waterfall"|"cafe"|"water_source"|"monastery"|"station"|"park"|"beach"|"mountain"|"bridge"|"field"|"castle"],"season_month":number}
 
 Rules (apply all that match):
 1. If user says "N км" → distance_target=N, distance_min=N*0.75, distance_max=N*1.25
@@ -372,7 +406,9 @@ Rules (apply all that match):
 12. "ровный"/"плоский"/"без подъёмов"/"минимальный подъём"/"мало подъёмов" → elevation_max=100
 13. "много подъёмов"/"гористый"/"с набором высот" (no explicit N) → elevation_min=500
 14. "попутный ветер"/"ветер в спину"/"по ветру"/"с попутным"/"без встречного ветра" → wind_intent=true
-15. "рядом со мной"/"рядом"/"поблизости"/"около меня"/"недалеко от меня"/"возле меня" → near_km=15`;
+15. "рядом со мной"/"рядом"/"поблизости"/"около меня"/"недалеко от меня"/"возле меня" → near_km=15
+16. poi_tags: "озеро"/"у озера" → ["lake"]; "лес"/"через лес" → ["forest"]; "водопад" → ["waterfall"]; "вид"/"панорама"/"смотровая" → ["viewpoint"]; "кафе"/"кофейня" → ["cafe"]; "море"/"залив" → ["sea"]; "пляж" → ["beach"]; "родник" → ["water_source"]; "монастырь"/"храм" → ["monastery"]; "электричка"/"станция" → ["station"]; "река"/"ручей" → ["river"]; "замок"/"крепость" → ["castle"]; "горы" (scenic) → ["mountain"]
+17. season_month: "весной"/"весенний"/"апрель"/"май" → 5; "летом"/"летний"/"июль"/"август" → 7; "осенью"/"осенний"/"сентябрь"/"октябрь" → 9; "зимой"/"зимний"/"январь" → 1`;
 
 // ─── AI filter parsing ────────────────────────────────────────────────────────
 
@@ -470,6 +506,17 @@ function mergeFilters(ai: RouteFilters, regex: RouteFilters): RouteFilters {
   // Either source can flag personal intent
   if (regex.personal_intent || ai.personal_intent) merged.personal_intent = true;
 
+  // POI tags: union of both sources (regex is reliable for explicit mentions)
+  const allPoi = [
+    ...(regex.poi_tags ?? []),
+    ...(ai.poi_tags ?? []),
+  ];
+  if (allPoi.length) merged.poi_tags = [...new Set(allPoi)];
+
+  // Season: regex wins (explicit month/season word is reliable)
+  if (regex.season_month != null) merged.season_month = regex.season_month;
+  else if (ai.season_month != null) merged.season_month = ai.season_month;
+
   return merged;
 }
 
@@ -505,6 +552,12 @@ function relaxFilters(f: RouteFilters): RelaxResult | null {
       filters: { ...f, distance_min: undefined, distance_max: undefined, distance_target: undefined },
       reason: "расширили диапазон дистанции",
     };
+  }
+  if (f.season_month != null) {
+    return { filters: { ...f, season_month: undefined }, reason: "убрали фильтр по сезону" };
+  }
+  if (f.poi_tags?.length) {
+    return { filters: { ...f, poi_tags: undefined }, reason: "убрали фильтр по точкам интереса" };
   }
   if (f.region) {
     return { filters: { ...f, region: undefined }, reason: "убрали фильтр по региону" };
@@ -667,6 +720,8 @@ async function runMatchRoutes(
     filter_near_lat: filters.near_lat ?? null,
     filter_near_lng: filters.near_lng ?? null,
     filter_near_km: filters.near_km ?? null,
+    filter_poi_tags: filters.poi_tags ?? null,
+    filter_season_month: filters.season_month ?? null,
   });
 
   if (error) {
