@@ -56,6 +56,15 @@ interface RouteFilters {
   personal_intent?: boolean;
   /** What the user is searching for — defaults to "routes". */
   entity_type?: EntityType;
+  /**
+   * Proximity filter: only routes whose start_point / route_line is within
+   * near_km km of (near_lat, near_lng). Set by the server from request body
+   * coords when the query contains "рядом / поблизости / недалеко от меня".
+   * Persisted in activeFilters so conversational refinements keep the geo context.
+   */
+  near_km?: number;
+  near_lat?: number;
+  near_lng?: number;
 }
 
 export interface RouteResult {
@@ -238,9 +247,9 @@ function extractFromText(query: string): RouteFilters {
   const hasExplicitDist = extractDistance(q, out);
 
   // Time / context hints → distance_max cap (only when no explicit distance)
+  // hoursMatch declared here so the "короткий" check below can see it.
+  const hoursMatch = !hasExplicitDist ? q.match(/(?:на\s+)?(\d+)\s*час/) : null;
   if (!hasExplicitDist) {
-    // "2 часа", "на 3 часа", "часик" → ~25 km/h average pace
-    const hoursMatch = q.match(/(?:на\s+)?(\d+)\s*час/);
     if (hoursMatch) {
       out.distance_max = Math.min(parseInt(hoursMatch[1], 10) * 25, 150);
     } else if (/вечер|после работы|пару час|час-другой/.test(q)) {
@@ -260,9 +269,19 @@ function extractFromText(query: string): RouteFilters {
     out.sort_by = "popular";
   }
 
+  // Short route: "недолгий / короткий" — apply only when no explicit distance/time already set
+  if (!hasExplicitDist && !hoursMatch && !out.distance_max && /недолг|коротк/.test(q)) {
+    out.distance_max = 40;
+  }
+
   // Urban / near-city hints
   if (/\bгород|\bпо городу|недалеко от город|рядом с город|окраин/.test(q)) {
     out.route_types = ["urban"];
+  }
+
+  // Geo proximity: user explicitly says "near me" — server will fill near_lat/lng from body
+  if (/рядом|поблизости|около меня|возле меня|недалеко от меня/.test(q)) {
+    out.near_km = 15;
   }
 
   // Difficulty
@@ -336,7 +355,7 @@ const SYSTEM_PROMPT = `You are a cycling route search assistant for CycleConnect
 Extract search filters from the user message. Return ONLY raw JSON, no markdown, no explanation.
 
 Output schema (all fields optional):
-{"difficulty":"easy"|"medium"|"hard","distance_min":number,"distance_max":number,"distance_target":number,"elevation_min":number,"elevation_max":number,"surface":["asphalt"|"gravel"|"dirt"|"mixed"],"route_types":["road"|"gravel"|"mtb"|"urban"],"bike_types":["road"|"mountain"|"gravel"],"region":"Карелия"|"Санкт-Петербург"|"Ленинградская область"|"Москва"|"Подмосковье"|"Краснодарский край"|"Крым"|"Алтай"|"Байкал"|"Урал","search_text":"string","sort_by":"relevance"|"popular","wind_intent":true}
+{"difficulty":"easy"|"medium"|"hard","distance_min":number,"distance_max":number,"distance_target":number,"elevation_min":number,"elevation_max":number,"surface":["asphalt"|"gravel"|"dirt"|"mixed"],"route_types":["road"|"gravel"|"mtb"|"urban"],"bike_types":["road"|"mountain"|"gravel"],"region":"Карелия"|"Санкт-Петербург"|"Ленинградская область"|"Москва"|"Подмосковье"|"Краснодарский край"|"Крым"|"Алтай"|"Байкал"|"Урал","search_text":"string","sort_by":"relevance"|"popular","wind_intent":true,"near_km":number}
 
 Rules (apply all that match):
 1. If user says "N км" → distance_target=N, distance_min=N*0.75, distance_max=N*1.25
@@ -352,7 +371,8 @@ Rules (apply all that match):
 11. "набор/подъём более N" or "более N м набора" → elevation_min=N; "набор до N" or "до N м набора" → elevation_max=N
 12. "ровный"/"плоский"/"без подъёмов"/"минимальный подъём"/"мало подъёмов" → elevation_max=100
 13. "много подъёмов"/"гористый"/"с набором высот" (no explicit N) → elevation_min=500
-14. "попутный ветер"/"ветер в спину"/"по ветру"/"с попутным"/"без встречного ветра" → wind_intent=true`;
+14. "попутный ветер"/"ветер в спину"/"по ветру"/"с попутным"/"без встречного ветра" → wind_intent=true
+15. "рядом со мной"/"рядом"/"поблизости"/"около меня"/"недалеко от меня"/"возле меня" → near_km=15`;
 
 // ─── AI filter parsing ────────────────────────────────────────────────────────
 
@@ -461,6 +481,13 @@ interface RelaxResult {
 }
 
 function relaxFilters(f: RouteFilters): RelaxResult | null {
+  // Geo: widen radius 15 → 50 → drop before touching other filters
+  if (f.near_km != null && f.near_km <= 20) {
+    return { filters: { ...f, near_km: 50 }, reason: "расширили радиус поиска до 50 км" };
+  }
+  if (f.near_km != null && f.near_km <= 50) {
+    return { filters: { ...f, near_km: undefined, near_lat: undefined, near_lng: undefined }, reason: "убрали ограничение по расстоянию от вас" };
+  }
   if (f.elevation_min != null && f.elevation_min > 0) {
     return { filters: { ...f, elevation_min: undefined }, reason: "убрали минимальный набор высот" };
   }
@@ -637,6 +664,9 @@ async function runMatchRoutes(
     filter_distance_target: filters.distance_target ?? null,
     match_count: count,
     sort_by: filters.sort_by ?? "relevance",
+    filter_near_lat: filters.near_lat ?? null,
+    filter_near_lng: filters.near_lng ?? null,
+    filter_near_km: filters.near_km ?? null,
   });
 
   if (error) {
@@ -1032,6 +1062,36 @@ async function buildUserProfile(userId: string): Promise<RouteFilters | null> {
   return profile;
 }
 
+// ─── Analytics: fire-and-forget search log ───────────────────────────────────
+
+function logSearch(
+  userId: string,
+  query: string,
+  filters: RouteFilters,
+  nResults: number,
+  entityType: EntityType,
+  relaxed: boolean,
+): void {
+  // Intentionally not awaited — analytics must never delay the response.
+  // Strip internal coord fields before serialising to keep the log readable.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { near_lat, near_lng, ...loggableFilters } = filters;
+  getSupabase()
+    .from("ai_search_log")
+    .insert({
+      user_id: userId,
+      query,
+      parsed_filters: loggableFilters as Record<string, unknown>,
+      n_results: nResults,
+      entity_type: entityType,
+      relaxed,
+    })
+    .then(() => {})
+    .catch((e: unknown) => {
+      console.warn("[ai-search] logSearch failed:", e instanceof Error ? e.message : String(e));
+    });
+}
+
 // ─── SSE helpers ──────────────────────────────────────────────────────────────
 
 function sseEvent(data: unknown): Uint8Array {
@@ -1105,9 +1165,17 @@ export async function POST(req: NextRequest) {
           ]);
           filters = mergeFilters(aiFilters, regexFilters);
 
-          // If coordinates provided and no region extracted — use nearest region
-          if (lat !== undefined && lng !== undefined && !filters.region) {
-            filters.region = closestRegion(lat, lng);
+          // If coordinates provided:
+          //  • near_km set by query → attach actual coords for PostGIS filter
+          //  • always set region for wind-forecast regional center (if not already set)
+          if (lat !== undefined && lng !== undefined) {
+            if (filters.near_km) {
+              filters.near_lat = lat;
+              filters.near_lng = lng;
+            }
+            if (!filters.region) {
+              filters.region = closestRegion(lat, lng);
+            }
           }
 
           // Merge personal profile as defaults (explicit query values win)
@@ -1135,10 +1203,12 @@ export async function POST(req: NextRequest) {
         if (entityType === "events") {
           controller.enqueue(sseEvent({ type: "searching" }));
           const events = await searchEvents(query);
+          logSearch(user.id, query, filters, events.length, "events", false);
           controller.enqueue(sseEvent({ type: "result", entity_type: "events", events, filters }));
         } else if (entityType === "clubs") {
           controller.enqueue(sseEvent({ type: "searching" }));
           const clubs = await searchClubs(query);
+          logSearch(user.id, query, filters, clubs.length, "clubs", false);
           controller.enqueue(sseEvent({ type: "result", entity_type: "clubs", clubs, filters }));
         } else {
           // ── routes (default) ───────────────────────────────────────────
@@ -1178,6 +1248,7 @@ export async function POST(req: NextRequest) {
             }
           }
 
+          logSearch(user.id, query, filters, routes.length, "routes", !!relaxedReason);
           controller.enqueue(sseEvent({ type: "result", entity_type: "routes", routes, filters, relaxedReason }));
         }
       } catch (err) {

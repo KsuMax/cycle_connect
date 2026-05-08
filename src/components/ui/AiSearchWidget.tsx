@@ -23,6 +23,10 @@ interface RouteFilters {
   search_text?: string;
   sort_by?: "relevance" | "popular";
   wind_intent?: boolean;
+  /** Geo-proximity filter set by server when query contains "рядом / поблизости / недалеко от меня" */
+  near_km?: number;
+  near_lat?: number;
+  near_lng?: number;
 }
 
 // ─── Chip definitions ─────────────────────────────────────────────────────────
@@ -175,6 +179,16 @@ const CHIPS: Chip[] = [
     },
   },
   {
+    label: "Расширить радиус",
+    emoji: "📍",
+    apply: (f) => {
+      if (!f.near_km) return null;
+      // 15 km → 40 km → drop geo filter entirely
+      if (f.near_km <= 20) return { ...f, near_km: 40 };
+      return { ...f, near_km: undefined, near_lat: undefined, near_lng: undefined };
+    },
+  },
+  {
     label: "С попутным ветром",
     emoji: "🌬️",
     apply: (f) => {
@@ -237,7 +251,7 @@ const DIFFICULTY_LABELS: Record<string, string> = {
 
 /** Returns true when the query implies the user wants location-based results. */
 function needsLocation(q: string): boolean {
-  return /рядом|поблизости|около меня|возле меня|недалеко от меня|near me/i.test(q);
+  return /рядом|поблизости|около меня|возле меня|недалеко от меня|около меня|near me/i.test(q);
 }
 
 /** Ask for geolocation via browser API — returns coords or throws GeolocationPositionError. */
@@ -304,6 +318,7 @@ function parseTraceLabel(phase: SearchPhase, filters: RouteFilters | null, isRef
     if (filters.surface?.includes("asphalt")) parts.push("асфальт");
     else if (filters.surface?.includes("gravel")) parts.push("гравий");
     if (filters.wind_intent) parts.push("🌬 попутный ветер");
+    if (filters.near_km) parts.push(`📍 в ${filters.near_km} км от тебя`);
     if (parts.length === 0) return "Ищу по смыслу...";
     return `Понял: ${parts.join(" · ")}`;
   }
