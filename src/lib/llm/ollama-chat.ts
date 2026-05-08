@@ -1,22 +1,19 @@
 /**
- * Lightweight chat wrapper: Ollama (primary) → OpenRouter (fallback).
- *
- * Ollama runs locally on the VPS alongside the app.
- * OpenRouter is the fallback when Ollama is unavailable or slow.
+ * Lightweight chat wrapper: DeepSeek → Ollama → OpenRouter.
  *
  * Env vars:
- *   OLLAMA_URL         — default http://localhost:11434
+ *   DEEPSEEK_API_KEY   — primary; fast (~300–500 ms), accessible from Russia
+ *   OLLAMA_URL         — secondary local fallback (default: http://localhost:11434)
  *   OLLAMA_CHAT_MODEL  — default llama3.2:3b
- *   OPENROUTER_API_KEY — for fallback
+ *   OPENROUTER_API_KEY — last-resort fallback
  *   NEXT_PUBLIC_SITE_URL
  */
 
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY ?? "";
 const OLLAMA_URL = (process.env.OLLAMA_URL ?? "http://localhost:11434").replace(/\/$/, "");
 const OLLAMA_CHAT_MODEL = process.env.OLLAMA_CHAT_MODEL ?? "llama3.2:3b";
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY ?? "";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://cycleconnect.cc";
-// Fallback model — llama-3.3-70b gives better extraction quality than 3b.
-// Free tier can be rate-limited at peak hours; failures are handled gracefully.
 const OPENROUTER_FALLBACK_MODEL = "meta-llama/llama-3.3-70b-instruct:free";
 
 export interface ChatMessage {
@@ -26,8 +23,7 @@ export interface ChatMessage {
 
 /**
  * Send messages and receive a JSON-parsed response object.
- * Uses Ollama `format:"json"` for guaranteed valid JSON output.
- * Falls back to OpenRouter on timeout (default 5 s) or error.
+ * Chain: DeepSeek (if key set) → Ollama (local) → OpenRouter (last resort).
  *
  * @param numCtx  Ollama context window (tokens). Default 1024 is fine for
  *                short search-filter prompts. Use 2048+ for long descriptions.
@@ -37,7 +33,47 @@ export async function chatJSON(
   timeoutMs = 5_000,
   numCtx = 1024,
 ): Promise<Record<string, unknown>> {
-  // ── Primary: Ollama local ──────────────────────────────────────────────────
+  // ── Primary: DeepSeek ─────────────────────────────────────────────────────
+  if (DEEPSEEK_API_KEY) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8_000);
+    try {
+      const res = await fetch("https://api.deepseek.com/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: "deepseek-chat",
+          messages,
+          max_tokens: 256,
+          temperature: 0,
+          response_format: { type: "json_object" },
+        }),
+      }).finally(() => clearTimeout(timer));
+      if (!res.ok) throw new Error(`deepseek HTTP ${res.status}`);
+      const data = await res.json() as {
+        choices?: Array<{ message?: { content?: string } }>;
+        error?: { message?: string };
+      };
+      if (data.error) throw new Error(`deepseek: ${data.error.message}`);
+      const raw = data.choices?.[0]?.message?.content ?? "{}";
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (!match) return {};
+      return JSON.parse(match[0]) as Record<string, unknown>;
+    } catch (err) {
+      console.warn(
+        "[ollama-chat] DeepSeek failed, trying Ollama:",
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // ── Secondary: Ollama local ───────────────────────────────────────────────
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -50,12 +86,7 @@ export async function chatJSON(
         messages,
         stream: false,
         format: "json",
-        options: {
-          temperature: 0,
-          num_ctx: numCtx,
-        },
-        // 24h keeps the model resident; otherwise the first request after a
-        // quiet period pays a multi-second reload cost.
+        options: { temperature: 0, num_ctx: numCtx },
         keep_alive: "24h",
       }),
     });
@@ -66,16 +97,16 @@ export async function chatJSON(
     return JSON.parse(content) as Record<string, unknown>;
   } catch (err) {
     console.warn(
-      "[ollama-chat] Ollama unavailable, trying OpenRouter fallback:",
+      "[ollama-chat] Ollama unavailable, trying OpenRouter:",
       err instanceof Error ? err.message : String(err),
     );
   } finally {
     clearTimeout(timer);
   }
 
-  // ── Fallback: OpenRouter ───────────────────────────────────────────────────
+  // ── Last resort: OpenRouter ───────────────────────────────────────────────
   if (!OPENROUTER_API_KEY) {
-    console.error("[ollama-chat] No OPENROUTER_API_KEY set, both LLM paths failed");
+    console.error("[ollama-chat] No fallback configured, all LLM paths failed");
     return {};
   }
   try {
@@ -109,7 +140,7 @@ export async function chatJSON(
     return JSON.parse(match[0]) as Record<string, unknown>;
   } catch (err) {
     console.error(
-      "[ollama-chat] OpenRouter fallback also failed:",
+      "[ollama-chat] OpenRouter also failed:",
       err instanceof Error ? err.message : String(err),
     );
     return {};
@@ -117,14 +148,11 @@ export async function chatJSON(
 }
 
 /**
- * Fire-and-forget warm-up: actually loads the chat model into Ollama memory so
- * the first real request is fast. Sends an empty `messages` array which Ollama
- * accepts as a load-only signal when paired with keep_alive.
- *
- * Only beneficial when the host has enough free RAM. On a CPU-only VPS with
- * limited RAM the model may still get evicted between requests.
+ * Fire-and-forget warm-up for Ollama. Only useful when Ollama is the active
+ * provider — skipped automatically if DeepSeek is configured.
  */
 export function warmUpOllama(): void {
+  if (DEEPSEEK_API_KEY) return;
   fetch(`${OLLAMA_URL}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
