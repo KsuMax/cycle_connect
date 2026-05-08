@@ -19,17 +19,20 @@ interface OllamaEmbedResponse {
   error?: string;
 }
 
+const EMBED_TIMEOUT_MS = 4_000;
+
 async function ollamaEmbed(inputs: string[]): Promise<number[][]> {
   if (!inputs.length) return [];
 
-  // keep_alive: "24h" prevents Ollama from unloading bge-m3 after the default
-  // 5-minute idle window. Without it, the first search after a quiet period
-  // pays a 3–15s model-reload cost.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), EMBED_TIMEOUT_MS);
+
   const res = await fetch(`${OLLAMA_URL}/api/embed`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    signal: controller.signal,
     body: JSON.stringify({ model: MODEL, input: inputs, keep_alive: "24h" }),
-  });
+  }).finally(() => clearTimeout(timer));
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");

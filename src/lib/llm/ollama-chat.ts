@@ -79,6 +79,8 @@ export async function chatJSON(
     return {};
   }
   try {
+    const orController = new AbortController();
+    const orTimer = setTimeout(() => orController.abort(), 10_000);
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -87,6 +89,7 @@ export async function chatJSON(
         "HTTP-Referer": SITE_URL,
         "X-Title": "CycleConnect",
       },
+      signal: orController.signal,
       body: JSON.stringify({
         model: OPENROUTER_FALLBACK_MODEL,
         messages,
@@ -94,7 +97,7 @@ export async function chatJSON(
         temperature: 0.1,
         response_format: { type: "json_object" },
       }),
-    });
+    }).finally(() => clearTimeout(orTimer));
     const data = await res.json() as {
       choices?: Array<{ message?: { content?: string } }>;
       error?: { message?: string };

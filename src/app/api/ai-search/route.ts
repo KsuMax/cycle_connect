@@ -1203,11 +1203,6 @@ export async function POST(req: NextRequest) {
 
   const stream = new ReadableStream({
     async start(controller) {
-      // Start embedding immediately — runs in parallel with LLM filter parsing.
-      // The promise-based cache in embedQuery deduplicates the second call
-      // inside runMatchRoutes, so no extra Ollama request is made.
-      void embedQuery(query);
-
       try {
         let filters: RouteFilters;
 
