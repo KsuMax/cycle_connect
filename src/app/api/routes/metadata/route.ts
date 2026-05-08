@@ -21,6 +21,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { extractRouteMetadata } from "@/lib/metadata/extract";
+import { warmUpOllama } from "@/lib/llm/ollama-chat";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // backfill batches can take a while
@@ -61,6 +62,12 @@ const COLUMNS = "id, author_id, title, description, tags";
 
 async function enrichRows(rows: RouteRow[]): Promise<{ count: number; skipped: number }> {
   if (!rows.length) return { count: 0, skipped: 0 };
+
+  // Warm up Ollama before the loop so the first real call doesn't pay the
+  // cold-load cost (~5 s on this VPS) and then timeout.
+  warmUpOllama();
+  // Give the model 6 s to load before we start sending extraction prompts.
+  await new Promise((r) => setTimeout(r, 6_000));
 
   const sb = admin();
   let count = 0;

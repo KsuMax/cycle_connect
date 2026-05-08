@@ -115,7 +115,7 @@ export async function extractRouteMetadata(
         { role: "system", content: EXTRACT_SYSTEM },
         { role: "user",   content: userMsg },
       ],
-      8_000, // longer timeout — extraction is less latency-sensitive than search
+      25_000, // extraction is batch/offline — tolerate cold model load (~5s) + inference
     );
 
     const poi_tags = Array.isArray(raw.poi_tags)

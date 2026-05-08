@@ -15,8 +15,9 @@ const OLLAMA_URL = (process.env.OLLAMA_URL ?? "http://localhost:11434").replace(
 const OLLAMA_CHAT_MODEL = process.env.OLLAMA_CHAT_MODEL ?? "llama3.2:3b";
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY ?? "";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://cycleconnect.cc";
-// Same model family as local, so prompts are consistent
-const OPENROUTER_FALLBACK_MODEL = "meta-llama/llama-3.2-3b-instruct:free";
+// Fallback model — llama-3.3-70b gives better extraction quality than 3b.
+// Free tier can be rate-limited at peak hours; failures are handled gracefully.
+const OPENROUTER_FALLBACK_MODEL = "meta-llama/llama-3.3-70b-instruct:free";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
