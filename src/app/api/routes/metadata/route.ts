@@ -142,15 +142,21 @@ export async function POST(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    try {
-      const result = await enrichRows((data ?? []) as RouteRow[]);
-      return NextResponse.json({ ...result, mode: "backfill", total: (data ?? []).length });
-    } catch (e) {
-      return NextResponse.json(
-        { error: e instanceof Error ? e.message : "extraction failed" },
-        { status: 500 },
-      );
-    }
+    const rows = (data ?? []) as RouteRow[];
+
+    // Run enrichment in the background so the HTTP response returns immediately
+    // (Caddy / browser will otherwise time out on large batches).
+    // Progress is visible in docker logs: docker logs cycleconnect-app --tail=50
+    void (async () => {
+      try {
+        const result = await enrichRows(rows);
+        console.log(`[metadata/backfill] done: count=${result.count} skipped=${result.skipped} total=${rows.length}`);
+      } catch (e) {
+        console.error("[metadata/backfill] failed:", e instanceof Error ? e.message : String(e));
+      }
+    })();
+
+    return NextResponse.json({ started: true, mode: "backfill", total: rows.length });
   }
 
   // ── Single-route mode — caller must own the route ───────────────────────────
