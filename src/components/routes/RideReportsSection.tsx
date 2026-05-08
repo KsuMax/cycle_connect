@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { BookOpen } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/context/AuthContext";
 import { ReportCard } from "./ReportCard";
 import type { DbRideReport } from "@/lib/supabase";
 
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function RideReportsSection({ routeId, routeTitle }: Props) {
+  const { user } = useAuth();
   const [reports, setReports] = useState<DbRideReport[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -53,7 +55,7 @@ export function RideReportsSection({ routeId, routeTitle }: Props) {
 
       <div className="space-y-4">
         {reports.map((r) => (
-          <ReportCard key={r.id} report={r} showRoute={false} />
+          <ReportCard key={r.id} report={r} showRoute={false} currentUserId={user?.id ?? null} />
         ))}
       </div>
     </section>
