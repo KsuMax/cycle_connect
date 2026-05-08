@@ -6,9 +6,11 @@ import Link from "next/link";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { ImageUpload } from "@/components/routes/ImageUpload";
+import { DayEditor } from "@/components/events/DayEditorLazy";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useToast } from "@/lib/context/ToastContext";
 import { supabase } from "@/lib/supabase";
+import { isEmptyRichText } from "@/lib/richText";
 import type { RideReportVibe } from "@/lib/supabase";
 
 const VIBES: { value: RideReportVibe; emoji: string; label: string }[] = [
@@ -77,7 +79,7 @@ function ReportForm({ routeId }: { routeId: string }) {
         ride_id: rideId ?? null,
         ridden_at: riddenAt,
         vibe: vibe ?? null,
-        text: text.trim() || null,
+        text: isEmptyRichText(text) ? null : text,
         photos: uploadedUrls,
       });
       if (error) throw error;
@@ -160,17 +162,11 @@ function ReportForm({ routeId }: { routeId: string }) {
               Расскажи про поездку{" "}
               <span className="font-normal text-[#A1A1AA]">(необязательно)</span>
             </label>
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              rows={5}
-              maxLength={2000}
+            <DayEditor
               placeholder="Как прошло? Что запомнилось? Есть ли что посоветовать тем, кто поедет этим маршрутом?"
-              className="w-full px-4 py-3 rounded-xl border border-[#E4E4E7] bg-white text-sm text-[#1C1C1E] placeholder:text-[#A1A1AA] focus:outline-none focus:ring-2 focus:ring-[#F4632A]/30 focus:border-[#F4632A] resize-none"
+              content={text}
+              onChange={(html) => setText(html)}
             />
-            {text.length > 0 && (
-              <div className="text-xs text-[#A1A1AA] text-right mt-1">{text.length}/2000</div>
-            )}
           </div>
 
           {/* Photos */}

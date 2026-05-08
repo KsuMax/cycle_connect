@@ -110,7 +110,7 @@ export function FeedClient({ initialRoutes, initialEvents, initialReports }: Pro
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {initialReports.map((report) => (
-                    <ReportCard key={report.id} report={report} showRoute />
+                    <ReportCard key={report.id} report={report} showRoute currentUserId={user?.id ?? null} />
                   ))}
                 </div>
               </section>

@@ -20,11 +20,12 @@ import { cookies } from "next/headers";
 import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? "";
+const TG_API_BASE = (process.env.TELEGRAM_API_BASE ?? "https://api.telegram.org").replace(/\/$/, "");
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://cycleconnect.cc";
 
 async function sendTg(chatId: number, text: string): Promise<boolean> {
   if (!BOT_TOKEN) return false;
-  const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+  const res = await fetch(`${TG_API_BASE}/bot${BOT_TOKEN}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),

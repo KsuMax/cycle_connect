@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { Pencil } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import { richTextToPlain } from "@/lib/richText";
 import type { DbRideReport, RideReportVibe } from "@/lib/supabase";
 
 const VIBE_CONFIG: Record<RideReportVibe, { emoji: string; label: string; color: string }> = {
@@ -15,27 +17,30 @@ const VIBE_CONFIG: Record<RideReportVibe, { emoji: string; label: string; color:
 interface Props {
   report: DbRideReport;
   showRoute?: boolean;
+  currentUserId?: string | null;
 }
 
-export function ReportCard({ report, showRoute = false }: Props) {
+export function ReportCard({ report, showRoute = false, currentUserId }: Props) {
   const vibe = report.vibe ? VIBE_CONFIG[report.vibe] : null;
   const photos = report.photos ?? [];
+  const routeId = report.route_id ?? report.route?.id;
+  const detailHref = routeId ? `/routes/${routeId}/report/${report.id}` : null;
+  const editHref = routeId ? `/routes/${routeId}/report/${report.id}/edit` : null;
+  const isOwner = !!currentUserId && currentUserId === report.user_id;
+
+  const preview = richTextToPlain(report.text);
+  const isTruncated = preview.length > 280;
 
   return (
     <article
       className="bg-white rounded-2xl overflow-hidden border border-[#E4E4E7]"
       style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}
     >
-      {/* Photos */}
       {photos.length > 0 && (
         <div className={`grid gap-0.5 ${photos.length === 1 ? "grid-cols-1" : "grid-cols-[2fr_1fr]"}`}>
           <div className="relative aspect-[16/9] overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={photos[0]}
-              alt=""
-              className="w-full h-full object-cover"
-            />
+            <img src={photos[0]} alt="" className="w-full h-full object-cover" />
           </div>
           {photos.length > 1 && (
             <div className="flex flex-col gap-0.5">
@@ -56,11 +61,13 @@ export function ReportCard({ report, showRoute = false }: Props) {
       )}
 
       <div className="p-4">
-        {/* Header: avatar + meta */}
         <div className="flex items-start gap-3 mb-3">
-          <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-sm font-semibold text-white"
-            style={{ backgroundColor: "#F4632A" }}>
+          <div
+            className="w-9 h-9 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-sm font-semibold text-white"
+            style={{ backgroundColor: "#F4632A" }}
+          >
             {report.author?.avatar_url
+              /* eslint-disable-next-line @next/next/no-img-element */
               ? <img src={report.author.avatar_url} alt="" className="w-full h-full object-cover" />
               : (report.author?.name?.[0] ?? "?").toUpperCase()}
           </div>
@@ -82,9 +89,17 @@ export function ReportCard({ report, showRoute = false }: Props) {
               {formatDate(report.ridden_at)} · отчёт о поездке
             </div>
           </div>
+          {isOwner && editHref && (
+            <Link
+              href={editHref}
+              className="shrink-0 p-1.5 rounded-lg text-[#A1A1AA] hover:text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors"
+              title="Редактировать"
+            >
+              <Pencil size={14} />
+            </Link>
+          )}
         </div>
 
-        {/* Route link (in feed) */}
         {showRoute && report.route && (
           <Link
             href={`/routes/${report.route.id}`}
@@ -95,23 +110,32 @@ export function ReportCard({ report, showRoute = false }: Props) {
           </Link>
         )}
 
-        {/* Text */}
-        {report.text && (
+        {preview && (
           <p className="text-sm text-[#3F3F46] leading-relaxed line-clamp-4 mb-3">
-            {report.text}
+            {preview}
           </p>
         )}
 
-        {/* Footer */}
-        {showRoute && report.route && (
-          <Link
-            href={`/routes/${report.route.id}`}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-            style={{ backgroundColor: "#F5F4F1", color: "#71717A" }}
-          >
-            Открыть маршрут →
-          </Link>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {detailHref && (preview || photos.length > 0) && (
+            <Link
+              href={detailHref}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+              style={{ backgroundColor: "#F4632A", color: "white" }}
+            >
+              {isTruncated ? "Читать целиком →" : "Открыть отчёт →"}
+            </Link>
+          )}
+          {showRoute && report.route && (
+            <Link
+              href={`/routes/${report.route.id}`}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+              style={{ backgroundColor: "#F5F4F1", color: "#71717A" }}
+            >
+              Открыть маршрут →
+            </Link>
+          )}
+        </div>
       </div>
     </article>
   );
