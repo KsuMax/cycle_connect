@@ -17,6 +17,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN")!;
+const TG_API_BASE = (Deno.env.get("TELEGRAM_API_BASE") ?? "https://api.telegram.org").replace(/\/$/, "");
 const WEBHOOK_SECRET = Deno.env.get("TG_WEBHOOK_SECRET") ?? "";
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY") ?? "";
 const SITE_URL = Deno.env.get("SITE_URL") ?? "https://cycleconnect.cc";
@@ -393,7 +394,7 @@ function escapeHtml(s: string): string {
 // ─── Telegram helpers ─────────────────────────────────────────────────────────
 
 async function sendMessage(chatId: number, text: string): Promise<void> {
-  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+  await fetch(`${TG_API_BASE}/bot${BOT_TOKEN}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -407,7 +408,7 @@ async function sendMessage(chatId: number, text: string): Promise<void> {
 
 /** Sends a reply keyboard with a "Share location" button. */
 async function sendLocationRequest(chatId: number): Promise<void> {
-  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+  await fetch(`${TG_API_BASE}/bot${BOT_TOKEN}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -429,7 +430,7 @@ Deno.serve(async (req: Request) => {
 
   // Authenticate via Telegram secret-token header. Set with
   //   curl -F "url=https://…/tg-webhook" -F "secret_token=$TG_WEBHOOK_SECRET" \
-  //        https://api.telegram.org/bot$TOKEN/setWebhook
+  //        ${TG_API_BASE}/bot$TOKEN/setWebhook
   // Without this, anyone could POST a forged "Telegram update" to this URL
   // and (combined with the /start login_<nonce> flow) hijack any account
   // that has a linked Telegram chat_id.
@@ -469,7 +470,7 @@ Deno.serve(async (req: Request) => {
           .upsert({ event_id: eventId, user_id: profile.id }, { onConflict: "event_id,user_id" });
       }
 
-      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
+      await fetch(`${TG_API_BASE}/bot${BOT_TOKEN}/answerCallbackQuery`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
