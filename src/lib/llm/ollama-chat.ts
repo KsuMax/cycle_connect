@@ -27,11 +27,15 @@ export interface ChatMessage {
 /**
  * Send messages and receive a JSON-parsed response object.
  * Uses Ollama `format:"json"` for guaranteed valid JSON output.
- * Falls back to OpenRouter on timeout (default 8 s) or error.
+ * Falls back to OpenRouter on timeout (default 5 s) or error.
+ *
+ * @param numCtx  Ollama context window (tokens). Default 1024 is fine for
+ *                short search-filter prompts. Use 2048+ for long descriptions.
  */
 export async function chatJSON(
   messages: ChatMessage[],
   timeoutMs = 5_000,
+  numCtx = 1024,
 ): Promise<Record<string, unknown>> {
   // ── Primary: Ollama local ──────────────────────────────────────────────────
   const controller = new AbortController();
@@ -48,7 +52,7 @@ export async function chatJSON(
         format: "json",
         options: {
           temperature: 0,
-          num_ctx: 1024,
+          num_ctx: numCtx,
         },
         // 24h keeps the model resident; otherwise the first request after a
         // quiet period pays a multi-second reload cost.

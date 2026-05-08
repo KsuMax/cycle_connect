@@ -589,6 +589,9 @@ export function AiSearchWidget() {
               }
               if (event.relaxedReason) setRelaxedReason(event.relaxedReason);
               setPhase("done");
+            } else if (event.type === "why_update") {
+              // Async why-texts arrived — quietly merge into current results
+              if (event.routes?.length) setRoutes(event.routes);
             } else if (event.type === "error") {
               setError("Не удалось выполнить поиск. Попробуй ещё раз.");
               setPhase("done");

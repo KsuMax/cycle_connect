@@ -116,6 +116,7 @@ export async function extractRouteMetadata(
         { role: "user",   content: userMsg },
       ],
       25_000, // extraction is batch/offline — tolerate cold model load (~5s) + inference
+      2048,   // system prompt ~540 tok + description ~600 tok > default 1024 → use 2048
     );
 
     const poi_tags = Array.isArray(raw.poi_tags)

@@ -480,8 +480,11 @@ function mergeFilters(ai: RouteFilters, regex: RouteFilters): RouteFilters {
     merged.distance_max = regex.distance_max;
   }
 
-  // Regex wins for explicit categorical signals
-  if (regex.difficulty && !merged.difficulty) merged.difficulty = regex.difficulty;
+  // Regex wins unconditionally for difficulty — small LLM (1b) often confuses
+  // negations ("несложный" → it reads "сложный"). Regex is 100% reliable here.
+  if (regex.difficulty) merged.difficulty = regex.difficulty;
+  else if (!merged.difficulty && ai.difficulty) merged.difficulty = ai.difficulty;
+
   if (regex.surface?.length && !merged.surface?.length) merged.surface = regex.surface;
   if (regex.bike_types?.length && !merged.bike_types?.length) merged.bike_types = regex.bike_types;
   if (regex.route_types?.length && !merged.route_types?.length) merged.route_types = regex.route_types;
@@ -1294,17 +1297,25 @@ export async function POST(req: NextRequest) {
             routes = await attachWeatherComfort(routes, filters, query);
           }
 
-          // ── 5. LLM reranker with explanations ──────────────────────────
-          if (routes.length > 0 && !body.filters) {
-            controller.enqueue(sseEvent({ type: "reranking" }));
-            const whys = await generateWhys(routes, query);
-            if (whys.size > 0) {
-              routes = routes.map((r) => whys.has(r.id) ? { ...r, why: whys.get(r.id) } : r);
-            }
-          }
-
+          // ── 5. Send routes immediately, then stream why-explanations async ──
           logSearch(user.id, query, filters, routes.length, "routes", !!relaxedReason);
           controller.enqueue(sseEvent({ type: "result", entity_type: "routes", routes, filters, relaxedReason }));
+
+          // Fire generateWhys after result is already sent so the user sees
+          // routes instantly. The why-texts arrive as a follow-up "why_update"
+          // event (typically +1–3 s) and the frontend merges them in.
+          if (routes.length > 0 && !body.filters) {
+            controller.enqueue(sseEvent({ type: "reranking" }));
+            generateWhys(routes, query).then((whys) => {
+              if (whys.size > 0) {
+                const updated = routes.map((r) =>
+                  whys.has(r.id) ? { ...r, why: whys.get(r.id) } : r,
+                );
+                controller.enqueue(sseEvent({ type: "why_update", routes: updated }));
+              }
+            }).catch(() => {}).finally(() => { controller.close(); });
+            return; // controller will be closed inside the promise above
+          }
         }
       } catch (err) {
         console.error("[ai-search] stream error:", err instanceof Error ? err.message : String(err));
