@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { EventCard } from "@/components/events/EventCard";
-import { Search, SlidersHorizontal, X, Plus, Map, Calendar, LocateFixed, Loader2 } from "lucide-react";
+import { Search, SlidersHorizontal, X, Plus, Map, Calendar, LocateFixed, Loader2, ArrowUpDown, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import type { Difficulty, RouteType, Route, CycleEvent, Surface } from "@/types";
 import { supabase } from "@/lib/supabase";
@@ -370,11 +370,6 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
     setEventOnlyWithSpots(false);
   };
 
-  const selectStyle = {
-    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23A1A1AA' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-    backgroundRepeat: "no-repeat" as const,
-    backgroundPosition: "right 12px center" as const,
-  };
 
   return (
     <div className="min-h-screen bg-[#F5F4F1]">
@@ -997,12 +992,15 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
                     <div className="text-sm text-[#71717A]">
                       {filtered.length === 0 ? "Маршруты не найдены" : `${filtered.length} маршрут${filtered.length === 1 ? "" : filtered.length < 5 ? "а" : "ов"}`}
                     </div>
-                    <select value={sortBy} onChange={(e) => setSortBy(e.target.value as "newest" | "oldest")}
-                      className="text-xs text-[#71717A] border border-[#E4E4E7] rounded-lg px-2.5 py-1.5 bg-white outline-none focus:border-[#F4632A] cursor-pointer appearance-none transition-colors"
-                      style={selectStyle}>
-                      <option value="newest">Сначала новые</option>
-                      <option value="oldest">Сначала старые</option>
-                    </select>
+                    <SortSelect
+                      value={sortBy}
+                      onChange={setSortBy}
+                      accentClass="focus:border-[#F4632A]"
+                      options={[
+                        { value: "newest", label: "Сначала новые" },
+                        { value: "oldest", label: "Сначала старые" },
+                      ]}
+                    />
                   </div>
                   {filtered.length > 0 ? (
                     <>
@@ -1054,12 +1052,15 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
                     <div className="text-sm text-[#71717A]">
                       {filteredEvents.length === 0 ? "Мероприятия не найдены" : `${filteredEvents.length} мероприяти${filteredEvents.length === 1 ? "е" : filteredEvents.length < 5 ? "я" : "й"}`}
                     </div>
-                    <select value={eventSortBy} onChange={(e) => setEventSortBy(e.target.value as "date_asc" | "date_desc")}
-                      className="text-xs text-[#71717A] border border-[#E4E4E7] rounded-lg px-2.5 py-1.5 bg-white outline-none focus:border-[#7C5CFC] cursor-pointer appearance-none transition-colors"
-                      style={selectStyle}>
-                      <option value="date_asc">Ближайшие</option>
-                      <option value="date_desc">Дальние сначала</option>
-                    </select>
+                    <SortSelect
+                      value={eventSortBy}
+                      onChange={setEventSortBy}
+                      accentClass="focus:border-[#7C5CFC]"
+                      options={[
+                        { value: "date_asc", label: "Ближайшие" },
+                        { value: "date_desc", label: "Дальние сначала" },
+                      ]}
+                    />
                   </div>
                   {filteredEvents.length > 0 ? (
                     <>
@@ -1099,6 +1100,37 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
           </div>
         </div>
       </main>
+    </div>
+  );
+}
+
+function SortSelect<T extends string>({
+  value, onChange, options, accentClass,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: { value: T; label: string }[];
+  accentClass: string;
+}) {
+  return (
+    <div className="relative inline-block">
+      <ArrowUpDown
+        size={13}
+        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#A1A1AA] pointer-events-none"
+      />
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as T)}
+        className={`appearance-none text-xs font-medium text-[#1C1C1E] border border-[#E4E4E7] rounded-lg pl-7 pr-7 h-8 bg-white outline-none cursor-pointer transition-colors hover:border-[#D4D4D8] ${accentClass}`}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+      <ChevronDown
+        size={13}
+        className="absolute right-2 top-1/2 -translate-y-1/2 text-[#A1A1AA] pointer-events-none"
+      />
     </div>
   );
 }
