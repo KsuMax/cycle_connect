@@ -34,9 +34,19 @@ export const metadata: Metadata = {
     siteName: "CycleConnect",
     locale: "ru_RU",
     url: "https://cycleconnect.cc",
+    images: [
+      {
+        url: "/og-default.png",
+        width: 1200,
+        height: 630,
+        type: "image/png",
+        alt: "CycleConnect — велосипедные маршруты, поездки и клубы",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
+    images: ["/og-default.png"],
   },
 };
 
