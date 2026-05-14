@@ -1,9 +1,17 @@
+import type { Metadata } from "next";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { dbToRoute, dbToEvent } from "@/lib/transforms";
 import type { Route, CycleEvent } from "@/types";
 import type { DbRoute, DbEvent } from "@/lib/supabase";
 import { RoutesPageClient } from "./RoutesPageClient";
 import { ROUTE_LIST_SELECT, EVENT_LIST_SELECT, PAGE_SIZE } from "@/lib/queries";
+
+export const metadata: Metadata = {
+  title: "Велосипедные маршруты с отзывами",
+  description:
+    "Каталог велосипедных маршрутов: шоссе, гравел, МТБ. Фильтры по региону, сложности и километражу, отзывы и фото от других велосипедистов.",
+  alternates: { canonical: "/routes" },
+};
 
 export default async function RoutesPage({
   searchParams,

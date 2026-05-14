@@ -5,6 +5,7 @@ import { ChevronLeft, Pencil } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { sanitizeHtml } from "@/lib/sanitize";
+import { metaDescription } from "@/lib/seo";
 import { formatDate } from "@/lib/utils";
 import type { DbRideReport, RideReportVibe } from "@/lib/supabase";
 
@@ -34,8 +35,7 @@ async function fetchReport(reportId: string): Promise<DbRideReport | null> {
 }
 
 function plainTextExcerpt(html: string | null, max = 160): string {
-  if (!html) return "";
-  return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+  return metaDescription(html, max);
 }
 
 interface Props {

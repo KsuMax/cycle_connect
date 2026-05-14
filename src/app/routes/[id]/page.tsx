@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { createServerSupabase } from "@/lib/supabase-server";
+import { metaDescription } from "@/lib/seo";
 import RoutePageClient from "./RoutePageClient";
 
 const BASE_URL = "https://cycleconnect.cc";
@@ -22,7 +23,7 @@ export async function generateMetadata(
 
   const title = `${data.title} | CycleConnect`;
   const description = data.description
-    ? data.description.replace(/<[^>]+>/g, "").slice(0, 160)
+    ? metaDescription(data.description)
     : `Велосипедный маршрут${data.distance_km ? ` · ${Math.round(data.distance_km)} км` : ""} на CycleConnect`;
 
   const images = (data.route_images as { url: string }[] | null) ?? [];

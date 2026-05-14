@@ -22,8 +22,22 @@ import { AchievementsProvider } from "@/lib/context/AchievementsContext";
 import { NotificationsProvider } from "@/lib/context/NotificationsContext";
 
 export const metadata: Metadata = {
-  title: "CycleConnect — велосипедное сообщество",
-  description: "Находи маршруты, объединяйся с людьми, открывай новые места",
+  metadataBase: new URL("https://cycleconnect.cc"),
+  title: {
+    default: "CycleConnect — велосипедные маршруты, поездки и клубы",
+    template: "%s | CycleConnect",
+  },
+  description:
+    "Социальная сеть для велосипедистов: ищи маршруты с отзывами, присоединяйся к групповым поездкам и клубам, делись отчётами о своих покатушках.",
+  openGraph: {
+    type: "website",
+    siteName: "CycleConnect",
+    locale: "ru_RU",
+    url: "https://cycleconnect.cc",
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
 };
 
 export default function RootLayout({
