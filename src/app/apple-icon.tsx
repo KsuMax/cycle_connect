@@ -13,22 +13,22 @@ export default function AppleIcon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(135deg, #F4632A 0%, #7C5CFC 100%)",
+          background: "#ffffff",
         }}
       >
-        <svg width="120" height="120" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="8" cy="22" r="7" fill="none" stroke="#ffffff" strokeWidth="2" />
-          <circle cx="24" cy="22" r="7" fill="none" stroke="#ffffff" strokeWidth="2" />
-          <circle cx="8" cy="22" r="1.5" fill="#ffffff" />
-          <circle cx="24" cy="22" r="1.5" fill="#ffffff" />
-          <line x1="8" y1="22" x2="15" y2="22" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
-          <line x1="8" y1="22" x2="13" y2="11" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
-          <line x1="15" y1="22" x2="13" y2="11" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
-          <line x1="13" y1="11" x2="22" y2="11" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
-          <line x1="15" y1="22" x2="22" y2="11" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
-          <line x1="22" y1="11" x2="24" y2="22" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
-          <line x1="11" y1="9" x2="15" y2="9" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
-          <line x1="21" y1="9" x2="25" y2="9" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
+        <svg width="140" height="140" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="8" cy="22" r="7" fill="none" stroke="#7C3AED" strokeWidth="2" />
+          <circle cx="24" cy="22" r="7" fill="none" stroke="#7C3AED" strokeWidth="2" />
+          <circle cx="8" cy="22" r="1.5" fill="#7C3AED" />
+          <circle cx="24" cy="22" r="1.5" fill="#7C3AED" />
+          <line x1="8" y1="22" x2="15" y2="22" stroke="#F97316" strokeWidth="2" strokeLinecap="round" />
+          <line x1="8" y1="22" x2="13" y2="11" stroke="#F97316" strokeWidth="2" strokeLinecap="round" />
+          <line x1="15" y1="22" x2="13" y2="11" stroke="#F97316" strokeWidth="2" strokeLinecap="round" />
+          <line x1="13" y1="11" x2="22" y2="11" stroke="#F97316" strokeWidth="2" strokeLinecap="round" />
+          <line x1="15" y1="22" x2="22" y2="11" stroke="#F97316" strokeWidth="2" strokeLinecap="round" />
+          <line x1="22" y1="11" x2="24" y2="22" stroke="#F97316" strokeWidth="2" strokeLinecap="round" />
+          <line x1="11" y1="9" x2="15" y2="9" stroke="#7C3AED" strokeWidth="2" strokeLinecap="round" />
+          <line x1="21" y1="9" x2="25" y2="9" stroke="#7C3AED" strokeWidth="2" strokeLinecap="round" />
         </svg>
       </div>
     ),
