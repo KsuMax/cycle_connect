@@ -113,15 +113,27 @@ export function RouteCard({ route, compact = false, priority = false }: RouteCar
               🗺 Маршрут
             </span>
             {route.club && (
-              <Link
-                href={`/clubs/${route.club.slug}`}
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-md transition-opacity hover:opacity-80"
+              <span
+                role="link"
+                tabIndex={0}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  router.push(`/clubs/${route.club!.slug}`);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    router.push(`/clubs/${route.club!.slug}`);
+                  }
+                }}
+                className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-md transition-opacity hover:opacity-80 cursor-pointer"
                 style={{ backgroundColor: "#E8FAF9", color: "#0BBFB5" }}
               >
                 <Shield size={10} />
                 {route.club.name}
-              </Link>
+              </span>
             )}
           </div>
           <h3 className="font-semibold text-[#1C1C1E] text-base leading-snug mb-2 line-clamp-2 group-hover:text-[#F4632A] transition-colors">

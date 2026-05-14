@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Calendar, Bike, Heart, ChevronRight, Shield } from "lucide-react";
 import { AvatarGroup } from "@/components/ui/Avatar";
@@ -37,6 +38,7 @@ interface EventCardProps {
 }
 
 export function EventCard({ event, priority = false }: EventCardProps) {
+  const router = useRouter();
   const { user } = useAuth();
   const { isLiked, toggleLike } = useEventLikes();
   const { requireAuth } = useAuthModal();
@@ -134,15 +136,27 @@ export function EventCard({ event, priority = false }: EventCardProps) {
                 📅 {isMultiDay ? `${event.days.length} дня · поход` : "Поездка"}
               </Badge>
               {event.club && (
-                <Link
-                  href={`/clubs/${event.club.slug}`}
-                  onClick={(e) => e.stopPropagation()}
-                  className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-md transition-opacity hover:opacity-80"
+                <span
+                  role="link"
+                  tabIndex={0}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    router.push(`/clubs/${event.club!.slug}`);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      router.push(`/clubs/${event.club!.slug}`);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-md transition-opacity hover:opacity-80 cursor-pointer"
                   style={{ backgroundColor: "rgba(11,191,181,0.25)", color: "white" }}
                 >
                   <Shield size={10} />
                   {event.club.name}
-                </Link>
+                </span>
               )}
             </div>
             <h3 className="text-white font-bold text-lg leading-tight group-hover:opacity-90 transition-opacity drop-shadow-sm">
