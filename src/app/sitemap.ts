@@ -30,6 +30,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     .order("updated_at", { ascending: false })
     .limit(200);
 
+  // Fetch ride reports
+  const { data: reports } = await supabase
+    .from("ride_reports")
+    .select("id, route_id, created_at")
+    .order("created_at", { ascending: false })
+    .limit(1000);
+
   const now = new Date();
 
   const staticPages: MetadataRoute.Sitemap = [
@@ -63,5 +70,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }));
 
-  return [...staticPages, ...eventPages, ...routePages, ...clubPages];
+  const reportPages: MetadataRoute.Sitemap = (reports ?? []).map((r) => ({
+    url: `${BASE_URL}/routes/${r.route_id}/report/${r.id}`,
+    lastModified: r.created_at ? new Date(r.created_at) : now,
+    changeFrequency: "monthly",
+    priority: 0.5,
+  }));
+
+  return [...staticPages, ...eventPages, ...routePages, ...clubPages, ...reportPages];
 }

@@ -1,14 +1,14 @@
-"use client";
-
-import { useEffect, useState, use } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronLeft, Pencil, Loader2 } from "lucide-react";
+import { notFound } from "next/navigation";
+import { ChevronLeft, Pencil } from "lucide-react";
 import { Header } from "@/components/layout/Header";
-import { useAuth } from "@/lib/context/AuthContext";
-import { supabase } from "@/lib/supabase";
+import { createServerSupabase } from "@/lib/supabase-server";
 import { sanitizeHtml } from "@/lib/sanitize";
 import { formatDate } from "@/lib/utils";
 import type { DbRideReport, RideReportVibe } from "@/lib/supabase";
+
+const BASE_URL = "https://cycleconnect.cc";
 
 const VIBE_CONFIG: Record<RideReportVibe, { emoji: string; label: string; color: string }> = {
   chill:   { emoji: "😌", label: "Кайф",     color: "#0BBFB5" },
@@ -18,59 +18,76 @@ const VIBE_CONFIG: Record<RideReportVibe, { emoji: string; label: string; color:
   explore: { emoji: "🧭", label: "Открытие", color: "#22A75B" },
 };
 
+const REPORT_SELECT =
+  "id, route_id, user_id, ride_id, ridden_at, vibe, text, photos, created_at, " +
+  "author:profiles!user_id(name, avatar_url), " +
+  "route:routes!route_id(id, title, cover_url)";
+
+async function fetchReport(reportId: string): Promise<DbRideReport | null> {
+  const supabase = await createServerSupabase();
+  const { data } = await supabase
+    .from("ride_reports")
+    .select(REPORT_SELECT)
+    .eq("id", reportId)
+    .maybeSingle();
+  return (data as unknown as DbRideReport | null) ?? null;
+}
+
+function plainTextExcerpt(html: string | null, max = 160): string {
+  if (!html) return "";
+  return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+}
+
 interface Props {
   params: Promise<{ id: string; reportId: string }>;
 }
 
-export default function ReportDetailPage({ params }: Props) {
-  const { id: routeId, reportId } = use(params);
-  const { user } = useAuth();
-  const [report, setReport] = useState<DbRideReport | null>(null);
-  const [routeTitle, setRouteTitle] = useState<string>("");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancel = false;
-    (async () => {
-      const { data } = await supabase
-        .from("ride_reports")
-        .select("id, route_id, user_id, ride_id, ridden_at, vibe, text, photos, created_at, author:profiles!user_id(name, avatar_url), route:routes!route_id(id, title, cover_url)")
-        .eq("id", reportId)
-        .maybeSingle();
-      if (cancel) return;
-      const r = (data as unknown as DbRideReport | null) ?? null;
-      setReport(r);
-      setRouteTitle(r?.route?.title ?? "");
-      setLoading(false);
-    })();
-    return () => { cancel = true; };
-  }, [reportId]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#F5F4F1]">
-        <Header />
-        <main className="max-w-2xl mx-auto px-4 py-16 flex justify-center">
-          <Loader2 size={20} className="animate-spin text-[#A1A1AA]" />
-        </main>
-      </div>
-    );
-  }
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id: routeId, reportId } = await params;
+  const report = await fetchReport(reportId);
 
   if (!report) {
-    return (
-      <div className="min-h-screen bg-[#F5F4F1]">
-        <Header />
-        <main className="max-w-2xl mx-auto px-4 py-16 text-center text-[#71717A]">
-          Отчёт не найден
-        </main>
-      </div>
-    );
+    return { title: "Отчёт | CycleConnect" };
   }
 
+  const author = report.author?.name ?? "Райдер";
+  const routeTitle = report.route?.title ?? "маршруте";
+  const title = `Отчёт ${author} о ${routeTitle} | CycleConnect`;
+  const description =
+    plainTextExcerpt(report.text) ||
+    `Отчёт о велопоездке от ${formatDate(report.ridden_at)} на CycleConnect`;
+  const ogImage = report.photos?.[0] ?? report.route?.cover_url ?? undefined;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: `${BASE_URL}/routes/${routeId}/report/${reportId}`,
+      siteName: "CycleConnect",
+      type: "article",
+      ...(ogImage ? { images: [{ url: ogImage, width: 1200, height: 630, alt: title }] } : {}),
+    },
+  };
+}
+
+export default async function ReportDetailPage({ params }: Props) {
+  const { id: routeId, reportId } = await params;
+  const supabase = await createServerSupabase();
+
+  const [{ data: reportData }, { data: userData }] = await Promise.all([
+    supabase.from("ride_reports").select(REPORT_SELECT).eq("id", reportId).maybeSingle(),
+    supabase.auth.getUser(),
+  ]);
+
+  const report = (reportData as unknown as DbRideReport | null) ?? null;
+  if (!report) notFound();
+
+  const routeTitle = report.route?.title ?? "";
   const vibe = report.vibe ? VIBE_CONFIG[report.vibe] : null;
   const photos = report.photos ?? [];
-  const isOwner = !!user && user.id === report.user_id;
+  const isOwner = !!userData.user && userData.user.id === report.user_id;
 
   return (
     <div className="min-h-screen bg-[#F5F4F1]">
