@@ -18,9 +18,10 @@ interface Props {
   report: DbRideReport;
   showRoute?: boolean;
   currentUserId?: string | null;
+  coverOnly?: boolean;
 }
 
-export function ReportCard({ report, showRoute = false, currentUserId }: Props) {
+export function ReportCard({ report, showRoute = false, currentUserId, coverOnly = false }: Props) {
   const vibe = report.vibe ? VIBE_CONFIG[report.vibe] : null;
   const photos = report.photos ?? [];
   const routeId = report.route_id ?? report.route?.id;
@@ -37,27 +38,34 @@ export function ReportCard({ report, showRoute = false, currentUserId }: Props) 
       style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}
     >
       {photos.length > 0 && (
-        <div className={`grid gap-0.5 ${photos.length === 1 ? "grid-cols-1" : "grid-cols-[2fr_1fr]"}`}>
+        coverOnly ? (
           <div className="relative aspect-[16/9] overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={photos[0]} alt="" className="w-full h-full object-cover" />
           </div>
-          {photos.length > 1 && (
-            <div className="flex flex-col gap-0.5">
-              {photos.slice(1, 3).map((url, i) => (
-                <div key={i} className="relative flex-1 overflow-hidden">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt="" className="w-full h-full object-cover" />
-                  {i === 1 && photos.length > 3 && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                      <span className="text-white text-sm font-semibold">+{photos.length - 3}</span>
-                    </div>
-                  )}
-                </div>
-              ))}
+        ) : (
+          <div className={`grid gap-0.5 ${photos.length === 1 ? "grid-cols-1" : "grid-cols-[2fr_1fr]"}`}>
+            <div className="relative aspect-[16/9] overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={photos[0]} alt="" className="w-full h-full object-cover" />
             </div>
-          )}
-        </div>
+            {photos.length > 1 && (
+              <div className="flex flex-col gap-0.5">
+                {photos.slice(1, 3).map((url, i) => (
+                  <div key={i} className="relative flex-1 overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt="" className="w-full h-full object-cover" />
+                    {i === 1 && photos.length > 3 && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <span className="text-white text-sm font-semibold">+{photos.length - 3}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
       )}
 
       <div className="p-4">
