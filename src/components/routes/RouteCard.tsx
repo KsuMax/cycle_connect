@@ -187,7 +187,7 @@ export function RouteCard({ route, compact = false, priority = false }: RouteCar
                 «{route.top_comment.text}»
               </span>
             ) : (
-              <span className="text-xs text-[#A1A1AA]">Будь первым</span>
+              <span className="text-xs text-[#A1A1AA]">Ещё нет комментариев</span>
             )}
 
             <div className="flex items-center gap-2">
