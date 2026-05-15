@@ -696,13 +696,22 @@ async function runMatchRoutes(
   filters: RouteFilters,
   query: string,
   count: number,
+  preComputedEmbedding?: string | null,
 ): Promise<RouteResult[]> {
-  let queryEmbedding: string | null = null;
-  try {
-    const v = await embedQuery(query);
-    queryEmbedding = toPgVector(v);
-  } catch (e) {
-    console.warn("[ai-search] embedQuery failed:", e);
+  // Caller can supply an already-computed embedding (or explicit `null` to
+  // skip the vector cosine and rely on filter/recency ordering — used for
+  // fast first-paint while bge-m3 is cold-loading).
+  let queryEmbedding: string | null;
+  if (preComputedEmbedding !== undefined) {
+    queryEmbedding = preComputedEmbedding;
+  } else {
+    queryEmbedding = null;
+    try {
+      const v = await embedQuery(query);
+      queryEmbedding = toPgVector(v);
+    } catch (e) {
+      console.warn("[ai-search] embedQuery failed:", e);
+    }
   }
 
   const { data, error } = await getSupabase().rpc("match_routes", {
@@ -1071,11 +1080,12 @@ async function attachWeatherComfort(
 async function searchRoutes(
   filters: RouteFilters,
   query: string,
+  preComputedEmbedding?: string | null,
 ): Promise<RouteResult[]> {
   if (filters.wind_intent) {
     return searchRoutesWind(filters, query);
   }
-  return runMatchRoutes(filters, query, 6);
+  return runMatchRoutes(filters, query, 6, preComputedEmbedding);
 }
 
 // ─── Personal profile ────────────────────────────────────────────────────────
@@ -1201,6 +1211,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "query required" }, { status: 400 });
   }
 
+  // Start the embedding *before* anything else. On a warm Ollama it finishes
+  // in ~300 ms; on a cold one it can take 8 s+ because bge-m3 gets evicted
+  // under VPS memory pressure. By kicking it off first and racing it against
+  // a hard deadline below, we can return a filter-only result fast and then
+  // re-rank once the vector is ready.
+  const embedStartedAt = Date.now();
+  const embedPromise: Promise<string | null> = embedQuery(query)
+    .then((v) => toPgVector(v))
+    .catch((e) => {
+      console.warn("[ai-search] embedQuery failed:", e instanceof Error ? e.message : String(e));
+      return null;
+    });
+  // Swallow unhandled rejections in case nothing awaits it.
+  embedPromise.catch(() => {});
+
   const stream = new ReadableStream({
     async start(controller) {
       try {
@@ -1290,7 +1315,25 @@ export async function POST(req: NextRequest) {
             : { type: "searching" };
           controller.enqueue(sseEvent(searchingEvent));
 
-          let routes = await searchRoutes(filters, query);
+          // Wind path has its own broader candidate fetch + bearing logic;
+          // skip the fast-first optimisation there. For the regular path,
+          // race the in-flight embedding against a hard deadline. If bge-m3
+          // is warm it lands well before the deadline; if it's cold we
+          // ship a filter-only result first and re-rank below.
+          const EMBED_DEADLINE_MS = 1500;
+          let firstEmbedding: string | null | undefined;
+          if (filters.wind_intent) {
+            firstEmbedding = undefined; // wind path computes its own
+          } else {
+            const elapsed = Date.now() - embedStartedAt;
+            const remaining = Math.max(0, EMBED_DEADLINE_MS - elapsed);
+            firstEmbedding = await Promise.race<string | null>([
+              embedPromise,
+              new Promise((r) => setTimeout(() => r(null), remaining)),
+            ]);
+          }
+
+          let routes = await searchRoutes(filters, query, firstEmbedding);
 
           // ── 3. Smart fallback: relax tightest filter once if empty ──────
           let relaxedReason: string | null = null;
@@ -1298,7 +1341,7 @@ export async function POST(req: NextRequest) {
             const relaxed = relaxFilters(filters);
             if (relaxed) {
               controller.enqueue(sseEvent({ type: "relaxing", reason: relaxed.reason }));
-              const fallback = await searchRoutes(relaxed.filters, query);
+              const fallback = await searchRoutes(relaxed.filters, query, firstEmbedding);
               if (fallback.length > 0) {
                 routes = fallback;
                 filters = relaxed.filters;
@@ -1316,19 +1359,54 @@ export async function POST(req: NextRequest) {
           logSearch(user.id, query, filters, routes.length, "routes", !!relaxedReason);
           controller.enqueue(sseEvent({ type: "result", entity_type: "routes", routes, filters, relaxedReason }));
 
+          // If we shipped a filter-only result because the embedding wasn't
+          // ready in time, re-rank with the real vector once it arrives and
+          // ship an updated result. Skip when wind path already handled its
+          // own ranking or when the embed never returned a value.
+          const needsRerank = firstEmbedding === null && !filters.wind_intent && !body.filters;
+
           // Fire generateWhys after result is already sent so the user sees
           // routes instantly. The why-texts arrive as a follow-up "why_update"
           // event (typically +1–3 s) and the frontend merges them in.
-          if (routes.length > 0 && !body.filters) {
-            controller.enqueue(sseEvent({ type: "reranking" }));
-            generateWhys(routes, query).then((whys) => {
-              if (whys.size > 0) {
-                const updated = routes.map((r) =>
-                  whys.has(r.id) ? { ...r, why: whys.get(r.id) } : r,
-                );
-                controller.enqueue(sseEvent({ type: "why_update", routes: updated }));
-              }
-            }).catch(() => {}).finally(() => { controller.close(); });
+          const whysPromise = (routes.length > 0 && !body.filters)
+            ? (controller.enqueue(sseEvent({ type: "reranking" })), generateWhys(routes, query))
+            : null;
+
+          const RERANK_DEADLINE_MS = 12_000;
+          const rerankPromise = needsRerank
+            ? Promise.race<string | null>([
+                embedPromise,
+                new Promise((r) => setTimeout(() => r(null), RERANK_DEADLINE_MS)),
+              ])
+                .then(async (lateEmbedding) => {
+                  if (!lateEmbedding) return null;
+                  const reranked = await searchRoutes(filters, query, lateEmbedding);
+                  if (reranked.length === 0) return null;
+                  const prevIds = routes.map((r) => r.id).join("|");
+                  const nextIds = reranked.map((r) => r.id).join("|");
+                  if (prevIds === nextIds) return null;
+                  routes = reranked;
+                  controller.enqueue(sseEvent({ type: "result", entity_type: "routes", routes, filters, relaxedReason }));
+                  return reranked;
+                })
+                .catch(() => null)
+            : null;
+
+          if (!whysPromise && !rerankPromise) {
+            // Nothing more to do — let the outer finally close the stream.
+          } else {
+            // Drain both tail tasks before closing the stream
+            Promise.all([whysPromise, rerankPromise])
+              .then(([whys]) => {
+                if (whys && whys.size > 0) {
+                  const updated = routes.map((r) =>
+                    whys.has(r.id) ? { ...r, why: whys.get(r.id) } : r,
+                  );
+                  controller.enqueue(sseEvent({ type: "why_update", routes: updated }));
+                }
+              })
+              .catch(() => {})
+              .finally(() => { controller.close(); });
             return; // controller will be closed inside the promise above
           }
         }
