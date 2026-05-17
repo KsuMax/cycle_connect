@@ -75,7 +75,7 @@ async function ollamaEmbed(inputs: string[]): Promise<number[][]> {
   const res = await fetch(`${OLLAMA_URL}/api/embed`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "bge-m3", input: inputs, keep_alive: "-1" }),
+    body: JSON.stringify({ model: "bge-m3", input: inputs, keep_alive: "87600h" }),
   });
   if (!res.ok) throw new Error(`Ollama ${res.status}: ${await res.text()}`);
   const data = await res.json() as { embeddings?: number[][]; embedding?: number[] };

@@ -31,7 +31,7 @@ async function ollamaEmbed(inputs: string[]): Promise<number[][]> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     signal: controller.signal,
-    body: JSON.stringify({ model: MODEL, input: inputs, keep_alive: "-1" }),
+    body: JSON.stringify({ model: MODEL, input: inputs, keep_alive: "87600h" }),
   }).finally(() => clearTimeout(timer));
 
   if (!res.ok) {
