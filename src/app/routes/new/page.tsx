@@ -14,8 +14,8 @@ import { useToast } from "@/lib/context/ToastContext";
 import { useAchievements } from "@/lib/context/AchievementsContext";
 import { supabase } from "@/lib/supabase";
 import { parseGpxFile, computeGpxStats, toWktPoint, toWktLinestring } from "@/lib/gpx";
-import { ROUTE_TYPES, DIFFICULTIES, SURFACES, BIKE_TYPES } from "@/constants/routes";
-import type { RouteType, Difficulty, Surface, BikeType, ExitPointsStatus } from "@/types";
+import { ROUTE_TYPES, DIFFICULTIES, SURFACES } from "@/constants/routes";
+import type { RouteType, Difficulty, Surface, ExitPointsStatus } from "@/types";
 import Link from "next/link";
 
 interface CaptainClub { id: string; name: string }
@@ -38,7 +38,6 @@ export default function NewRoutePage() {
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [routeTypes, setRouteTypes] = useState<RouteType[]>([]);
   const [surfaces, setSurfaces] = useState<Surface[]>([]);
-  const [bikeTypes, setBikeTypes] = useState<BikeType[]>([]);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -96,12 +95,6 @@ export default function NewRoutePage() {
   const toggleSurface = (s: Surface) => {
     setSurfaces((prev) =>
       prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
-    );
-  };
-
-  const toggleBikeType = (b: BikeType) => {
-    setBikeTypes((prev) =>
-      prev.includes(b) ? prev.filter((x) => x !== b) : [...prev, b]
     );
   };
 
@@ -212,7 +205,6 @@ export default function NewRoutePage() {
         duration_min: parseInt(duration) || 0,
         difficulty,
         surface: surfaces,
-        bike_types: bikeTypes,
         route_types: routeTypes,
         tags: [],
         mapmagic_url: mapUrl || null,
@@ -441,29 +433,12 @@ export default function NewRoutePage() {
           {/* Surface */}
           <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
             <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">Покрытие</label>
-            <p className="text-xs text-[#71717A] mb-3">Можно выбрать несколько</p>
+            <p className="text-xs text-[#71717A] mb-3">Выбери все, что встречается на маршруте</p>
             <div className="flex flex-wrap gap-2">
               {SURFACES.map(({ value, label }) => (
                 <button type="button" key={value} onClick={() => toggleSurface(value)}
                   className="px-4 py-2 rounded-xl text-sm font-medium transition-colors border"
                   style={surfaces.includes(value)
-                    ? { backgroundColor: "#1C1C1E", color: "white", borderColor: "#1C1C1E" }
-                    : { backgroundColor: "white", color: "#71717A", borderColor: "#E4E4E7" }}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Bike types */}
-          <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-            <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">Тип велосипеда</label>
-            <p className="text-xs text-[#71717A] mb-3">Для каких велосипедов подходит маршрут</p>
-            <div className="flex flex-wrap gap-2">
-              {BIKE_TYPES.map(({ value, label }) => (
-                <button type="button" key={value} onClick={() => toggleBikeType(value)}
-                  className="px-4 py-2 rounded-xl text-sm font-medium transition-colors border"
-                  style={bikeTypes.includes(value)
                     ? { backgroundColor: "#1C1C1E", color: "white", borderColor: "#1C1C1E" }
                     : { backgroundColor: "white", color: "#71717A", borderColor: "#E4E4E7" }}>
                   {label}

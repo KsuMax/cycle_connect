@@ -27,7 +27,6 @@ const route: DbRoute = {
   duration_min: 240,
   difficulty: "hard",
   surface: ["gravel", "dirt"],
-  bike_types: ["mountain"],
   route_types: ["gravel", "mtb"],
   tags: ["горы", "живописный"],
   mapmagic_url: null,
@@ -149,7 +148,6 @@ describe("dbToRoute", () => {
   it("maps array fields", () => {
     const r = dbToRoute(route);
     expect(r.surface).toEqual(["gravel", "dirt"]);
-    expect(r.bike_types).toEqual(["mountain"]);
     expect(r.route_types).toEqual(["gravel", "mtb"]);
     expect(r.tags).toEqual(["горы", "живописный"]);
   });

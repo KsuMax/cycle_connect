@@ -43,7 +43,6 @@ interface RouteFilters {
   elevation_max?: number;
   surface?: string[];
   route_types?: string[];
-  bike_types?: string[];
   region?: string;
   search_text?: string;
 }
@@ -160,14 +159,13 @@ function extractFromText(query: string): RouteFilters {
   if (/грязь|бездорожье/.test(q)) surface.push("dirt");
   if (surface.length) out.surface = surface;
 
-  // Bike type
+  // Bike intent → route type
   if (/горный вел|mtb|эндуро/.test(q)) {
-    out.bike_types = ["mountain"];
     if (!out.route_types) out.route_types = ["mtb"];
   } else if (/шоссейн/.test(q)) {
-    out.bike_types = ["road"];
+    if (!out.route_types) out.route_types = ["road"];
   } else if (/гравийн|гравел/.test(q)) {
-    out.bike_types = ["gravel"];
+    if (!out.route_types) out.route_types = ["gravel"];
   }
 
   // Region — matched against all inflected forms
@@ -196,7 +194,7 @@ const SYSTEM_PROMPT = `You are a cycling route search assistant for CycleConnect
 Extract search filters from the user message. Return ONLY raw JSON, no markdown, no explanation.
 
 Output schema (all fields optional):
-{"difficulty":"easy"|"medium"|"hard","distance_min":number,"distance_max":number,"distance_target":number,"elevation_max":number,"surface":["asphalt"|"gravel"|"dirt"|"mixed"],"route_types":["road"|"gravel"|"mtb"|"urban"],"bike_types":["road"|"mountain"|"gravel"],"region":"Карелия"|"Санкт-Петербург"|"Ленинградская область"|"Москва"|"Подмосковье"|"Краснодарский край"|"Крым"|"Алтай"|"Байкал"|"Урал","search_text":"string"}
+{"difficulty":"easy"|"medium"|"hard","distance_min":number,"distance_max":number,"distance_target":number,"elevation_max":number,"surface":["asphalt"|"gravel"|"dirt"],"route_types":["road"|"gravel"|"mtb"|"urban"],"region":"Карелия"|"Санкт-Петербург"|"Ленинградская область"|"Москва"|"Подмосковье"|"Краснодарский край"|"Крым"|"Алтай"|"Байкал"|"Урал","search_text":"string"}
 
 Rules (apply all that match):
 1. If user says "N км" → distance_target=N, distance_min=N*0.75, distance_max=N*1.25
@@ -295,7 +293,6 @@ function mergeFilters(ai: RouteFilters, regex: RouteFilters): RouteFilters {
 
   if (regex.difficulty && !merged.difficulty) merged.difficulty = regex.difficulty;
   if (regex.surface?.length && !merged.surface?.length) merged.surface = regex.surface;
-  if (regex.bike_types?.length && !merged.bike_types?.length) merged.bike_types = regex.bike_types;
   if (regex.route_types?.length && !merged.route_types?.length) merged.route_types = regex.route_types;
   if (regex.region && !merged.region) merged.region = regex.region;
 
@@ -321,7 +318,6 @@ async function searchRoutes(filters: RouteFilters): Promise<DbRoute[]> {
   if (filters.region) q = q.ilike("region", `%${filters.region}%`);
   if (filters.surface?.length) q = q.overlaps("surface", filters.surface);
   if (filters.route_types?.length) q = q.overlaps("route_types", filters.route_types);
-  if (filters.bike_types?.length) q = q.overlaps("bike_types", filters.bike_types);
   if (filters.search_text) {
     // PostgREST `.or()` is a string DSL — commas, parens, dots, percent
     // signs in user input would change the filter structure (PostgREST-side

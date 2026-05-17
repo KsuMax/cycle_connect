@@ -18,7 +18,6 @@ interface RouteFilters {
   elevation_max?: number;
   surface?: string[];
   route_types?: string[];
-  bike_types?: string[];
   region?: string;
   search_text?: string;
   sort_by?: "relevance" | "popular";
@@ -54,7 +53,6 @@ const SURFACE_LABELS: Record<string, string> = {
   asphalt: "асфальт",
   gravel: "гравий",
   dirt: "грунт",
-  mixed: "микс",
 };
 
 /**

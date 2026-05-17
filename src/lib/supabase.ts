@@ -126,7 +126,6 @@ export interface DbRoute {
   duration_min: number;
   difficulty: "easy" | "medium" | "hard";
   surface: string[];
-  bike_types: string[];
   route_types: string[];
   tags: string[];
   mapmagic_url: string | null;

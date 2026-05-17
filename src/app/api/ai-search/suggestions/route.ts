@@ -55,7 +55,7 @@ interface RiddenRoute {
   difficulty: string | null;
   region: string | null;
   surface: string[] | null;
-  bike_types: string[] | null;
+  route_types: string[] | null;
 }
 
 export async function GET(req: NextRequest) {
@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
   // Fetch user's ridden routes (limit to 30 most recent for perf)
   const { data: rows } = await getSupabase()
     .from("route_rides")
-    .select("routes(distance_km, elevation_m, difficulty, region, surface, bike_types)")
+    .select("routes(distance_km, elevation_m, difficulty, region, surface, route_types)")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(30);
@@ -94,8 +94,8 @@ export async function GET(req: NextRequest) {
   const avgElevation = avg(ridden.map((r) => r.elevation_m));
   const allSurfaces = ridden.flatMap((r) => r.surface ?? []);
   const topSurface = mode(allSurfaces);
-  const allBikeTypes = ridden.flatMap((r) => r.bike_types ?? []);
-  const topBikeType = mode(allBikeTypes);
+  const allRouteTypes = ridden.flatMap((r) => r.route_types ?? []);
+  const topRouteType = mode(allRouteTypes);
 
   const riddenRegions = new Set(ridden.map((r) => r.region).filter(Boolean));
   const ALL_REGIONS = [
@@ -134,7 +134,7 @@ export async function GET(req: NextRequest) {
     suggestions.push(`Гравийный маршрут${regionStr}`);
   } else if (topSurface === "gravel" || topSurface === "dirt") {
     suggestions.push("Асфальтовый маршрут на скорость");
-  } else if (topBikeType === "mountain") {
+  } else if (topRouteType === "mtb") {
     suggestions.push("MTB с техничными спусками");
   } else {
     suggestions.push("Маршрут с красивыми видами");
