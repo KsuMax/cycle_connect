@@ -32,4 +32,5 @@ jobs:
               --add-host=host.docker.internal:host-gateway \
               --env-file /opt/cycleconnect/.env.production \
               cycleconnect:latest
+            docker builder prune -f
             echo "✅ Deployed"
