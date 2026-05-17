@@ -1,11 +1,13 @@
 /**
  * POST /api/routes/embed
  *
- * Body: { id: string }  — single route
- *       { all: true }   — backfill all routes missing an embedding (admin only)
+ * Body: { id: string }            — single route (owner or admin)
+ *       { all: true }             — backfill routes with no embedding (admin)
+ *       { reindex: true }         — re-embed ALL routes, cursor-paginated (admin)
+ *         optional: { limit: number, after_id: string }
  *
- * Auth:  authenticated user must own the route, OR be admin for `all`.
- *        Service role on server is used for the actual write.
+ * Auth: authenticated user must own the route, OR be admin for bulk modes.
+ *       Service role is used for the actual write.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -37,10 +39,12 @@ interface RouteRow {
   bike_types: string[] | null;
   distance_km: number | null;
   elevation_m: number | null;
+  poi_tags: string[] | null;
+  season_months: number[] | null;
 }
 
 const COLUMNS =
-  "id, author_id, title, description, region, difficulty, tags, surface, route_types, bike_types, distance_km, elevation_m";
+  "id, author_id, title, description, region, difficulty, tags, surface, route_types, bike_types, distance_km, elevation_m, poi_tags, season_months";
 
 async function getCaller() {
   const cookieStore = await cookies();
@@ -60,7 +64,6 @@ async function embedRows(rows: RouteRow[]) {
   const sb = admin();
   const now = new Date().toISOString();
 
-  // Updates can't be batched cleanly via supabase-js with different values, so loop.
   for (let i = 0; i < rows.length; i++) {
     await sb
       .from("routes")
@@ -82,8 +85,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const sb = admin();
 
-  // Backfill mode — admin only.
-  if (body.all === true) {
+  // ── Admin bulk modes ──────────────────────────────────────────────────────
+  if (body.all === true || body.reindex === true) {
     const { data: profile } = await sb
       .from("profiles")
       .select("is_admin")
@@ -93,17 +96,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
 
-    const limit = typeof body.limit === "number" ? Math.min(body.limit, 200) : 50;
-    const { data, error } = await sb
-      .from("routes")
-      .select(COLUMNS)
-      .is("embedding", null)
-      .limit(limit);
+    const limit = typeof body.limit === "number" ? Math.min(body.limit, 50) : 50;
+    const afterId: string | null = typeof body.after_id === "string" ? body.after_id : null;
+
+    let q = sb.from("routes").select(COLUMNS).order("id").limit(limit);
+
+    if (body.reindex === true) {
+      // Re-embed all routes in id order; caller advances cursor with after_id
+      if (afterId) q = q.gt("id", afterId);
+    } else {
+      // Backfill: only routes missing an embedding
+      q = q.is("embedding", null);
+      if (afterId) q = q.gt("id", afterId);
+    }
+
+    const { data, error } = await q;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+    const rows = (data ?? []) as RouteRow[];
+    if (!rows.length) {
+      return NextResponse.json({ count: 0, done: true, mode: body.reindex ? "reindex" : "backfill" });
+    }
+
     try {
-      const result = await embedRows((data ?? []) as RouteRow[]);
-      return NextResponse.json({ ...result, mode: "backfill" });
+      const result = await embedRows(rows);
+      const lastId = rows[rows.length - 1].id;
+      return NextResponse.json({
+        ...result,
+        done: rows.length < limit,
+        next_after_id: rows.length === limit ? lastId : null,
+        mode: body.reindex ? "reindex" : "backfill",
+      });
     } catch (e) {
       return NextResponse.json(
         { error: e instanceof Error ? e.message : "embed failed" },
@@ -112,7 +135,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Single-route mode — caller must own the route.
+  // ── Single-route mode — caller must own the route ─────────────────────────
   const id = typeof body.id === "string" ? body.id : "";
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
