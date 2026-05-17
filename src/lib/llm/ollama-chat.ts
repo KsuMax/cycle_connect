@@ -10,7 +10,12 @@
  */
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY ?? "";
-const OPENROUTER_MODEL = "meta-llama/llama-3.3-70b-instruct:free";
+// Ordered by quality; on 429 the next model is tried automatically.
+const OPENROUTER_MODELS = [
+  "nvidia/nemotron-3-super-120b-a12b:free",
+  "nvidia/nemotron-3-nano-30b-a3b:free",
+  "meta-llama/llama-3.3-70b-instruct:free",
+];
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY ?? "";
 const OLLAMA_URL = (process.env.OLLAMA_URL ?? "http://localhost:11434").replace(/\/$/, "");
 const OLLAMA_CHAT_MODEL = process.env.OLLAMA_CHAT_MODEL ?? "llama3.2:3b";
@@ -30,46 +35,54 @@ export async function chatJSON(
   timeoutMs = 5_000,
   numCtx = 1024,
 ): Promise<Record<string, unknown>> {
-  // ── Primary: OpenRouter (free 70b model) ─────────────────────────────────
+  // ── Primary: OpenRouter (rotate models on 429) ───────────────────────────
   if (OPENROUTER_API_KEY) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 10_000);
-    try {
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": SITE_URL,
-          "X-Title": "CycleConnect",
-        },
-        signal: controller.signal,
-        body: JSON.stringify({
-          model: OPENROUTER_MODEL,
-          messages,
-          max_tokens: 256,
-          temperature: 0,
-          response_format: { type: "json_object" },
-        }),
-      }).finally(() => clearTimeout(timer));
-      if (!res.ok) throw new Error(`openrouter HTTP ${res.status}`);
-      const data = await res.json() as {
-        choices?: Array<{ message?: { content?: string } }>;
-        error?: { message?: string };
-      };
-      if (data.error) throw new Error(`openrouter: ${data.error.message}`);
-      const raw = data.choices?.[0]?.message?.content ?? "{}";
-      const match = raw.match(/\{[\s\S]*\}/);
-      if (!match) return {};
-      return JSON.parse(match[0]) as Record<string, unknown>;
-    } catch (err) {
-      console.warn(
-        "[llm] OpenRouter failed, trying Ollama:",
-        err instanceof Error ? err.message : String(err),
-      );
-    } finally {
-      clearTimeout(timer);
+    for (const model of OPENROUTER_MODELS) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10_000);
+      try {
+        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": SITE_URL,
+            "X-Title": "CycleConnect",
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            model,
+            messages,
+            max_tokens: 256,
+            temperature: 0,
+            response_format: { type: "json_object" },
+          }),
+        }).finally(() => clearTimeout(timer));
+        if (!res.ok) throw new Error(`openrouter HTTP ${res.status}`);
+        const data = await res.json() as {
+          choices?: Array<{ message?: { content?: string } }>;
+          error?: { message?: string; code?: number };
+        };
+        // 429 = rate-limited upstream → try next model in list
+        if (data.error?.code === 429) {
+          console.warn(`[llm] OpenRouter ${model} rate-limited, trying next`);
+          continue;
+        }
+        if (data.error) throw new Error(`openrouter: ${data.error.message}`);
+        const raw = data.choices?.[0]?.message?.content ?? "{}";
+        const match = raw.match(/\{[\s\S]*\}/);
+        if (!match) return {};
+        return JSON.parse(match[0]) as Record<string, unknown>;
+      } catch (err) {
+        console.warn(
+          `[llm] OpenRouter ${model} failed:`,
+          err instanceof Error ? err.message : String(err),
+        );
+      } finally {
+        clearTimeout(timer);
+      }
     }
+    console.warn("[llm] All OpenRouter models failed, falling back to Ollama");
   }
 
   // ── Secondary: Ollama local ───────────────────────────────────────────────
