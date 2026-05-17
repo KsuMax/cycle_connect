@@ -39,6 +39,7 @@ export interface Route {
   distance_km: number;
   elevation_m: number;
   duration_min: number;
+  duration_days?: number | null;
   difficulty: Difficulty;
   surface: Surface[];
   route_types: RouteType[];

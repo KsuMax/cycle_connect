@@ -34,7 +34,10 @@ export default function NewRoutePage() {
   const [regions, setRegions] = useState<string[]>([]);
   const [distance, setDistance] = useState("");
   const [elevation, setElevation] = useState("");
-  const [duration, setDuration] = useState("");
+  const [durationMode, setDurationMode] = useState<"single" | "multi">("single");
+  const [durationHours, setDurationHours] = useState("");
+  const [durationMinutes, setDurationMinutes] = useState("");
+  const [durationDays, setDurationDays] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [routeTypes, setRouteTypes] = useState<RouteType[]>([]);
   const [surfaces, setSurfaces] = useState<Surface[]>([]);
@@ -217,7 +220,12 @@ export default function NewRoutePage() {
         region: region || null,
         distance_km: parseFloat(distance) || 0,
         elevation_m: parseInt(elevation) || 0,
-        duration_min: parseInt(duration) || 0,
+        duration_min: durationMode === "single"
+          ? ((parseInt(durationHours) || 0) * 60 + (parseInt(durationMinutes) || 0))
+          : 0,
+        duration_days: durationMode === "multi"
+          ? (parseInt(durationDays) || null)
+          : null,
         difficulty,
         surface: surfaces,
         route_types: routeTypes,
@@ -594,10 +602,40 @@ export default function NewRoutePage() {
                 <input type="number" placeholder="450" value={elevation} onChange={(e) => setElevation(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors" />
               </div>
-              <div>
-                <label className="text-xs text-[#71717A] mb-1 block">Время, мин</label>
-                <input type="number" placeholder="240" value={duration} onChange={(e) => setDuration(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors" />
+              <div className="sm:col-span-2">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-[#71717A] block">Длительность</label>
+                  <div className="inline-flex rounded-lg bg-[#F4F4F5] p-0.5 text-xs">
+                    <button type="button" onClick={() => setDurationMode("single")}
+                      className={`px-2.5 py-1 rounded-md transition-colors ${durationMode === "single" ? "bg-white text-[#1C1C1E] shadow-sm" : "text-[#71717A]"}`}>
+                      Однодневный
+                    </button>
+                    <button type="button" onClick={() => setDurationMode("multi")}
+                      className={`px-2.5 py-1 rounded-md transition-colors ${durationMode === "multi" ? "bg-white text-[#1C1C1E] shadow-sm" : "text-[#71717A]"}`}>
+                      Многодневный
+                    </button>
+                  </div>
+                </div>
+                {durationMode === "single" ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="relative">
+                      <input type="number" min="0" placeholder="4" value={durationHours} onChange={(e) => setDurationHours(e.target.value)}
+                        className="w-full px-3 py-2 pr-10 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors" />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#A1A1AA]">ч</span>
+                    </div>
+                    <div className="relative">
+                      <input type="number" min="0" max="59" placeholder="30" value={durationMinutes} onChange={(e) => setDurationMinutes(e.target.value)}
+                        className="w-full px-3 py-2 pr-10 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors" />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#A1A1AA]">мин</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <input type="number" min="1" max="60" placeholder="4" value={durationDays} onChange={(e) => setDurationDays(e.target.value)}
+                      className="w-full px-3 py-2 pr-12 rounded-xl border border-[#E4E4E7] text-sm outline-none focus:border-[#F4632A] transition-colors" />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#A1A1AA]">дней</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

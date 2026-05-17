@@ -13,6 +13,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useEventRides } from "@/lib/context/EventRidesContext";
 import { useIntents } from "@/lib/context/IntentsContext";
 import { proxyImageUrl } from "@/lib/supabase";
+import { formatRouteDuration } from "@/lib/duration";
 import type { Route, RouteType } from "@/types";
 
 const ROUTE_TYPE_LABELS: Record<RouteType, string> = {
@@ -163,7 +164,7 @@ export function RouteCard({ route, compact = false, priority = false }: RouteCar
             </span>
             <span className="flex items-center gap-1">
               <Clock size={14} />
-              ~{Math.round(route.duration_min / 60)} ч
+              {formatRouteDuration(route.duration_min, route.duration_days)}
             </span>
           </div>
 

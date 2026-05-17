@@ -84,6 +84,7 @@ export interface RouteResult {
   distance_km: number;
   elevation_m: number;
   duration_min: number;
+  duration_days?: number | null;
   difficulty: string;
   region: string;
   cover_url: string | null;
@@ -745,6 +746,7 @@ async function runMatchRoutes(
     distance_km: r.distance_km,
     elevation_m: r.elevation_m,
     duration_min: r.duration_min,
+    duration_days: r.duration_days ?? null,
     difficulty: r.difficulty,
     region: r.region,
     cover_url: r.cover_url,

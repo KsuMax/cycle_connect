@@ -52,6 +52,7 @@ export function dbToRoute(r: DbRoute): Route {
     distance_km: r.distance_km,
     elevation_m: r.elevation_m,
     duration_min: r.duration_min,
+    duration_days: r.duration_days ?? null,
     difficulty: r.difficulty,
     surface: r.surface as Route["surface"],
     route_types: r.route_types as RouteType[],

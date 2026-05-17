@@ -124,6 +124,7 @@ export interface DbRoute {
   distance_km: number;
   elevation_m: number;
   duration_min: number;
+  duration_days: number | null;
   difficulty: "easy" | "medium" | "hard";
   surface: string[];
   route_types: string[];

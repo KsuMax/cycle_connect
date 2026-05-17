@@ -25,6 +25,7 @@ const route: DbRoute = {
   distance_km: 85,
   elevation_m: 1500,
   duration_min: 240,
+  duration_days: null,
   difficulty: "hard",
   surface: ["gravel", "dirt"],
   route_types: ["gravel", "mtb"],

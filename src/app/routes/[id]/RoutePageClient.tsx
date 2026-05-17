@@ -12,6 +12,7 @@ import { useRides } from "@/lib/context/RidesContext";
 import { useEventRides } from "@/lib/context/EventRidesContext";
 import { useIntents } from "@/lib/context/IntentsContext";
 import { supabase } from "@/lib/supabase";
+import { formatRouteDuration } from "@/lib/duration";
 import { DifficultyBadge, Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { useRouter } from "next/navigation";
@@ -521,7 +522,7 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
                 {[
                   { icon: <Bike size={16} />, value: `${route.distance_km} км`, label: "Дистанция" },
                   { icon: <Mountain size={16} />, value: `${route.elevation_m} м`, label: "Набор" },
-                  { icon: <Clock size={16} />, value: route.duration_min ? `~${Math.round(route.duration_min / 60)} ч` : "—", label: "Время" },
+                  { icon: <Clock size={16} />, value: formatRouteDuration(route.duration_min, route.duration_days), label: route.duration_days ? "Длительность" : "Время" },
                 ].map(({ icon, value, label }) => (
                   <div key={label} className="text-center p-3 rounded-xl" style={{ backgroundColor: "#F5F4F1" }}>
                     <div className="flex justify-center mb-1 text-[#71717A]">{icon}</div>

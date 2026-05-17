@@ -13,7 +13,7 @@ const PROFILE_FIELDS =
 /** Use for route list pages (routes/page.tsx, RoutesPageClient load-more). */
 export const ROUTE_LIST_SELECT = [
   "id, author_id, title, description, region",
-  "distance_km, elevation_m, duration_min, difficulty",
+  "distance_km, elevation_m, duration_min, duration_days, difficulty",
   "surface, route_types, tags",
   "mapmagic_url, mapmagic_embed, cover_url, gpx_path, gpx_updated_at",
   "exit_points_status, likes_count, riders_today, is_club_featured, created_at",
