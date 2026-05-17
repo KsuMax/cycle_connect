@@ -31,7 +31,7 @@ async function ollamaEmbed(inputs: string[]): Promise<number[][]> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     signal: controller.signal,
-    body: JSON.stringify({ model: MODEL, input: inputs, keep_alive: "24h" }),
+    body: JSON.stringify({ model: MODEL, input: inputs, keep_alive: "-1" }),
   }).finally(() => clearTimeout(timer));
 
   if (!res.ok) {
@@ -97,6 +97,12 @@ export function warmUpEmbeddings(): void {
 }
 
 /** Build the canonical embedding text for a route row. */
+const SEASON_LABEL: Record<number, string> = {
+  1: "январь", 2: "февраль", 3: "март", 4: "апрель",
+  5: "май", 6: "июнь", 7: "июль", 8: "август",
+  9: "сентябрь", 10: "октябрь", 11: "ноябрь", 12: "декабрь",
+};
+
 export function routeEmbeddingText(r: {
   title?: string | null;
   description?: string | null;
@@ -108,6 +114,8 @@ export function routeEmbeddingText(r: {
   bike_types?: string[] | null;
   distance_km?: number | null;
   elevation_m?: number | null;
+  poi_tags?: string[] | null;
+  season_months?: number[] | null;
 }): string {
   const parts: string[] = [];
   if (r.title) parts.push(r.title);
@@ -119,6 +127,11 @@ export function routeEmbeddingText(r: {
   if (r.route_types?.length) parts.push(`Тип: ${r.route_types.join(", ")}`);
   if (r.bike_types?.length) parts.push(`Велосипед: ${r.bike_types.join(", ")}`);
   if (r.tags?.length) parts.push(`Теги: ${r.tags.join(", ")}`);
+  if (r.poi_tags?.length) parts.push(`Места: ${r.poi_tags.join(", ")}`);
+  if (r.season_months?.length) {
+    const labels = r.season_months.map((m) => SEASON_LABEL[m] ?? m).join(", ");
+    parts.push(`Сезон: ${labels}`);
+  }
   if (r.description) parts.push(r.description);
   return parts.join(". ");
 }

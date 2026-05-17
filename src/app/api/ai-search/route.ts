@@ -195,8 +195,8 @@ function extractDistance(q: string, out: RouteFilters): boolean {
   if (target) {
     const n = parseInt(target[1], 10);
     out.distance_target = n;
-    out.distance_min = Math.max(1, Math.round(n * 0.75));
-    out.distance_max = Math.round(n * 1.25);
+    out.distance_min = Math.max(1, Math.round(n * 0.80));
+    out.distance_max = Math.round(n * 1.20);
     return true;
   }
 
@@ -1257,8 +1257,15 @@ export async function POST(req: NextRequest) {
           const regexFilters = extractFromText(query);
           const isPersonal = regexFilters.personal_intent;
 
+          // Skip LLM parsing for short numeric queries that regex already covered
+          // fully (distance + at least one more filter). Saves ~400ms per search.
+          const regexKeyCount = Object.keys(regexFilters).filter(
+            (k) => !["wind_intent", "weather_intent", "personal_intent", "entity_type"].includes(k),
+          ).length;
+          const isSimpleQuery = regexKeyCount >= 2 && query.trim().split(/\s+/).length <= 7;
+
           const [aiFilters, personalProfile] = await Promise.all([
-            parseAI(query),
+            isSimpleQuery ? Promise.resolve({}) : parseAI(query),
             isPersonal ? buildUserProfile(user.id) : Promise.resolve(null),
           ]);
           filters = mergeFilters(aiFilters, regexFilters);
