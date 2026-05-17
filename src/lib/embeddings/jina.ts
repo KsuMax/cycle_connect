@@ -115,11 +115,13 @@ export function routeEmbeddingText(r: {
   elevation_m?: number | null;
   poi_tags?: string[] | null;
   season_months?: number[] | null;
+  duration_days?: number | null;
 }): string {
   const parts: string[] = [];
   if (r.title) parts.push(r.title);
   if (r.region) parts.push(`Регион: ${r.region}`);
   if (r.difficulty) parts.push(`Сложность: ${r.difficulty}`);
+  if (r.duration_days) parts.push(`Многодневный маршрут на ${r.duration_days} дн.`);
   if (r.distance_km) parts.push(`${r.distance_km} км`);
   if (r.elevation_m) parts.push(`набор ${r.elevation_m} м`);
   if (r.surface?.length) parts.push(`Покрытие: ${r.surface.join(", ")}`);

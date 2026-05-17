@@ -30,6 +30,11 @@ interface RouteFilters {
   poi_tags?: string[];
   /** Month (1–12) the route must be recommended for */
   season_month?: number;
+  /** Duration kind: true = multi-day only, false = single-day only, undefined = both */
+  multi_day_only?: boolean;
+  /** Days range — implies multi-day */
+  duration_days_min?: number;
+  duration_days_max?: number;
 }
 
 // ─── Chip definitions ─────────────────────────────────────────────────────────
@@ -378,6 +383,18 @@ function parseTraceLabel(phase: SearchPhase, filters: RouteFilters | null, isRef
         bridge: "🌉 мост", field: "🌾 поля", castle: "🏰 замок",
       };
       parts.push(filters.poi_tags.map((t) => POI_EMOJI[t] ?? t).join(", "));
+    }
+    if (filters.duration_days_min != null || filters.duration_days_max != null) {
+      const lo = filters.duration_days_min;
+      const hi = filters.duration_days_max;
+      if (lo === hi && lo != null) parts.push(`🗓 на ${lo} дн.`);
+      else if (lo != null && hi != null) parts.push(`🗓 ${lo}–${hi} дн.`);
+      else if (lo != null) parts.push(`🗓 от ${lo} дн.`);
+      else if (hi != null) parts.push(`🗓 до ${hi} дн.`);
+    } else if (filters.multi_day_only === true) {
+      parts.push("🗓 многодневный");
+    } else if (filters.multi_day_only === false) {
+      parts.push("🗓 однодневный");
     }
     if (filters.season_month != null) {
       const SEASON_LABEL: Record<number, string> = {

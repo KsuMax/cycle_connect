@@ -76,6 +76,14 @@ interface RouteFilters {
    * no season restriction (season_months IS NULL = year-round).
    */
   season_month?: number;
+  /**
+   * Duration kind: true → only multi-day routes (duration_days IS NOT NULL),
+   * false → only single-day routes (duration_days IS NULL), undefined → both.
+   */
+  multi_day_only?: boolean;
+  /** Days range — implies multi-day. "на 4 дня" → min=3, max=5. */
+  duration_days_min?: number;
+  duration_days_max?: number;
 }
 
 export interface RouteResult {
@@ -314,6 +322,26 @@ function extractFromText(query: string): RouteFilters {
   if (/достопримечательност|много\s+объект/.test(q))               poi.push("landmarks");
   if (poi.length) out.poi_tags = poi;
 
+  // Duration kind & days range
+  // "на N дней / на N день / N-дневный / на N суток" → multi-day with range around N
+  const daysMatch = q.match(/(?:на\s+)?(\d{1,2})\s*[-\s]?(?:дн[еяй]|дней|день|сут(?:ки|ок))|(\d{1,2})\s*[-]?дневн/);
+  if (daysMatch) {
+    const n = parseInt(daysMatch[1] ?? daysMatch[2], 10);
+    if (n >= 1 && n <= 60) {
+      if (n === 1) {
+        out.multi_day_only = false;
+      } else {
+        out.multi_day_only = true;
+        out.duration_days_min = Math.max(2, n - 1);
+        out.duration_days_max = Math.min(60, n + 1);
+      }
+    }
+  } else if (/поход|многодневн|тур\b|путешеств|вело[-\s]?тур|байкпак/.test(q)) {
+    out.multi_day_only = true;
+  } else if (/однодневн|на\s+один\s+день|одним\s+днём|одним\s+днем/.test(q)) {
+    out.multi_day_only = false;
+  }
+
   // Season: map common phrases to a representative month for the DB filter
   if (/весн|весенн|март|апрел|май/.test(q))      out.season_month = 5;
   else if (/лет[оа]|летн|июн|июл|август/.test(q)) out.season_month = 7;
@@ -390,7 +418,7 @@ const SYSTEM_PROMPT = `You are a cycling route search assistant for CycleConnect
 Extract search filters from the user message. Return ONLY raw JSON, no markdown, no explanation.
 
 Output schema (all fields optional):
-{"difficulty":"easy"|"medium"|"hard","distance_min":number,"distance_max":number,"distance_target":number,"elevation_min":number,"elevation_max":number,"surface":["asphalt"|"gravel"|"dirt"],"route_types":["road"|"gravel"|"mtb"|"urban"],"region":"Карелия"|"Санкт-Петербург"|"Ленинградская область"|"Москва"|"Подмосковье"|"Краснодарский край"|"Крым"|"Алтай"|"Байкал"|"Урал","search_text":"string","sort_by":"relevance"|"popular","wind_intent":true,"near_km":number,"poi_tags":["lake"|"river"|"sea"|"forest"|"viewpoint"|"waterfall"|"cafe"|"water_source"|"monastery"|"station"|"park"|"beach"|"mountain"|"bridge"|"field"|"castle"|"historical"|"landmarks"],"season_month":number}
+{"difficulty":"easy"|"medium"|"hard","distance_min":number,"distance_max":number,"distance_target":number,"elevation_min":number,"elevation_max":number,"surface":["asphalt"|"gravel"|"dirt"],"route_types":["road"|"gravel"|"mtb"|"urban"],"region":"Карелия"|"Санкт-Петербург"|"Ленинградская область"|"Москва"|"Подмосковье"|"Краснодарский край"|"Крым"|"Алтай"|"Байкал"|"Урал","search_text":"string","sort_by":"relevance"|"popular","wind_intent":true,"near_km":number,"poi_tags":["lake"|"river"|"sea"|"forest"|"viewpoint"|"waterfall"|"cafe"|"water_source"|"monastery"|"station"|"park"|"beach"|"mountain"|"bridge"|"field"|"castle"|"historical"|"landmarks"],"season_month":number,"multi_day_only":boolean,"duration_days_min":number,"duration_days_max":number}
 
 Rules (apply all that match):
 1. If user says "N км" → distance_target=N, distance_min=N*0.75, distance_max=N*1.25
@@ -409,7 +437,11 @@ Rules (apply all that match):
 14. "попутный ветер"/"ветер в спину"/"по ветру"/"с попутным"/"без встречного ветра" → wind_intent=true
 15. "рядом со мной"/"рядом"/"поблизости"/"около меня"/"недалеко от меня"/"возле меня" → near_km=15
 16. poi_tags: "озеро"/"у озера" → ["lake"]; "лес"/"через лес" → ["forest"]; "водопад" → ["waterfall"]; "вид"/"панорама"/"смотровая" → ["viewpoint"]; "кафе"/"кофейня" → ["cafe"]; "море"/"залив" → ["sea"]; "пляж" → ["beach"]; "родник" → ["water_source"]; "монастырь"/"храм" → ["monastery"]; "электричка"/"станция" → ["station"]; "река"/"ручей" → ["river"]; "замок"/"крепость" → ["castle"]; "горы" (scenic) → ["mountain"]; "историческ"/"старинн"/"древн" → ["historical"]; "достопримечательност" → ["landmarks"]
-17. season_month: "весной"/"весенний"/"апрель"/"май" → 5; "летом"/"летний"/"июль"/"август" → 7; "осенью"/"осенний"/"сентябрь"/"октябрь" → 9; "зимой"/"зимний"/"январь" → 1`;
+17. season_month: "весной"/"весенний"/"апрель"/"май" → 5; "летом"/"летний"/"июль"/"август" → 7; "осенью"/"осенний"/"сентябрь"/"октябрь" → 9; "зимой"/"зимний"/"январь" → 1
+18. Многодневные туры (Route как шаблон путешествия, не датированное событие):
+    "на N дней"/"N-дневный"/"на N суток" → multi_day_only=true, duration_days_min=max(2,N-1), duration_days_max=min(60,N+1) (если N≥2). Если N=1 → multi_day_only=false.
+    "поход"/"многодневный"/"тур"/"путешествие"/"велотур"/"байкпакинг" без числа → multi_day_only=true (без duration_days_min/max)
+    "однодневный"/"на один день"/"одним днём" → multi_day_only=false`;
 
 // ─── AI filter parsing ────────────────────────────────────────────────────────
 
@@ -520,6 +552,14 @@ function mergeFilters(ai: RouteFilters, regex: RouteFilters): RouteFilters {
   if (regex.season_month != null) merged.season_month = regex.season_month;
   else if (ai.season_month != null) merged.season_month = ai.season_month;
 
+  // Duration kind: regex wins (explicit "N дней" is reliable)
+  if (regex.multi_day_only != null) merged.multi_day_only = regex.multi_day_only;
+  else if (ai.multi_day_only != null) merged.multi_day_only = ai.multi_day_only;
+  if (regex.duration_days_min != null) merged.duration_days_min = regex.duration_days_min;
+  else if (ai.duration_days_min != null) merged.duration_days_min = ai.duration_days_min;
+  if (regex.duration_days_max != null) merged.duration_days_max = regex.duration_days_max;
+  else if (ai.duration_days_max != null) merged.duration_days_max = ai.duration_days_max;
+
   return merged;
 }
 
@@ -554,6 +594,12 @@ function relaxFilters(f: RouteFilters): RelaxResult | null {
     return {
       filters: { ...f, distance_min: undefined, distance_max: undefined, distance_target: undefined },
       reason: "расширили диапазон дистанции",
+    };
+  }
+  if (f.duration_days_min != null || f.duration_days_max != null) {
+    return {
+      filters: { ...f, duration_days_min: undefined, duration_days_max: undefined },
+      reason: "расширили диапазон по количеству дней",
     };
   }
   if (f.season_month != null) {
@@ -733,6 +779,9 @@ async function runMatchRoutes(
     filter_near_km: filters.near_km ?? null,
     filter_poi_tags: filters.poi_tags ?? null,
     filter_season_month: filters.season_month ?? null,
+    filter_multi_day_only: filters.multi_day_only ?? null,
+    filter_duration_days_min: filters.duration_days_min ?? null,
+    filter_duration_days_max: filters.duration_days_max ?? null,
   });
 
   if (error) {

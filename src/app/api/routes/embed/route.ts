@@ -40,10 +40,11 @@ interface RouteRow {
   elevation_m: number | null;
   poi_tags: string[] | null;
   season_months: number[] | null;
+  duration_days: number | null;
 }
 
 const COLUMNS =
-  "id, author_id, title, description, region, difficulty, tags, surface, route_types, distance_km, elevation_m, poi_tags, season_months";
+  "id, author_id, title, description, region, difficulty, tags, surface, route_types, distance_km, elevation_m, poi_tags, season_months, duration_days";
 
 async function getCaller() {
   const cookieStore = await cookies();
