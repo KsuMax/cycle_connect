@@ -1224,6 +1224,7 @@ export async function POST(req: NextRequest) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      let tailAsync = false; // true when a Promise chain will close the stream
       try {
         let filters: RouteFilters;
 
@@ -1395,10 +1396,9 @@ export async function POST(req: NextRequest) {
                 .catch(() => null)
             : null;
 
-          if (!whysPromise && !rerankPromise) {
-            // Nothing more to do — let the outer finally close the stream.
-          } else {
-            // Drain both tail tasks before closing the stream
+          if (whysPromise || rerankPromise) {
+            // Tail tasks will close the stream — skip the outer finally close.
+            tailAsync = true;
             Promise.all([whysPromise, rerankPromise])
               .then(([whys]) => {
                 if (whys && whys.size > 0) {
@@ -1410,14 +1410,13 @@ export async function POST(req: NextRequest) {
               })
               .catch(() => {})
               .finally(() => { controller.close(); });
-            return; // controller will be closed inside the promise above
           }
         }
       } catch (err) {
         console.error("[ai-search] stream error:", err instanceof Error ? err.message : String(err));
         controller.enqueue(sseEvent({ type: "error", message: "Не удалось выполнить поиск" }));
       } finally {
-        controller.close();
+        if (!tailAsync) controller.close();
       }
     },
   });
