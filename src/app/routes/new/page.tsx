@@ -14,7 +14,7 @@ import { useToast } from "@/lib/context/ToastContext";
 import { useAchievements } from "@/lib/context/AchievementsContext";
 import { supabase } from "@/lib/supabase";
 import { parseGpxFile, computeGpxStats, toWktPoint, toWktLinestring } from "@/lib/gpx";
-import { ROUTE_TYPES, DIFFICULTIES, SURFACES } from "@/constants/routes";
+import { ROUTE_TYPES, DIFFICULTIES, SURFACES, POI_TAGS, SEASONS } from "@/constants/routes";
 import type { RouteType, Difficulty, Surface, ExitPointsStatus } from "@/types";
 import Link from "next/link";
 
@@ -38,6 +38,8 @@ export default function NewRoutePage() {
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [routeTypes, setRouteTypes] = useState<RouteType[]>([]);
   const [surfaces, setSurfaces] = useState<Surface[]>([]);
+  const [poiTags, setPoiTags] = useState<string[]>([]);
+  const [seasonMonths, setSeasonMonths] = useState<number[]>([]);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -95,6 +97,19 @@ export default function NewRoutePage() {
   const toggleSurface = (s: Surface) => {
     setSurfaces((prev) =>
       prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
+    );
+  };
+
+  const togglePoi = (tag: string) => {
+    setPoiTags((prev) =>
+      prev.includes(tag) ? prev.filter((x) => x !== tag) : [...prev, tag]
+    );
+  };
+
+  const toggleSeason = (months: number[]) => {
+    const allIn = months.every((m) => seasonMonths.includes(m));
+    setSeasonMonths((prev) =>
+      allIn ? prev.filter((m) => !months.includes(m)) : [...new Set([...prev, ...months])]
     );
   };
 
@@ -207,6 +222,8 @@ export default function NewRoutePage() {
         surface: surfaces,
         route_types: routeTypes,
         tags: [],
+        poi_tags: poiTags.length > 0 ? poiTags : null,
+        season_months: seasonMonths.length > 0 ? seasonMonths : null,
         mapmagic_url: mapUrl || null,
         mapmagic_embed: buildEmbedUrl(mapUrl),
         club_id: clubId || null,
@@ -444,6 +461,43 @@ export default function NewRoutePage() {
                   {label}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* POI tags */}
+          <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+            <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">Места и природа</label>
+            <p className="text-xs text-[#71717A] mb-3">Что встречается на маршруте? Помогает находить его в поиске</p>
+            <div className="flex flex-wrap gap-2">
+              {POI_TAGS.map(({ value, label, emoji }) => (
+                <button type="button" key={value} onClick={() => togglePoi(value)}
+                  className="px-3 py-1.5 rounded-xl text-sm font-medium transition-colors border"
+                  style={poiTags.includes(value)
+                    ? { backgroundColor: "#1C1C1E", color: "white", borderColor: "#1C1C1E" }
+                    : { backgroundColor: "white", color: "#71717A", borderColor: "#E4E4E7" }}>
+                  {emoji} {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Seasons */}
+          <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+            <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">Лучший сезон</label>
+            <p className="text-xs text-[#71717A] mb-3">Когда маршрут особенно хорош? Можно выбрать несколько</p>
+            <div className="flex gap-2">
+              {SEASONS.map(({ months, label, emoji }) => {
+                const active = months.every((m) => seasonMonths.includes(m));
+                return (
+                  <button type="button" key={label} onClick={() => toggleSeason(months)}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors border text-center"
+                    style={active
+                      ? { backgroundColor: "#1C1C1E", color: "white", borderColor: "#1C1C1E" }
+                      : { backgroundColor: "white", color: "#71717A", borderColor: "#E4E4E7" }}>
+                    {emoji} {label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
