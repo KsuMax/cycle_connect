@@ -28,10 +28,28 @@ drop function if exists public.match_routes(
   text[], int
 );
 
--- ── 3. Drop the column ─────────────────────────────────────────────────────
+-- ── 3. Drop dependent view (it `select *`s from routes, pinning column set) ─
+drop view if exists public.routes_ranked;
+
+-- ── 4. Drop the column ─────────────────────────────────────────────────────
 alter table public.routes drop column if exists bike_types;
 
--- ── 4. Recreate match_routes WITHOUT filter_bike_types ─────────────────────
+-- ── 5. Recreate routes_ranked view (mirrors migration 029) ─────────────────
+create or replace view public.routes_ranked
+with (security_invoker = true)
+as
+select
+  *,
+  (likes_count + 2.0 * riders_today + rides_count)
+    / power(
+        extract(epoch from (now() - created_at)) / 3600.0 + 24,
+        1.5
+      ) as hot_score
+from public.routes;
+
+grant select on public.routes_ranked to anon, authenticated, service_role;
+
+-- ── 6. Recreate match_routes WITHOUT filter_bike_types ─────────────────────
 create or replace function public.match_routes(
   query_embedding      vector(1024)      default null,
   filter_difficulty    text              default null,
