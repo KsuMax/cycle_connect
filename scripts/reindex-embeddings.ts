@@ -13,17 +13,6 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
-import * as dotenv from "dotenv";
-import * as path from "path";
-import * as fs from "fs";
-
-// Load .env.local from the project root
-const envPath = path.resolve(process.cwd(), ".env.local");
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
-} else {
-  dotenv.config();
-}
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY!;
