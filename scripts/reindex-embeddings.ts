@@ -44,7 +44,6 @@ function routeEmbeddingText(r: {
   tags?: string[] | null;
   surface?: string[] | null;
   route_types?: string[] | null;
-  bike_types?: string[] | null;
   distance_km?: number | null;
   elevation_m?: number | null;
   poi_tags?: string[] | null;
@@ -58,7 +57,6 @@ function routeEmbeddingText(r: {
   if (r.elevation_m) parts.push(`набор ${r.elevation_m} м`);
   if (r.surface?.length) parts.push(`Покрытие: ${r.surface.join(", ")}`);
   if (r.route_types?.length) parts.push(`Тип: ${r.route_types.join(", ")}`);
-  if (r.bike_types?.length) parts.push(`Велосипед: ${r.bike_types.join(", ")}`);
   if (r.tags?.length) parts.push(`Теги: ${r.tags.join(", ")}`);
   if (r.poi_tags?.length) parts.push(`Места: ${r.poi_tags.join(", ")}`);
   if (r.season_months?.length) {
@@ -92,7 +90,7 @@ function sleep(ms: number) {
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
-const COLUMNS = "id, title, description, region, difficulty, tags, surface, route_types, bike_types, distance_km, elevation_m, poi_tags, season_months";
+const COLUMNS = "id, title, description, region, difficulty, tags, surface, route_types, distance_km, elevation_m, poi_tags, season_months";
 
 async function main() {
   console.log(`Reindex embeddings — batch=${BATCH_SIZE} sleep=${SLEEP_MS}ms dry_run=${DRY_RUN}`);

@@ -43,7 +43,6 @@ interface RouteFilters {
   elevation_max?: number;
   surface?: string[];
   route_types?: string[];
-  bike_types?: string[];
   region?: string;
   search_text?: string;
   /** Ranking mode: 'relevance' (default cosine) | 'popular' (weighted score) */
@@ -334,14 +333,13 @@ function extractFromText(query: string): RouteFilters {
   if (/грязь|бездорожье/.test(q)) surface.push("dirt");
   if (surface.length) out.surface = surface;
 
-  // Bike type
+  // Bike intent → route type (the route type encodes which bike fits)
   if (/горный вел|mtb|эндуро/.test(q)) {
-    out.bike_types = ["mountain"];
     if (!out.route_types) out.route_types = ["mtb"];
   } else if (/шоссейн/.test(q)) {
-    out.bike_types = ["road"];
+    if (!out.route_types) out.route_types = ["road"];
   } else if (/гравийн|гравел/.test(q)) {
-    out.bike_types = ["gravel"];
+    if (!out.route_types) out.route_types = ["gravel"];
   }
 
   // Wind intent — user wants routes with favorable wind conditions
@@ -389,7 +387,7 @@ const SYSTEM_PROMPT = `You are a cycling route search assistant for CycleConnect
 Extract search filters from the user message. Return ONLY raw JSON, no markdown, no explanation.
 
 Output schema (all fields optional):
-{"difficulty":"easy"|"medium"|"hard","distance_min":number,"distance_max":number,"distance_target":number,"elevation_min":number,"elevation_max":number,"surface":["asphalt"|"gravel"|"dirt"|"mixed"],"route_types":["road"|"gravel"|"mtb"|"urban"],"bike_types":["road"|"mountain"|"gravel"],"region":"Карелия"|"Санкт-Петербург"|"Ленинградская область"|"Москва"|"Подмосковье"|"Краснодарский край"|"Крым"|"Алтай"|"Байкал"|"Урал","search_text":"string","sort_by":"relevance"|"popular","wind_intent":true,"near_km":number,"poi_tags":["lake"|"river"|"sea"|"forest"|"viewpoint"|"waterfall"|"cafe"|"water_source"|"monastery"|"station"|"park"|"beach"|"mountain"|"bridge"|"field"|"castle"],"season_month":number}
+{"difficulty":"easy"|"medium"|"hard","distance_min":number,"distance_max":number,"distance_target":number,"elevation_min":number,"elevation_max":number,"surface":["asphalt"|"gravel"|"dirt"],"route_types":["road"|"gravel"|"mtb"|"urban"],"region":"Карелия"|"Санкт-Петербург"|"Ленинградская область"|"Москва"|"Подмосковье"|"Краснодарский край"|"Крым"|"Алтай"|"Байкал"|"Урал","search_text":"string","sort_by":"relevance"|"popular","wind_intent":true,"near_km":number,"poi_tags":["lake"|"river"|"sea"|"forest"|"viewpoint"|"waterfall"|"cafe"|"water_source"|"monastery"|"station"|"park"|"beach"|"mountain"|"bridge"|"field"|"castle"],"season_month":number}
 
 Rules (apply all that match):
 1. If user says "N км" → distance_target=N, distance_min=N*0.75, distance_max=N*1.25
@@ -397,7 +395,7 @@ Rules (apply all that match):
 3. "полдня" → distance_max=80; "на день" → distance_max=150
 4. "несложный"/"лёгкий"/"для новичка" → difficulty="easy"; "средний" → "medium"; "сложный" → "hard"
 5. "по городу"/"городской"/"недалеко от города" → route_types=["urban"]
-6. "горы"/"горный маршрут" → route_types=["mtb"]
+6. "горы"/"горный маршрут"/"горный вел"/"mtb" → route_types=["mtb"]; "шоссейный вел" → route_types=["road"]; "гравел"/"гравийный вел" → route_types=["gravel"]
 7. "асфальт"/"шоссе" → surface=["asphalt"]; "гравий"/"грунт" → ["gravel"]
 8. Region names → region field
 9. Nature words (море, озеро, лес) → search_text
@@ -486,7 +484,6 @@ function mergeFilters(ai: RouteFilters, regex: RouteFilters): RouteFilters {
   else if (!merged.difficulty && ai.difficulty) merged.difficulty = ai.difficulty;
 
   if (regex.surface?.length && !merged.surface?.length) merged.surface = regex.surface;
-  if (regex.bike_types?.length && !merged.bike_types?.length) merged.bike_types = regex.bike_types;
   if (regex.route_types?.length && !merged.route_types?.length) merged.route_types = regex.route_types;
   if (regex.region && !merged.region) merged.region = regex.region;
 
@@ -724,7 +721,6 @@ async function runMatchRoutes(
     filter_region: filters.region ?? null,
     filter_surface: filters.surface ?? null,
     filter_route_types: filters.route_types ?? null,
-    filter_bike_types: filters.bike_types ?? null,
     filter_search_text: filters.search_text ?? null,
     filter_distance_target: filters.distance_target ?? null,
     match_count: count,
@@ -1115,13 +1111,13 @@ function avgOf(nums: (number | null | undefined)[]): number | null {
 async function buildUserProfile(userId: string): Promise<RouteFilters | null> {
   const { data: rows } = await getSupabase()
     .from("route_rides")
-    .select("routes(distance_km, elevation_m, difficulty, region, surface, bike_types)")
+    .select("routes(distance_km, elevation_m, difficulty, region, surface)")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(30);
 
   const ridden = (rows ?? [])
-    .map((r: { routes: { distance_km: number | null; elevation_m: number | null; difficulty: string | null; region: string | null; surface: string[] | null; bike_types: string[] | null } | null }) => r.routes)
+    .map((r: { routes: { distance_km: number | null; elevation_m: number | null; difficulty: string | null; region: string | null; surface: string[] | null } | null }) => r.routes)
     .filter((r): r is NonNullable<typeof r> => r != null);
 
   if (ridden.length < 3) return null;
@@ -1140,7 +1136,7 @@ async function buildUserProfile(userId: string): Promise<RouteFilters | null> {
   }
   if (topDifficulty) profile.difficulty = topDifficulty;
   if (topRegion) profile.region = topRegion;
-  if (topSurface && topSurface !== "mixed") profile.surface = [topSurface];
+  if (topSurface) profile.surface = [topSurface];
 
   return profile;
 }

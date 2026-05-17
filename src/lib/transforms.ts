@@ -54,7 +54,6 @@ export function dbToRoute(r: DbRoute): Route {
     duration_min: r.duration_min,
     difficulty: r.difficulty,
     surface: r.surface as Route["surface"],
-    bike_types: r.bike_types as Route["bike_types"],
     route_types: r.route_types as RouteType[],
     tags: r.tags,
     author: r.author
@@ -132,7 +131,7 @@ const EMPTY_ROUTE: Route = {
   id: "", title: "", description: "", region: "",
   distance_km: 0, elevation_m: 0, duration_min: 0,
   difficulty: "medium",
-  surface: [], bike_types: [], route_types: [], tags: [],
+  surface: [], route_types: [], tags: [],
   author: { id: "", name: "", initials: "", color: "", avatar_url: null, km_total: 0, routes_count: 0, events_count: 0 },
   riders_today: 0, likes: 0, exit_points_status: "unknown", created_at: "",
 };

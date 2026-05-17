@@ -1,6 +1,5 @@
 export type Difficulty = "easy" | "medium" | "hard";
-export type Surface = "asphalt" | "gravel" | "dirt" | "mixed";
-export type BikeType = "road" | "mountain" | "gravel" | "any";
+export type Surface = "asphalt" | "gravel" | "dirt";
 export type RouteType = "road" | "gravel" | "mtb" | "urban";
 export type ExitPointKind = "train" | "bus" | "taxi" | "road" | "other";
 export type ExitPointsStatus = "has" | "none" | "unknown";
@@ -42,7 +41,6 @@ export interface Route {
   duration_min: number;
   difficulty: Difficulty;
   surface: Surface[];
-  bike_types: BikeType[];
   route_types: RouteType[];
   tags: string[];
   author: User;
