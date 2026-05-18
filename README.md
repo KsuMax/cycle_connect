@@ -38,18 +38,23 @@ CycleConnect — это веб-платформа для велосипедис�
 
 ```bash
 npm install
-2) Создать .env.local
+```
+
+### 2) Создать `.env.local`
 
 Минимально для запуска нужны:
 
+```env
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
+```
 
 Дополнительно (по используемым функциям):
 
+```env
 # AI
 OLLAMA_URL=http://localhost:11434
 OLLAMA_CHAT_MODEL=llama3.2:3b
@@ -70,19 +75,34 @@ STRAVA_CLIENT_SECRET=
 STRAVA_REDIRECT_URI=
 STRAVA_WEBHOOK_VERIFY_TOKEN=
 CRON_SECRET=
-3) Запустить dev-сервер
+```
+
+### 3) Запустить dev-сервер
+
+```bash
 npm run dev
+```
 
-Откройте http://localhost:3000.
+Откройте `http://localhost:3000`.
 
-Скрипты
+---
+
+## Скрипты
+
+```bash
 npm run dev        # запуск dev-сервера
 npm run build      # production build
 npm run start      # запуск production-сборки
 npm run lint       # eslint
 npm run test       # vitest (однократный запуск)
 npm run test:watch # vitest в watch-режиме
-Структура проекта
+```
+
+---
+
+## Структура проекта
+
+```text
 src/
   app/                 # страницы и route handlers (App Router)
   components/          # UI и feature-компоненты
@@ -92,30 +112,50 @@ src/
 supabase/
   migrations/          # SQL-миграции
   functions/           # Edge Functions (Telegram и пр.)
-Supabase и миграции
+```
 
-В репозитории есть SQL-миграции в supabase/migrations.
+---
+
+## Supabase и миграции
+
+В репозитории есть SQL-миграции в `supabase/migrations`.
 
 Типовой workflow:
 
-Поднять локальный Supabase.
-Применить миграции.
-Проверить переменные из .env.local.
-Интеграции
-Strava OAuth — предусмотрен в коде, но стартовый endpoint временно отключён флагом в route handler.
-AI-поиск — использует векторизацию, LLM-нормализацию запроса и SQL-ранжирование.
-Telegram — используется для связки аккаунта и уведомлений.
-Продакшн
-В next.config.ts настроены security headers.
-Есть rewrites для проксирования Supabase endpoint’ов через домен приложения.
-Используется output: "standalone" для контейнеризации и деплоя.
-Вклад в проект
-Создайте feature-branch.
-Делайте небольшие атомарные коммиты.
-Перед PR запускайте:
+1. Поднять локальный Supabase.
+2. Применить миграции.
+3. Проверить переменные из `.env.local`.
+
+---
+
+## Интеграции
+
+- **Strava OAuth** — предусмотрен в коде, но стартовый endpoint временно отключён флагом в route handler.
+- **AI-поиск** — использует векторизацию, LLM-нормализацию запроса и SQL-ранжирование.
+- **Telegram** — используется для связки аккаунта и уведомлений.
+
+---
+
+## Продакшн
+
+- В `next.config.ts` настроены security headers.
+- Есть rewrites для проксирования Supabase endpoint’ов через домен приложения.
+- Используется `output: "standalone"` для контейнеризации и деплоя.
+
+---
+
+## Вклад в проект
+
+1. Создайте feature-branch.
+2. Делайте небольшие атомарные коммиты.
+3. Перед PR запускайте:
+
+```bash
 npm run lint
 npm run test
-В описании PR указывайте проверенные сценарии.
-Лицензия
+```
 
-Пока не указана отдельно. При необходимости добавьте LICENSE в корень репозитория.
+4. В описании PR указывайте проверенные сценарии.
+
+---
+
