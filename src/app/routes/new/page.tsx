@@ -130,6 +130,16 @@ export default function NewRoutePage() {
       if (stats.distanceKm > 0) setDistance(String(stats.distanceKm));
       if (stats.elevationM > 0) setElevation(String(stats.elevationM));
       if (stats.durationMin > 0) setDuration(String(stats.durationMin));
+
+      // Auto-detect region from the track midpoint when user hasn't picked one.
+      if (!region && trackpoints.length > 0) {
+        const mid = trackpoints[Math.floor(trackpoints.length / 2)];
+        const { data } = await supabase.rpc("find_region_for_point", {
+          lat: mid.lat,
+          lng: mid.lng,
+        });
+        if (typeof data === "string" && data) setRegion(data);
+      }
     } catch {
       // Non-critical — fields stay empty
     }
