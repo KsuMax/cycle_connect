@@ -129,7 +129,10 @@ export default function NewRoutePage() {
       const stats = computeGpxStats(trackpoints);
       if (stats.distanceKm > 0) setDistance(String(stats.distanceKm));
       if (stats.elevationM > 0) setElevation(String(stats.elevationM));
-      if (stats.durationMin > 0) setDuration(String(stats.durationMin));
+      if (stats.durationMin > 0) {
+        setDurationHours(String(Math.floor(stats.durationMin / 60)));
+        setDurationMinutes(String(stats.durationMin % 60));
+      }
 
       // Auto-detect region from the track midpoint when user hasn't picked one.
       if (!region && trackpoints.length > 0) {
