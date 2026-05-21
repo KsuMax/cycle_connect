@@ -9,6 +9,7 @@ import { ImageUpload } from "@/components/routes/ImageUpload";
 import { CoverUpload } from "@/components/routes/CoverUpload";
 import { GpxUpload } from "@/components/routes/GpxUpload";
 import { ExitPointsEditor, type ExitPointDraft } from "@/components/routes/ExitPointsEditor";
+import { RegionPicker, type RegionOption } from "@/components/routes/RegionPicker";
 import { DayEditor } from "@/components/events/DayEditorLazy";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useToast } from "@/lib/context/ToastContext";
@@ -34,7 +35,7 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
   const [description, setDescription] = useState("");
   const [mapUrl, setMapUrl] = useState("");
   const [region, setRegion] = useState("");
-  const [regions, setRegions] = useState<string[]>([]);
+  const [regions, setRegions] = useState<RegionOption[]>([]);
   const [distance, setDistance] = useState("");
   const [elevation, setElevation] = useState("");
   const [durationMode, setDurationMode] = useState<"single" | "multi">("single");
@@ -67,10 +68,10 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
   useEffect(() => {
     supabase
       .from("regions")
-      .select("name")
+      .select("name, aliases")
       .order("name")
       .then(({ data }) => {
-        if (data) setRegions(data.map((r) => r.name));
+        if (data) setRegions(data.map((r) => ({ name: r.name, aliases: r.aliases ?? [] })));
       });
   }, []);
 
@@ -633,18 +634,7 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="sm:col-span-2">
                 <label className="text-xs text-[#71717A] mb-1 block"><MapPin size={11} className="inline mr-1" />Регион</label>
-                <select value={region} onChange={(e) => setRegion(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-[#E4E4E7] bg-white text-sm outline-none focus:border-[#F4632A] transition-colors appearance-none cursor-pointer"
-                  style={{
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23A1A1AA' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-                    backgroundRepeat: "no-repeat",
-                    backgroundPosition: "right 12px center",
-                  }}>
-                  <option value="">Не указан</option>
-                  {regions.map((r) => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
+                <RegionPicker value={region} onChange={setRegion} options={regions} />
               </div>
               <div>
                 <label className="text-xs text-[#71717A] mb-1 block">Дистанция, км</label>
