@@ -54,10 +54,10 @@ export function RouteCard({ route, compact = false, priority = false }: RouteCar
   };
 
   return (
-    <Link href={`/routes/${route.id}`} className="group block">
+    <Link href={`/routes/${route.id}`} className="group block h-full">
       <div
         className={cn(
-          "bg-white rounded-2xl overflow-hidden transition-all duration-200",
+          "bg-white rounded-2xl overflow-hidden transition-all duration-200 h-full flex flex-col",
           "border border-[#E4E4E7] hover:border-[#D1D1D6]"
         )}
         style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}
@@ -108,7 +108,7 @@ export function RouteCard({ route, compact = false, priority = false }: RouteCar
         </div>
 
         {/* Content */}
-        <div className="p-4">
+        <div className="p-4 flex flex-col flex-1">
           <div className="flex items-center gap-1.5 mb-2 flex-wrap">
             <span className="text-xs font-semibold px-2 py-0.5 rounded-md" style={{ backgroundColor: "#FFF0EB", color: "#F4632A" }}>
               🗺 Маршрут
@@ -189,7 +189,7 @@ export function RouteCard({ route, compact = false, priority = false }: RouteCar
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between pt-2 border-t border-[#F5F4F1]">
+          <div className="flex items-center justify-between pt-2 border-t border-[#F5F4F1] mt-auto">
             {route.riders_today > 0 ? (
               <AvatarGroup
                 users={[route.author]}
