@@ -3,11 +3,12 @@
  * Seed `regions` from an OSM admin_level=4 GeoJSON for Russia.
  *
  * Source (download once and place at ./data/russia-subjects.geojson):
- *   https://github.com/timurkanaz/Russia_geojson_OSM/raw/master/RF/admin_level_4.geojson
+ *   https://raw.githubusercontent.com/timurkanaz/Russia_geojson_OSM/master/GeoJson%27s/Countries/Russia_regions.geojson
  *
  * Each feature must expose at least one of these properties:
- *   - name:ru / name  — used for matching to our short colloquial label
- *   - full_name      — formal subject name (optional, falls back to name)
+ *   - region          — short OSM label with abbreviations ("Тверская обл.")
+ *   - name:ru / name  — formal label
+ *   - full_name       — formal subject name (optional, falls back to name)
  *
  * Usage (on the VPS where .env.local has service role key):
  *   npx tsx scripts/seed-regions.ts [./data/russia-subjects.geojson]
@@ -29,6 +30,30 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
 }
 
 const sb = createClient(SUPABASE_URL, SERVICE_KEY);
+
+// ── Normalize OSM `region` (with abbreviations) → formal full_name ──────────
+// The single-file source uses abbreviations like "обл." / "АО" and various
+// dash styles. Map every value we expect to the formal full name that
+// SHORT_NAME below is keyed by, so the rest of the pipeline is uniform.
+function normalizeOsmName(raw: string): string {
+  let s = raw.trim();
+  // Drop "(short)" parentheticals like "Республика Адыгея (Адыгея)"
+  s = s.replace(/\s*\(([^)]+)\)\s*$/u, (_m, inner) =>
+    /Якутия/u.test(inner) ? ` (${inner})` : ""
+  );
+  // City-of prefixes
+  s = s.replace(/^г\.\s*/u, "Город ");
+  s = s.replace(/^город федерального значения\s+/iu, "Город ");
+  // Hyphen-minus → em-dash between subject and second name
+  s = s.replace(/\s*-\s*(Югра|Алания|Кузбасс|Чувашия)\b/u, " — $1");
+  // "Чувашская Республика — Чувашия" → drop the trailing "— Чувашия"
+  s = s.replace(/\s—\s*Чувашия$/u, "");
+  // Abbreviation expansions
+  s = s.replace(/\bобл\.\s*/u, "область ").trim();
+  s = s.replace(/^Еврейская АО$/u, "Еврейская автономная область");
+  s = s.replace(/\bАО\b/u, "автономный округ");
+  return s.replace(/\s+/g, " ").trim();
+}
 
 // ── Canonical short names for OSM full names ────────────────────────────────
 // Maps OSM `name:ru` (formal) → short colloquial label we want in UI.
@@ -118,11 +143,13 @@ async function main() {
 
   for (const f of gj.features) {
     const props = f.properties ?? {};
-    const fullName: string = props["name:ru"] ?? props.name ?? props.NAME ?? "";
-    if (!fullName) {
+    const rawName: string =
+      props["name:ru"] ?? props.name ?? props.NAME ?? props.region ?? "";
+    if (!rawName) {
       skipped++;
       continue;
     }
+    const fullName = normalizeOsmName(rawName);
     const shortName = SHORT_NAME[fullName] ?? fullName;
     const aliases = fullName !== shortName ? [fullName] : [];
 
