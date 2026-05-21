@@ -140,7 +140,7 @@ export function RouteInterestSection({ routeId, interests, onChange }: RouteInte
       <div className="mb-3">
         <h3 className="text-sm font-semibold text-[#1C1C1E]">Хочу проехать</h3>
         <p className="text-xs text-[#A1A1AA] mt-0.5">
-          Отметься — найдёшь компанию. Без обязательств, дата необязательна.
+          Покажи интерес к маршруту и найди попутчиков. Не забудь активировать tg-бот в профиле — получишь уведомления о желающих проехать вместе.
         </p>
       </div>
 
