@@ -29,6 +29,17 @@ function formatNotification(n: DbNotification) {
     return `${icon} ${actorName} получил достижение «${title}»`;
   }
 
+  if (n.type === "route_interest_new" && data) {
+    const routeTitle = (data.route_title as string) ?? "маршрут";
+    return `🚴 ${actorName} хочет проехать «${routeTitle}»`;
+  }
+
+  if (n.type === "event_for_interested_route" && data) {
+    const eventTitle = (data.event_title as string) ?? "мероприятие";
+    const date = data.start_date as string | undefined;
+    return `📅 На маршруте, который ты хотел проехать, открыто мероприятие «${eventTitle}»${date ? ` (${formatDate(date)})` : ""}`;
+  }
+
   if (n.type === "intent_joined" && data) {
     // Legacy notifications from the ride_intents era; render best-effort.
     const routeTitle = (data.route_title as string) ?? "маршрут";

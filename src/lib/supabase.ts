@@ -77,7 +77,7 @@ export interface DbProfile {
   telegram_chat_id?: number | null;
   tg_link_code?: string | null;
   tg_link_code_exp?: string | null;
-  tg_notify_intents?: boolean;
+  tg_notify_interests?: boolean;
   // Onboarding (migration 026). NULL until the user completes /onboarding.
   onboarded_at?: string | null;
 }

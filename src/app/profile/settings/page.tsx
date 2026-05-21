@@ -45,7 +45,7 @@ export default function SettingsPage() {
   const [stravaUrl, setStravaUrl] = useState("");
   const [telegramUsername, setTelegramUsername] = useState("");
   const [tgLinked, setTgLinked] = useState(false);
-  const [tgNotifyIntents, setTgNotifyIntents] = useState(true);
+  const [tgNotifyInterests, setTgNotifyIntents] = useState(true);
   const [tgLinking, setTgLinking] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -73,7 +73,7 @@ export default function SettingsPage() {
       setStravaUrl(profile.strava_url ?? "");
       setTelegramUsername(profile.telegram_username ?? "");
       setTgLinked(!!profile.telegram_chat_id);
-      setTgNotifyIntents(profile.tg_notify_intents !== false);
+      setTgNotifyInterests(profile.tg_notify_interests !== false);
     }
     if (user) setEmail(user.email ?? "");
   }, [profile, user]);
@@ -165,7 +165,7 @@ export default function SettingsPage() {
       website: website.trim() || null,
       strava_url: stravaUrl.trim() || null,
       telegram_username: tgTrimmed || null,
-      tg_notify_intents: tgNotifyIntents,
+      tg_notify_interests: tgNotifyInterests,
     };
     const { error: profileError } = await supabase
       .from("profiles")
@@ -331,11 +331,11 @@ export default function SettingsPage() {
               <label className="flex items-center gap-2 text-xs text-[#71717A] cursor-pointer select-none">
                 <input
                   type="checkbox"
-                  checked={tgNotifyIntents}
+                  checked={tgNotifyInterests}
                   onChange={(e) => setTgNotifyIntents(e.target.checked)}
                   className="w-4 h-4 rounded border-[#E4E4E7] accent-[#F4632A]"
                 />
-                Уведомлять о совместных катаниях (ride intents)
+                Уведомлять о компании на маршрутах, которые я хочу проехать
               </label>
             )}
           </Section>

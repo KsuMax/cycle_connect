@@ -85,6 +85,12 @@ export function RouteInterestSection({ routeId, interests, onChange }: RouteInte
     showToast("Отмечено! Другие катальщики увидят", "success");
     onChange();
     refreshInterests();
+
+    // Fire-and-forget TG push to the rest of the pool. The DB trigger
+    // already wrote in-app notifications; this just adds the TG channel.
+    supabase.functions
+      .invoke("tg-notify", { body: { mode: "route_interest_new", routeId } })
+      .catch(() => { /* silent — non-critical */ });
   };
 
   const handleSave = async () => {

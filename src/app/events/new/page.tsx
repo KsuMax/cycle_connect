@@ -257,6 +257,15 @@ function CreateEventForm() {
       } catch { /* ignore — don't block navigation on TG failure */ }
     }
 
+    // 6. Ping route's interest pool — only public events tied to a route.
+    // In-app notifications were already written by the DB trigger; this
+    // fires the TG push. Fire-and-forget; navigation must not wait.
+    if (routeId && !isPrivate) {
+      supabase.functions
+        .invoke("tg-notify", { body: { mode: "event_for_pool", eventId: eventData.id } })
+        .catch(() => { /* silent */ });
+    }
+
     showToast("Мероприятие опубликовано!", "success");
     checkAndAward("event_created", {});
     router.push(`/events/${eventData.id}`);
