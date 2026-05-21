@@ -236,16 +236,17 @@ export interface DbUserAchievement {
   level_updated_at: string | null;
 }
 
-export interface DbRideIntent {
-  id: string;
+export type RoughWhen = "anytime" | "weekend" | "this_month" | "specific";
+
+export interface DbRouteInterest {
   route_id: string;
-  creator_id: string;
-  planned_date: string;
+  user_id: string;
+  planned_date: string | null;
+  rough_when: RoughWhen | null;
   note: string | null;
   created_at: string;
   // joined
-  creator?: DbProfile;
-  participants?: { user_id: string; joined_at: string; profile?: DbProfile | null }[];
+  profile?: DbProfile;
 }
 
 export interface DbNotification {

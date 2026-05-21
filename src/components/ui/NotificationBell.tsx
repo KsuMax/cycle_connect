@@ -30,9 +30,9 @@ function formatNotification(n: DbNotification) {
   }
 
   if (n.type === "intent_joined" && data) {
+    // Legacy notifications from the ride_intents era; render best-effort.
     const routeTitle = (data.route_title as string) ?? "маршрут";
-    const date = data.planned_date as string | undefined;
-    return `🚴 ${actorName} хочет присоединиться к поездке «${routeTitle}»${date ? ` ${formatDate(date)}` : ""}`;
+    return `🚴 ${actorName} хочет проехать «${routeTitle}»`;
   }
 
   if (n.type === "club_event" && data) {

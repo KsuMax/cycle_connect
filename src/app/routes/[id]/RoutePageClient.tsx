@@ -10,7 +10,7 @@ import { useLikes } from "@/lib/context/LikesContext";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useRides } from "@/lib/context/RidesContext";
 import { useEventRides } from "@/lib/context/EventRidesContext";
-import { useIntents } from "@/lib/context/IntentsContext";
+import { useInterests } from "@/lib/context/InterestsContext";
 import { supabase } from "@/lib/supabase";
 import { formatRouteDuration } from "@/lib/duration";
 import { DifficultyBadge, Badge } from "@/components/ui/Badge";
@@ -19,7 +19,7 @@ import { useRouter } from "next/navigation";
 import { useAuthModal } from "@/components/ui/AuthModal";
 import { useToast } from "@/lib/context/ToastContext";
 import { useAchievements } from "@/lib/context/AchievementsContext";
-import { RideIntentsSection } from "@/components/routes/RideIntentsSection";
+import { RouteInterestSection } from "@/components/routes/RouteInterestSection";
 import { RideReportsSection } from "@/components/routes/RideReportsSection";
 import { WindWidget } from "@/components/routes/WindWidget";
 import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users, Download, Train, Bus, CarTaxiFront, Route as RouteIcon, MoreVertical } from "lucide-react";
@@ -27,7 +27,7 @@ import type { ExitPointKind } from "@/types";
 import { formatDate } from "@/lib/utils";
 import { sanitizeHtml } from "@/lib/sanitize";
 import type { Route, RouteType } from "@/types";
-import type { DbRoute, DbRideIntent } from "@/lib/supabase";
+import type { DbRoute, DbRouteInterest } from "@/lib/supabase";
 import { dbToRoute } from "@/lib/transforms";
 
 interface RelatedEvent {
@@ -131,7 +131,7 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
   const { showToast } = useToast();
   const { checkAndAward } = useAchievements();
   const { getRouteEventStatus } = useEventRides();
-  const { getRouteIntentStatus } = useIntents();
+  const { getRouteInterest } = useInterests();
   const router = useRouter();
 
   const [route, setRoute] = useState<Route | null>(null);
@@ -140,8 +140,8 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
   const [likeCount, setLikeCount] = useState(0);
   const [deleting, setDeleting] = useState(false);
   const [relatedEvents, setRelatedEvents] = useState<RelatedEvent[]>([]);
-  const [rideIntents, setRideIntents] = useState<DbRideIntent[]>([]);
-  const [intentsKey, setIntentsKey] = useState(0);
+  const [interests, setInterests] = useState<DbRouteInterest[]>([]);
+  const [interestsKey, setInterestsKey] = useState(0);
   const [showRideMenu, setShowRideMenu] = useState(false);
   const [removingRide, setRemovingRide] = useState(false);
   const [reportPromptRideId, setReportPromptRideId] = useState<string | null>(null);
@@ -178,19 +178,17 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
       });
   }, [id]);
 
-  // Load ride intents for this route
+  // Load interest pool for this route
   useEffect(() => {
-    const today = new Date().toISOString().split("T")[0];
     supabase
-      .from("ride_intents")
-      .select("*, creator:profiles!creator_id(id, name, avatar_url, telegram_username), participants:ride_intent_participants(user_id, joined_at, profile:profiles!user_id(id, name, avatar_url, telegram_username))")
+      .from("route_interests")
+      .select("*, profile:profiles!user_id(id, name, avatar_url, telegram_username)")
       .eq("route_id", id)
-      .gte("planned_date", today)
-      .order("planned_date", { ascending: true })
+      .order("created_at", { ascending: true })
       .then(({ data }) => {
-        if (data) setRideIntents(data as unknown as DbRideIntent[]);
+        if (data) setInterests(data as unknown as DbRouteInterest[]);
       });
-  }, [id, intentsKey]);
+  }, [id, interestsKey]);
 
   if (loading) {
     return (
@@ -270,12 +268,12 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
       };
     }
 
-    const intentStatus = getRouteIntentStatus(route!.id);
-    if (intentStatus) {
+    const interest = getRouteInterest(route!.id);
+    if (interest) {
       return {
         type: "has_intent",
-        intentDate: intentStatus.plannedDate,
-        intentId: intentStatus.intentId,
+        intentDate: interest.plannedDate,
+        intentId: "",
       };
     }
 
@@ -645,12 +643,11 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
               </div>
             )}
 
-            {/* Ride intents */}
-            <RideIntentsSection
+            {/* Interest pool */}
+            <RouteInterestSection
               routeId={route.id}
-              routeTitle={route.title}
-              intents={rideIntents}
-              onIntentsChange={() => setIntentsKey(k => k + 1)}
+              interests={interests}
+              onChange={() => setInterestsKey(k => k + 1)}
             />
 
             {/* Create event */}

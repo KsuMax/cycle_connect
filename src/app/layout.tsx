@@ -8,7 +8,7 @@ import { RidesProvider } from "@/lib/context/RidesContext";
 import { FollowProvider } from "@/lib/context/FollowContext";
 import { ToastProvider } from "@/lib/context/ToastContext";
 import { EventRidesProvider } from "@/lib/context/EventRidesContext";
-import { IntentsProvider } from "@/lib/context/IntentsContext";
+import { InterestsProvider } from "@/lib/context/InterestsContext";
 import { NavigationProvider } from "@/lib/context/NavigationContext";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { TopProgressBar } from "@/components/layout/TopProgressBar";
@@ -68,7 +68,7 @@ export default function RootLayout({
                     <RidesProvider>
                       <FollowProvider>
                         <EventRidesProvider>
-                          <IntentsProvider>
+                          <InterestsProvider>
                             <AchievementsProvider>
                               <NotificationsProvider>
                                 <TopProgressBar />
@@ -81,7 +81,7 @@ export default function RootLayout({
                                 <YandexMetrika />
                               </NotificationsProvider>
                             </AchievementsProvider>
-                          </IntentsProvider>
+                          </InterestsProvider>
                         </EventRidesProvider>
                       </FollowProvider>
                     </RidesProvider>

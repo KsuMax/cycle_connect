@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { useLikes } from "@/lib/context/LikesContext";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useEventRides } from "@/lib/context/EventRidesContext";
-import { useIntents } from "@/lib/context/IntentsContext";
+import { useInterests } from "@/lib/context/InterestsContext";
 import { proxyImageUrl } from "@/lib/supabase";
 import { formatRouteDuration } from "@/lib/duration";
 import type { Route, RouteType } from "@/types";
@@ -40,7 +40,7 @@ export function RouteCard({ route, compact = false, priority = false }: RouteCar
   const { isLiked, toggleLike } = useLikes();
   const { user } = useAuth();
   const { getRouteEventStatus } = useEventRides();
-  const { getRouteIntentStatus } = useIntents();
+  const { hasInterest } = useInterests();
   const router = useRouter();
   const [likeCount, setLikeCount] = useState(route.likes);
   const liked = isLiked(route.id);
@@ -144,10 +144,10 @@ export function RouteCard({ route, compact = false, priority = false }: RouteCar
                 style={{ backgroundColor: "#EFF6FF", color: "#2563EB" }}>
                 Скоро еду
               </span>
-            ) : getRouteIntentStatus(route.id) ? (
+            ) : hasInterest(route.id) ? (
               <span className="inline-block ml-1.5 align-middle -translate-y-px text-[11px] font-semibold px-2 py-0.5 rounded-md"
                 style={{ backgroundColor: "#F0FDF4", color: "#16A34A" }}>
-                Запланировано
+                Хочу проехать
               </span>
             ) : null}
           </h3>
