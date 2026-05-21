@@ -45,13 +45,13 @@ function normalizeOsmName(raw: string): string {
   s = s.replace(/^г\.\s*/u, "Город ");
   s = s.replace(/^город федерального значения\s+/iu, "Город ");
   // Hyphen-minus → em-dash between subject and second name
-  s = s.replace(/\s*-\s*(Югра|Алания|Кузбасс|Чувашия)\b/u, " — $1");
+  s = s.replace(/\s*-\s*(Югра|Алания|Кузбасс|Чувашия)(?=\s|$)/u, " — $1");
   // "Чувашская Республика — Чувашия" → drop the trailing "— Чувашия"
   s = s.replace(/\s—\s*Чувашия$/u, "");
-  // Abbreviation expansions
-  s = s.replace(/\bобл\.\s*/u, "область ").trim();
+  // Abbreviation expansions (JS \b is ASCII-only, so don't rely on it for Cyrillic)
+  s = s.replace(/обл\.\s*/u, "область ").trim();
   s = s.replace(/^Еврейская АО$/u, "Еврейская автономная область");
-  s = s.replace(/\bАО\b/u, "автономный округ");
+  s = s.replace(/(^|\s)АО(\s|$)/u, "$1автономный округ$2");
   return s.replace(/\s+/g, " ").trim();
 }
 
