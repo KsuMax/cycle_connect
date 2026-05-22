@@ -33,4 +33,6 @@ jobs:
               --env-file /opt/cycleconnect/.env.production \
               cycleconnect:latest
             docker builder prune -f
+            docker image prune -f
+            df -h / | tail -1
             echo "✅ Deployed"
