@@ -15,7 +15,7 @@ import { supabase } from "@/lib/supabase";
 import { formatRouteDuration } from "@/lib/duration";
 import { DifficultyBadge, Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
-import { useRouter } from "next/navigation";
+import { useRouter, notFound } from "next/navigation";
 import { useAuthModal } from "@/components/ui/AuthModal";
 import { useToast } from "@/lib/context/ToastContext";
 import { useAchievements } from "@/lib/context/AchievementsContext";
@@ -136,7 +136,6 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
 
   const [route, setRoute] = useState<Route | null>(null);
   const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
   const [likeCount, setLikeCount] = useState(0);
   const [deleting, setDeleting] = useState(false);
   const [relatedEvents, setRelatedEvents] = useState<RelatedEvent[]>([]);
@@ -158,8 +157,6 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
         const r = dbToRoute(data);
         setRoute(r);
         setLikeCount(r.likes);
-      } else {
-        setFetchError(error?.message ?? "Маршрут не найден");
       }
       setLoading(false);
     }
@@ -202,17 +199,7 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
   }
 
   if (!route) {
-    return (
-      <div className="min-h-screen bg-[#F5F4F1]">
-        <Header />
-        <main className="max-w-6xl mx-auto px-4 py-8 text-center">
-          <div className="text-4xl mb-3">🗺️</div>
-          <h2 className="text-xl font-bold text-[#1C1C1E] mb-2">Маршрут не найден</h2>
-          {fetchError && <p className="text-sm text-[#71717A] mb-2 font-mono">{fetchError}</p>}
-          <Link href="/routes" className="text-sm text-[#F4632A] hover:underline">← Все маршруты</Link>
-        </main>
-      </div>
-    );
+    notFound();
   }
 
   const isAuthor = user?.id === route.author.id;

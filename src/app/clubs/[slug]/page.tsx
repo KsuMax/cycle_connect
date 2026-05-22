@@ -3,6 +3,7 @@
 import React, { useState, useEffect, use, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { EventCard } from "@/components/events/EventCard";
@@ -13,7 +14,7 @@ import { dbToClub, dbToClubMember, dbToRoute, dbToEvent } from "@/lib/transforms
 import type { Club, ClubMember, Route, CycleEvent, ClubPoll, ClubPollOption } from "@/types";
 import {
   ArrowLeft, Users, MapPin, Lock, Globe, UserPlus, UserMinus,
-  Clock, Map, Calendar, CheckCircle, Shield, Settings, Check, X, Trophy, Pin, PinOff,
+  Clock, Map, Calendar, CheckCircle, Settings, Check, X, Trophy, Pin, PinOff,
   Vote, Plus, Trash2,
 } from "lucide-react";
 
@@ -30,7 +31,7 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
   const [routes, setRoutes] = useState<Route[]>([]);
   const [events, setEvents] = useState<CycleEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
+  const [missing, setMissing] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("feed");
   const [joining, setJoining] = useState(false);
 
@@ -61,7 +62,7 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
       .single();
 
     if (!clubData) {
-      setNotFound(true);
+      setMissing(true);
       setLoading(false);
       return;
     }
@@ -304,20 +305,8 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
     );
   }
 
-  if (notFound || !club) {
-    return (
-      <div className="min-h-screen bg-[#F5F4F1]">
-        <Header />
-        <main className="max-w-2xl mx-auto px-4 py-16 text-center">
-          <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center mb-4" style={{ backgroundColor: "#E8FAF9" }}>
-            <Shield size={28} style={{ color: "#0BBFB5" }} />
-          </div>
-          <div className="font-semibold text-[#1C1C1E] mb-1">Клуб не найден</div>
-          <div className="text-sm text-[#71717A] mb-4">Возможно, ссылка устарела или клуб был удалён</div>
-          <Link href="/clubs" className="text-sm text-[#0BBFB5] hover:underline">← Все клубы</Link>
-        </main>
-      </div>
-    );
+  if (missing || !club) {
+    notFound();
   }
 
   return (

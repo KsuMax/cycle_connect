@@ -3,7 +3,7 @@
 import { useState, use, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, notFound } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Avatar, AvatarGroup } from "@/components/ui/Avatar";
 import { ContactButton } from "@/components/ui/ContactButton";
@@ -118,7 +118,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const router = useRouter();
   const [event, setEvent] = useState<EventData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
   const [likeCount, setLikeCount] = useState(0);
   const [going, setGoing] = useState(false);
   const [activeDay, setActiveDay] = useState<number | null>(null);
@@ -166,8 +165,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         setEvent(ev);
         setLikeCount(ev.likes_count);
         if (user) setGoing(ev.participants.some((p) => p.id === user.id));
-      } else {
-        setFetchError(error?.message ?? "Мероприятие не найдено");
       }
       setLoading(false);
     }
@@ -352,17 +349,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   if (!event) {
-    return (
-      <div className="min-h-screen bg-[#F5F4F1]">
-        <Header />
-        <main className="max-w-6xl mx-auto px-4 py-8 text-center">
-          <div className="text-4xl mb-3">🗺️</div>
-          <h2 className="text-xl font-bold text-[#1C1C1E] mb-2">Мероприятие не найдено</h2>
-          {fetchError && <p className="text-sm text-[#71717A] mb-2 font-mono">{fetchError}</p>}
-          <Link href="/" className="text-sm text-[#F4632A] hover:underline">← На главную</Link>
-        </main>
-      </div>
-    );
+    notFound();
   }
 
   const totalKm = event.days.reduce((sum, d) => sum + (d.distance_km ?? 0), 0);

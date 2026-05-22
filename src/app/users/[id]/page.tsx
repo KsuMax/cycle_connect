@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { Avatar } from "@/components/ui/Avatar";
@@ -37,7 +38,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
 
   const [profile, setProfile] = useState<DbProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
+  const [missing, setMissing] = useState(false);
 
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
@@ -60,7 +61,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
       .eq("id", id)
       .single()
       .then(({ data, error }) => {
-        if (error || !data) { setNotFound(true); }
+        if (error || !data) { setMissing(true); }
         else { setProfile(data as DbProfile); }
         setLoading(false);
       });
@@ -150,17 +151,8 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  if (notFound || !profile) {
-    return (
-      <div className="min-h-screen bg-[#F5F4F1]">
-        <Header />
-        <main className="max-w-4xl mx-auto px-4 py-8 text-center py-20">
-          <div className="text-4xl mb-3">👤</div>
-          <h2 className="text-xl font-bold text-[#1C1C1E] mb-2">Пользователь не найден</h2>
-          <Link href="/" className="text-sm text-[#F4632A] hover:underline">← На главную</Link>
-        </main>
-      </div>
-    );
+  if (missing || !profile) {
+    notFound();
   }
 
   const initials = profile.name
