@@ -414,9 +414,9 @@ function ClubCard({ club, isMember }: { club: Club; isMember?: boolean }) {
       </div>
 
       {/* Body */}
-      <div className="px-4 pb-4 pt-0 flex-1 flex flex-col">
+      <div className="px-4 pb-4 pt-0 flex-1 flex flex-col relative">
         {/* Avatar over cover */}
-        <div className="-mt-7 mb-2">
+        <div className="-mt-7 mb-2 relative z-10">
           <div
             className="w-12 h-12 rounded-xl overflow-hidden border-2 border-white flex items-center justify-center text-white font-bold text-base shrink-0"
             style={{ backgroundColor: "#0BBFB5" }}
