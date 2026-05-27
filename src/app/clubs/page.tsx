@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
@@ -10,9 +10,18 @@ import { CLUB_LIST_SELECT } from "@/lib/queries";
 import { dbToClub } from "@/lib/transforms";
 import type { Club } from "@/types";
 import { Shield, Plus, Users, MapPin, Search, Lock, Globe, X, CheckCircle, ArrowUpDown } from "lucide-react";
+import type { ClubVisibility } from "@/types";
 
-type Tab = "mine" | "open" | "all";
+type Tab = "mine" | "all";
 type Sort = "activity" | "members" | "new" | "name";
+type VisFilter = "any" | ClubVisibility;
+
+const VIS_LABELS: Record<VisFilter, string> = {
+  any:     "Все",
+  open:    "Открытые",
+  request: "По заявке",
+  closed:  "Закрытые",
+};
 
 const SORT_LABELS: Record<Sort, string> = {
   activity: "По активности",
@@ -53,6 +62,8 @@ export default function ClubsPage() {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Tab>("all");
   const [sort, setSort] = useState<Sort>("activity");
+  const [vis, setVis] = useState<VisFilter>("any");
+  const [city, setCity] = useState<string>("");
 
   useEffect(() => {
     if (authLoading) return;
@@ -97,27 +108,45 @@ export default function ClubsPage() {
   }
 
   const myIdSet = new Set(myClubs.map((c) => c.id));
-  const baseList: Club[] =
-    tab === "mine" ? myClubs
-    : tab === "open" ? allClubs.filter((c) => c.visibility === "open" && !myIdSet.has(c.id))
-    : allClubs;
+  const baseList: Club[] = tab === "mine" ? myClubs : allClubs;
 
   const q = search.trim().toLowerCase();
-  const filtered = q
-    ? baseList.filter(
-        (c) =>
-          c.name.toLowerCase().includes(q) ||
-          c.city?.toLowerCase().includes(q) ||
-          c.description?.toLowerCase().includes(q),
-      )
-    : baseList;
+  const filtered = baseList.filter((c) => {
+    if (vis !== "any" && c.visibility !== vis) return false;
+    if (city && c.city !== city) return false;
+    if (q) {
+      const hit =
+        c.name.toLowerCase().includes(q) ||
+        c.city?.toLowerCase().includes(q) ||
+        c.description?.toLowerCase().includes(q);
+      if (!hit) return false;
+    }
+    return true;
+  });
   const visibleList = sortClubs(filtered, sort);
 
   const tabs: { id: Tab; label: string; count: number }[] = [
-    { id: "mine", label: "Мои",      count: myClubs.length },
-    { id: "open", label: "Открытые", count: allClubs.filter((c) => c.visibility === "open" && !myIdSet.has(c.id)).length },
-    { id: "all",  label: "Все",      count: allClubs.length },
+    { id: "mine", label: "Мои", count: myClubs.length },
+    { id: "all",  label: "Все", count: allClubs.length },
   ];
+
+  // City options derived from the pool we currently look at (so "Мои" tab shows only cities of joined clubs).
+  const cityOptions = Array.from(
+    new Set(baseList.map((c) => c.city).filter((s): s is string => !!s)),
+  ).sort((a, b) => a.localeCompare(b, "ru"));
+
+  // Visibility counts for chip badges (reflect tab + city, ignore vis itself).
+  const visCounts = baseList.reduce(
+    (acc, c) => {
+      if (city && c.city !== city) return acc;
+      acc.any += 1;
+      acc[c.visibility] = (acc[c.visibility] ?? 0) + 1;
+      return acc;
+    },
+    { any: 0, open: 0, request: 0, closed: 0 } as Record<VisFilter, number>,
+  );
+
+  const hasActiveFilters = vis !== "any" || !!city || !!search;
 
   return (
     <div className="min-h-screen bg-[#F5F4F1]">
@@ -201,24 +230,72 @@ export default function ClubsPage() {
             )}
           </div>
 
-          <div className="relative">
-            <ArrowUpDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A1A1AA] pointer-events-none" />
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as Sort)}
-              className="appearance-none pl-9 pr-8 py-2.5 bg-white border border-[#E4E4E7] rounded-xl text-sm text-[#1C1C1E] focus:outline-none focus:border-[#0BBFB5] focus:ring-2 focus:ring-[#0BBFB5]/20 transition-all cursor-pointer"
-            >
-              {(Object.keys(SORT_LABELS) as Sort[]).map((s) => (
-                <option key={s} value={s}>{SORT_LABELS[s]}</option>
-              ))}
-            </select>
-            <svg
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#A1A1AA] pointer-events-none"
-              width="10" height="10" viewBox="0 0 10 10" fill="none"
-            >
-              <path d="M2 4l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+          <SelectControl
+            icon={<ArrowUpDown size={14} />}
+            value={sort}
+            onChange={(v) => setSort(v as Sort)}
+            options={(Object.keys(SORT_LABELS) as Sort[]).map((s) => ({ value: s, label: SORT_LABELS[s] }))}
+          />
+        </div>
+
+        {/* Filter row: visibility chips + city */}
+        <div className="flex items-center gap-3 mb-6 flex-wrap">
+          <div className="flex gap-1.5 flex-wrap">
+            {(Object.keys(VIS_LABELS) as VisFilter[]).map((v) => {
+              const active = vis === v;
+              const count = visCounts[v];
+              const disabled = count === 0 && v !== "any";
+              return (
+                <button
+                  key={v}
+                  onClick={() => !disabled && setVis(v)}
+                  disabled={disabled}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={
+                    active
+                      ? { backgroundColor: "#1C1C1E", color: "white", borderColor: "#1C1C1E" }
+                      : { backgroundColor: "white", color: "#71717A", borderColor: "#E4E4E7" }
+                  }
+                >
+                  {VIS_LABELS[v]}
+                  {count > 0 && (
+                    <span
+                      className="text-[10px] font-bold px-1 rounded"
+                      style={
+                        active
+                          ? { backgroundColor: "rgba(255,255,255,0.2)", color: "white" }
+                          : { color: "#A1A1AA" }
+                      }
+                    >
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
+
+          {cityOptions.length > 0 && (
+            <SelectControl
+              icon={<MapPin size={14} />}
+              value={city}
+              onChange={setCity}
+              options={[
+                { value: "", label: "Все города" },
+                ...cityOptions.map((c) => ({ value: c, label: c })),
+              ]}
+            />
+          )}
+
+          {hasActiveFilters && (
+            <button
+              onClick={() => { setSearch(""); setVis("any"); setCity(""); }}
+              className="inline-flex items-center gap-1 text-xs font-medium text-[#A1A1AA] hover:text-[#1C1C1E] transition-colors ml-auto"
+            >
+              <X size={12} />
+              Сбросить фильтры
+            </button>
+          )}
         </div>
 
         {/* Grid */}
@@ -237,9 +314,9 @@ export default function ClubsPage() {
         ) : (
           <EmptyState
             tab={tab}
-            search={search}
+            hasFilters={hasActiveFilters}
             isAuthed={!!user}
-            onClearSearch={() => setSearch("")}
+            onReset={() => { setSearch(""); setVis("any"); setCity(""); }}
           />
         )}
 
@@ -261,6 +338,41 @@ export default function ClubsPage() {
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+function SelectControl({
+  icon,
+  value,
+  onChange,
+  options,
+}: {
+  icon: React.ReactNode;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <div className="relative">
+      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A1A1AA] pointer-events-none">
+        {icon}
+      </span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="appearance-none pl-9 pr-8 py-2.5 bg-white border border-[#E4E4E7] rounded-xl text-sm text-[#1C1C1E] focus:outline-none focus:border-[#0BBFB5] focus:ring-2 focus:ring-[#0BBFB5]/20 transition-all cursor-pointer max-w-[180px] truncate"
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+      <svg
+        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#A1A1AA] pointer-events-none"
+        width="10" height="10" viewBox="0 0 10 10" fill="none"
+      >
+        <path d="M2 4l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
     </div>
   );
 }
@@ -370,16 +482,16 @@ function ClubCard({ club, isMember }: { club: Club; isMember?: boolean }) {
 
 function EmptyState({
   tab,
-  search,
+  hasFilters,
   isAuthed,
-  onClearSearch,
+  onReset,
 }: {
   tab: Tab;
-  search: string;
+  hasFilters: boolean;
   isAuthed: boolean;
-  onClearSearch: () => void;
+  onReset: () => void;
 }) {
-  if (search) {
+  if (hasFilters) {
     return (
       <div className="text-center py-16">
         <div
@@ -389,12 +501,12 @@ function EmptyState({
           <Search size={28} style={{ color: "#0BBFB5" }} />
         </div>
         <div className="font-semibold text-[#1C1C1E] mb-1">Ничего не найдено</div>
-        <div className="text-sm text-[#71717A] mb-4">Попробуй другое название или город</div>
+        <div className="text-sm text-[#71717A] mb-4">Попробуй ослабить фильтры</div>
         <button
-          onClick={onClearSearch}
+          onClick={onReset}
           className="text-sm font-medium text-[#0BBFB5] hover:underline"
         >
-          Сбросить поиск
+          Сбросить
         </button>
       </div>
     );
@@ -411,7 +523,7 @@ function EmptyState({
         </div>
         <div className="font-semibold text-[#1C1C1E] mb-1">Ты пока не в клубах</div>
         <div className="text-sm text-[#71717A]">
-          Загляни во вкладку «Открытые» — туда можно вступить в один клик
+          Переключись на «Все» и выбери клуб, в который хочется
         </div>
       </div>
     );
