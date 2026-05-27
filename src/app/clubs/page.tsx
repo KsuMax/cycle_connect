@@ -9,9 +9,40 @@ import { supabase, proxyImageUrl } from "@/lib/supabase";
 import { CLUB_LIST_SELECT } from "@/lib/queries";
 import { dbToClub } from "@/lib/transforms";
 import type { Club } from "@/types";
-import { Shield, Plus, Users, MapPin, Search, Lock, Globe, X, CheckCircle } from "lucide-react";
+import { Shield, Plus, Users, MapPin, Search, Lock, Globe, X, CheckCircle, ArrowUpDown } from "lucide-react";
 
 type Tab = "mine" | "open" | "all";
+type Sort = "activity" | "members" | "new" | "name";
+
+const SORT_LABELS: Record<Sort, string> = {
+  activity: "По активности",
+  members:  "По числу участников",
+  new:      "Новые",
+  name:     "По алфавиту",
+};
+
+function sortClubs(list: Club[], sort: Sort): Club[] {
+  const arr = [...list];
+  switch (sort) {
+    case "activity":
+      arr.sort((a, b) => {
+        const ta = a.last_activity_at ? new Date(a.last_activity_at).getTime() : 0;
+        const tb = b.last_activity_at ? new Date(b.last_activity_at).getTime() : 0;
+        return tb - ta;
+      });
+      break;
+    case "members":
+      arr.sort((a, b) => b.members_count - a.members_count);
+      break;
+    case "new":
+      arr.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      break;
+    case "name":
+      arr.sort((a, b) => a.name.localeCompare(b.name, "ru"));
+      break;
+  }
+  return arr;
+}
 
 export default function ClubsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -21,6 +52,7 @@ export default function ClubsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Tab>("all");
+  const [sort, setSort] = useState<Sort>("activity");
 
   useEffect(() => {
     if (authLoading) return;
@@ -38,7 +70,7 @@ export default function ClubsPage() {
     const allQ = supabase
       .from("clubs")
       .select(CLUB_LIST_SELECT)
-      .order("members_count", { ascending: false });
+      .order("last_activity_at", { ascending: false, nullsFirst: false });
 
     if (user) {
       const [{ data: allData }, { data: myIds }] = await Promise.all([
@@ -71,7 +103,7 @@ export default function ClubsPage() {
     : allClubs;
 
   const q = search.trim().toLowerCase();
-  const visibleList = q
+  const filtered = q
     ? baseList.filter(
         (c) =>
           c.name.toLowerCase().includes(q) ||
@@ -79,6 +111,7 @@ export default function ClubsPage() {
           c.description?.toLowerCase().includes(q),
       )
     : baseList;
+  const visibleList = sortClubs(filtered, sort);
 
   const tabs: { id: Tab; label: string; count: number }[] = [
     { id: "mine", label: "Мои",      count: myClubs.length },
@@ -166,6 +199,25 @@ export default function ClubsPage() {
                 <X size={13} />
               </button>
             )}
+          </div>
+
+          <div className="relative">
+            <ArrowUpDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A1A1AA] pointer-events-none" />
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as Sort)}
+              className="appearance-none pl-9 pr-8 py-2.5 bg-white border border-[#E4E4E7] rounded-xl text-sm text-[#1C1C1E] focus:outline-none focus:border-[#0BBFB5] focus:ring-2 focus:ring-[#0BBFB5]/20 transition-all cursor-pointer"
+            >
+              {(Object.keys(SORT_LABELS) as Sort[]).map((s) => (
+                <option key={s} value={s}>{SORT_LABELS[s]}</option>
+              ))}
+            </select>
+            <svg
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#A1A1AA] pointer-events-none"
+              width="10" height="10" viewBox="0 0 10 10" fill="none"
+            >
+              <path d="M2 4l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </div>
         </div>
 

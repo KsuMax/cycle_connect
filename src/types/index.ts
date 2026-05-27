@@ -128,6 +128,7 @@ export interface Club {
   members_count: number;
   telegram_channel?: string | null;
   created_at: string;
+  last_activity_at?: string | null;
 }
 
 export interface ClubPollOption {

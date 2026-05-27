@@ -273,6 +273,7 @@ export interface DbClub {
   members_count: number;
   telegram_channel?: string | null;
   created_at: string;
+  last_activity_at?: string | null;
   // joined
   members?: DbClubMember[];
 }
