@@ -277,7 +277,8 @@ export default function ClubsPage() {
 
           {cityOptions.length > 0 && (
             <SelectControl
-              icon={<MapPin size={14} />}
+              compact
+              icon={<MapPin size={12} />}
               value={city}
               onChange={setCity}
               options={[
@@ -347,28 +348,39 @@ function SelectControl({
   value,
   onChange,
   options,
+  compact = false,
 }: {
   icon: React.ReactNode;
   value: string;
   onChange: (v: string) => void;
   options: { value: string; label: string }[];
+  compact?: boolean;
 }) {
+  const padY = compact ? "py-1.5" : "py-2.5";
+  const radius = compact ? "rounded-lg" : "rounded-xl";
+  const textSize = compact ? "text-xs font-medium" : "text-sm";
+  const padL = compact ? "pl-7" : "pl-9";
+  const padR = compact ? "pr-6" : "pr-8";
+  const iconL = compact ? "left-2" : "left-3";
+  const iconR = compact ? "right-1.5" : "right-2.5";
+  const maxW = compact ? "max-w-[160px]" : "max-w-[180px]";
+
   return (
     <div className="relative">
-      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A1A1AA] pointer-events-none">
+      <span className={`absolute ${iconL} top-1/2 -translate-y-1/2 text-[#A1A1AA] pointer-events-none`}>
         {icon}
       </span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="appearance-none pl-9 pr-8 py-2.5 bg-white border border-[#E4E4E7] rounded-xl text-sm text-[#1C1C1E] focus:outline-none focus:border-[#0BBFB5] focus:ring-2 focus:ring-[#0BBFB5]/20 transition-all cursor-pointer max-w-[180px] truncate"
+        className={`appearance-none ${padL} ${padR} ${padY} bg-white border border-[#E4E4E7] ${radius} ${textSize} text-[#1C1C1E] focus:outline-none focus:border-[#0BBFB5] focus:ring-2 focus:ring-[#0BBFB5]/20 transition-all cursor-pointer ${maxW} truncate`}
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
       </select>
       <svg
-        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#A1A1AA] pointer-events-none"
+        className={`absolute ${iconR} top-1/2 -translate-y-1/2 text-[#A1A1AA] pointer-events-none`}
         width="10" height="10" viewBox="0 0 10 10" fill="none"
       >
         <path d="M2 4l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
