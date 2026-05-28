@@ -66,6 +66,18 @@ function getSmtp(): SMTPClient {
   return smtpClient;
 }
 
+// ── шаблоны: загрузка при старте ────────────────────────────────────────────
+const TEMPLATES = new Map<string, string>();
+for (const n of [
+  "_base", "event-cancelled", "event-rescheduled", "event-rsvp-confirmation",
+  "event-new-rsvp", "announcement", "club-join-request", "club-join-approved",
+  "club-join-rejected", "event-hour-reminder", "event-post-report",
+]) {
+  TEMPLATES.set(n, await Deno.readTextFile(
+    new URL(`./templates/${n}.html`, import.meta.url).pathname,
+  ));
+}
+
 // ── основной обработчик ──────────────────────────────────────────────────────
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return json({ error: "method not allowed" }, 405);
@@ -773,9 +785,15 @@ function json(data: unknown, status = 200): Response {
 }
 
 // ── шаблоны ──────────────────────────────────────────────────────────────────
-// Шаг 3 плана: вынести в supabase/email-templates/*.html и грузить через
-// Deno.readTextFile. Пока инлайним — это позволяет ускорить итерации
-// и не требует деплоя ассетов отдельно.
+
+function fillTemplate(tpl: string, vars: Record<string, string>): string {
+  return tpl.replace(/\{\{([A-Z_]+)\}\}/g, (_, k) => vars[k] ?? "");
+}
+
+function render(name: string, vars: Record<string, string>, pageTitle: string): string {
+  const body = fillTemplate(TEMPLATES.get(name)!, vars);
+  return fillTemplate(TEMPLATES.get("_base")!, { PAGE_TITLE: pageTitle, BODY: body });
+}
 
 interface EventCancelledVars {
   firstName: string;
@@ -789,282 +807,155 @@ interface EventCancelledVars {
 }
 
 function renderEventCancelled(v: EventCancelledVars): string {
-  return baseLayout({
-    title: `Поездку «${v.title}» отменили`,
-    body: `
-      <h1 style="font-size:22px;line-height:1.3;color:#1C1C1E;margin:0 0 16px;">
-        Поездку отменили
-      </h1>
-      <p style="font-size:15px;line-height:1.5;color:#3F3F46;margin:0 0 20px;">
-        ${escapeHtml(v.firstName === "привет" ? "Привет" : "Привет, " + v.firstName)}!
-        Организатор отменил поездку, на которую ты записан${"ассистент" === "" ? "а" : ""}.
-      </p>
-
-      <table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F4F1;border-radius:12px;padding:16px;margin:0 0 20px;">
-        <tr><td style="font-size:14px;color:#1C1C1E;line-height:1.6;">
-          📅 <b>${escapeHtml(v.title)}</b><br/>
-          ${v.dateStr ? `🗓 ${escapeHtml(v.dateStr)}<br/>` : ""}
-          ${v.meetPoint ? `📍 ${escapeHtml(v.meetPoint)}<br/>` : ""}
-          👤 Организатор: ${escapeHtml(v.organizerName)}
-        </td></tr>
-      </table>
-
-      ${v.reason ? `
-        <p style="font-size:14px;line-height:1.5;color:#71717A;margin:0 0 20px;">
-          <b style="color:#3F3F46;">Причина:</b> ${escapeHtml(v.reason)}
-        </p>
-      ` : ""}
-
-      <p style="font-size:14px;line-height:1.5;color:#71717A;margin:0 0 24px;">
-        Если хочется покатать всё равно — посмотри, что есть рядом.
-      </p>
-
-      ${ctaButton("Найти поездки рядом", `${SITE_URL}/events`)}
-
-      <p style="font-size:12px;line-height:1.5;color:#A1A1AA;margin:24px 0 0;">
-        Это письмо нельзя отключить — оно про твои планы.
-        <a href="${v.settingsUrl}" style="color:#F4632A;text-decoration:none;">Настроить остальные уведомления →</a>
-      </p>
-    `,
-  });
+  const greeting = v.firstName === "привет"
+    ? "Привет! Организатор отменил поездку, на которую ты записан."
+    : `Привет, ${escapeHtml(v.firstName)}! Организатор отменил поездку, на которую ты записан.`;
+  const reasonBlock = v.reason
+    ? `<p style="font-size:14px;line-height:1.5;color:#71717A;margin:0 0 20px;"><b style="color:#3F3F46;">Причина:</b> ${escapeHtml(v.reason)}</p>`
+    : "";
+  return render("event-cancelled", {
+    GREETING: greeting,
+    TITLE: escapeHtml(v.title),
+    DATE_ROW: v.dateStr ? `🗓 ${escapeHtml(v.dateStr)}<br/>` : "",
+    MEET_POINT_ROW: v.meetPoint ? `📍 ${escapeHtml(v.meetPoint)}<br/>` : "",
+    ORGANIZER_NAME: escapeHtml(v.organizerName),
+    REASON_BLOCK: reasonBlock,
+    EVENTS_URL: `${SITE_URL}/events`,
+    SETTINGS_URL: v.settingsUrl,
+  }, escapeHtml(`Поездку «${v.title}» отменили`));
 }
-
-function ctaButton(text: string, href: string): string {
-  return `
-    <table cellpadding="0" cellspacing="0">
-      <tr><td style="background:#F4632A;border-radius:10px;">
-        <a href="${href}" style="display:inline-block;padding:12px 24px;color:#fff;font-size:15px;font-weight:600;text-decoration:none;">
-          ${escapeHtml(text)}
-        </a>
-      </td></tr>
-    </table>
-  `;
-}
-
-// ── новые шаблоны ─────────────────────────────────────────────────────────────
 
 function renderEventRescheduled(v: {
   firstName: string; title: string; oldDate: string; newDate: string;
   meetPoint: string | null; organizerName: string; eventUrl: string; settingsUrl: string;
 }): string {
-  return baseLayout({ title: `Поездка «${v.title}» — новое время`, body: `
-    <h1 style="font-size:22px;line-height:1.3;color:#1C1C1E;margin:0 0 16px;">Поездка перенесена</h1>
-    <p style="font-size:15px;line-height:1.5;color:#3F3F46;margin:0 0 20px;">
-      Привет${v.firstName !== "привет" ? ", " + escapeHtml(v.firstName) : ""}! У поездки поменялись детали.
-    </p>
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F4F1;border-radius:12px;padding:16px;margin:0 0 24px;">
-      <tr><td style="font-size:14px;color:#1C1C1E;line-height:1.8;">
-        📅 <b>${escapeHtml(v.title)}</b><br/>
-        ❌ <span style="text-decoration:line-through;color:#A1A1AA;">Было: ${escapeHtml(v.oldDate)}</span><br/>
-        ✅ Стало: <b>${escapeHtml(v.newDate)}</b><br/>
-        ${v.meetPoint ? `📍 ${escapeHtml(v.meetPoint)}<br/>` : ""}
-        👤 Организатор: ${escapeHtml(v.organizerName)}
-      </td></tr>
-    </table>
-    ${ctaButton("Открыть поездку", v.eventUrl)}
-    <p style="font-size:12px;color:#A1A1AA;margin:24px 0 0;">
-      <a href="${v.settingsUrl}" style="color:#F4632A;text-decoration:none;">Настроить уведомления →</a>
-    </p>
-  `});
+  const greeting = v.firstName !== "привет"
+    ? `Привет, ${escapeHtml(v.firstName)}! У поездки поменялись детали.`
+    : "Привет! У поездки поменялись детали.";
+  return render("event-rescheduled", {
+    GREETING: greeting,
+    TITLE: escapeHtml(v.title),
+    OLD_DATE: escapeHtml(v.oldDate),
+    NEW_DATE: escapeHtml(v.newDate),
+    MEET_POINT_ROW: v.meetPoint ? `📍 ${escapeHtml(v.meetPoint)}<br/>` : "",
+    ORGANIZER_NAME: escapeHtml(v.organizerName),
+    EVENT_URL: v.eventUrl,
+    SETTINGS_URL: v.settingsUrl,
+  }, escapeHtml(`Поездка «${v.title}» — новое время`));
 }
 
 function renderEventRsvpConfirmation(v: {
   firstName: string; title: string; dateStr: string; meetPoint: string | null;
   organizerName: string; participantsCount: number; eventUrl: string; settingsUrl: string;
 }): string {
-  return baseLayout({ title: `Ты записан на «${v.title}»`, body: `
-    <h1 style="font-size:22px;line-height:1.3;color:#1C1C1E;margin:0 0 16px;">Готово — до встречи!</h1>
-    <p style="font-size:15px;line-height:1.5;color:#3F3F46;margin:0 0 20px;">
-      ${v.firstName !== "привет" ? escapeHtml(v.firstName) + ", ты" : "Ты"} записан${""} на поездку:
-    </p>
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F4F1;border-radius:12px;padding:16px;margin:0 0 24px;">
-      <tr><td style="font-size:14px;color:#1C1C1E;line-height:1.8;">
-        📅 <b>${escapeHtml(v.title)}</b><br/>
-        ${v.dateStr ? `🗓 ${escapeHtml(v.dateStr)}<br/>` : ""}
-        ${v.meetPoint ? `📍 ${escapeHtml(v.meetPoint)}<br/>` : ""}
-        👤 Организатор: ${escapeHtml(v.organizerName)}<br/>
-        👥 Уже едут: ${v.participantsCount}
-      </td></tr>
-    </table>
-    ${ctaButton("Открыть поездку", v.eventUrl)}
-    <p style="font-size:12px;color:#A1A1AA;margin:24px 0 0;">
-      <a href="${v.settingsUrl}" style="color:#F4632A;text-decoration:none;">Настроить уведомления →</a>
-    </p>
-  `});
+  const leadText = v.firstName !== "привет"
+    ? `${escapeHtml(v.firstName)}, ты записан на поездку:`
+    : "Ты записан на поездку:";
+  return render("event-rsvp-confirmation", {
+    LEAD_TEXT: leadText,
+    TITLE: escapeHtml(v.title),
+    DATE_ROW: v.dateStr ? `🗓 ${escapeHtml(v.dateStr)}<br/>` : "",
+    MEET_POINT_ROW: v.meetPoint ? `📍 ${escapeHtml(v.meetPoint)}<br/>` : "",
+    ORGANIZER_NAME: escapeHtml(v.organizerName),
+    PARTICIPANTS_COUNT: String(v.participantsCount),
+    EVENT_URL: v.eventUrl,
+    SETTINGS_URL: v.settingsUrl,
+  }, escapeHtml(`Ты записан на «${v.title}»`));
 }
 
 function renderEventNewRsvp(v: {
   organizerName: string; actorName: string; title: string;
   participantsCount: number; eventUrl: string; settingsUrl: string;
 }): string {
-  return baseLayout({ title: `+1 на «${v.title}»: ${v.actorName}`, body: `
-    <h1 style="font-size:22px;line-height:1.3;color:#1C1C1E;margin:0 0 16px;">
-      Новый участник 🎉
-    </h1>
-    <p style="font-size:15px;line-height:1.5;color:#3F3F46;margin:0 0 20px;">
-      ${v.organizerName !== "привет" ? escapeHtml(v.organizerName) + ", к" : "К"} твоей поездке
-      «${escapeHtml(v.title)}» присоединился <b>${escapeHtml(v.actorName)}</b>.
-    </p>
-    <p style="font-size:14px;color:#71717A;margin:0 0 24px;">
-      Сейчас участников: <b>${v.participantsCount}</b>
-    </p>
-    ${ctaButton("Список участников →", v.eventUrl)}
-    <p style="font-size:12px;color:#A1A1AA;margin:24px 0 0;">
-      <a href="${v.settingsUrl}" style="color:#F4632A;text-decoration:none;">Настроить уведомления →</a>
-    </p>
-  `});
+  const leadPrefix = v.organizerName !== "привет" ? `${escapeHtml(v.organizerName)}, к` : "К";
+  const leadText = `${leadPrefix} твоей поездке «${escapeHtml(v.title)}» присоединился <b>${escapeHtml(v.actorName)}</b>.`;
+  return render("event-new-rsvp", {
+    LEAD_TEXT: leadText,
+    PARTICIPANTS_COUNT: String(v.participantsCount),
+    EVENT_URL: v.eventUrl,
+    SETTINGS_URL: v.settingsUrl,
+  }, escapeHtml(`+1 на «${v.title}»: ${v.actorName}`));
 }
 
 function renderAnnouncement(v: {
   firstName: string; eventTitle: string; body: string;
   isUrgent: boolean; eventUrl: string; settingsUrl: string;
 }): string {
-  return baseLayout({ title: `${v.isUrgent ? "🚨 " : "📢 "}${v.eventTitle}`, body: `
-    <h1 style="font-size:22px;line-height:1.3;color:#1C1C1E;margin:0 0 8px;">
-      ${v.isUrgent ? "🚨 Срочное объявление" : "📢 Объявление"}
-    </h1>
-    <p style="font-size:13px;color:#A1A1AA;margin:0 0 20px;">${escapeHtml(v.eventTitle)}</p>
-    <div style="font-size:15px;line-height:1.6;color:#3F3F46;white-space:pre-line;margin:0 0 24px;">
-      ${escapeHtml(v.body)}
-    </div>
-    ${ctaButton("Открыть поездку", v.eventUrl)}
-    <p style="font-size:12px;color:#A1A1AA;margin:24px 0 0;">
-      <a href="${v.settingsUrl}" style="color:#F4632A;text-decoration:none;">Настроить уведомления →</a>
-    </p>
-  `});
+  return render("announcement", {
+    HEADING: v.isUrgent ? "🚨 Срочное объявление" : "📢 Объявление",
+    EVENT_TITLE: escapeHtml(v.eventTitle),
+    MESSAGE_TEXT: escapeHtml(v.body),
+    EVENT_URL: v.eventUrl,
+    SETTINGS_URL: v.settingsUrl,
+  }, escapeHtml(`${v.isUrgent ? "🚨 " : "📢 "}${v.eventTitle}`));
 }
 
 function renderClubJoinRequest(v: {
   adminName: string; applicantName: string; clubName: string;
   kmTotal: number; memberSince: string; clubUrl: string; settingsUrl: string;
 }): string {
-  return baseLayout({ title: `Заявка в «${v.clubName}» — ${v.applicantName}`, body: `
-    <h1 style="font-size:22px;line-height:1.3;color:#1C1C1E;margin:0 0 16px;">Новая заявка</h1>
-    <p style="font-size:15px;line-height:1.5;color:#3F3F46;margin:0 0 20px;">
-      ${v.adminName !== "привет" ? escapeHtml(v.adminName) + ", в" : "В"} клуб
-      «${escapeHtml(v.clubName)}» хочет вступить <b>${escapeHtml(v.applicantName)}</b>.
-    </p>
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F4F1;border-radius:12px;padding:16px;margin:0 0 24px;">
-      <tr><td style="font-size:14px;color:#1C1C1E;line-height:1.8;">
-        👤 <b>${escapeHtml(v.applicantName)}</b><br/>
-        🚴 ${v.kmTotal} км накатано<br/>
-        📅 На сервисе с ${escapeHtml(v.memberSince)}
-      </td></tr>
-    </table>
-    ${ctaButton("Открыть заявки →", v.clubUrl + "?tab=members")}
-    <p style="font-size:12px;color:#A1A1AA;margin:24px 0 0;">
-      <a href="${v.settingsUrl}" style="color:#F4632A;text-decoration:none;">Настроить уведомления →</a>
-    </p>
-  `});
+  const leadPrefix = v.adminName !== "привет" ? `${escapeHtml(v.adminName)}, в` : "В";
+  const leadText = `${leadPrefix} клуб «${escapeHtml(v.clubName)}» хочет вступить <b>${escapeHtml(v.applicantName)}</b>.`;
+  return render("club-join-request", {
+    LEAD_TEXT: leadText,
+    APPLICANT_NAME: escapeHtml(v.applicantName),
+    KM_TOTAL: String(v.kmTotal),
+    MEMBER_SINCE: escapeHtml(v.memberSince),
+    CLUB_MEMBERS_URL: `${v.clubUrl}?tab=members`,
+    SETTINGS_URL: v.settingsUrl,
+  }, escapeHtml(`Заявка в «${v.clubName}» — ${v.applicantName}`));
 }
 
 function renderClubJoinApproved(v: {
   firstName: string; clubName: string; clubUrl: string; settingsUrl: string;
 }): string {
-  return baseLayout({ title: `Ты в клубе «${v.clubName}»`, body: `
-    <h1 style="font-size:22px;line-height:1.3;color:#1C1C1E;margin:0 0 16px;">
-      Добро пожаловать в «${escapeHtml(v.clubName)}»! 🎉
-    </h1>
-    <p style="font-size:15px;line-height:1.5;color:#3F3F46;margin:0 0 24px;">
-      ${v.firstName !== "привет" ? escapeHtml(v.firstName) + ", т" : "Т"}вою заявку одобрили.
-      Теперь ты часть клуба.
-    </p>
-    <p style="font-size:14px;color:#71717A;margin:0 0 24px;">
-      Загляни в клуб: посмотри календарь поездок и закреплённые маршруты.
-    </p>
-    ${ctaButton("Открыть клуб →", v.clubUrl)}
-    <p style="font-size:12px;color:#A1A1AA;margin:24px 0 0;">
-      <a href="${v.settingsUrl}" style="color:#F4632A;text-decoration:none;">Настроить уведомления →</a>
-    </p>
-  `});
+  const leadText = v.firstName !== "привет"
+    ? `${escapeHtml(v.firstName)}, твою заявку одобрили. Теперь ты часть клуба.`
+    : "Твою заявку одобрили. Теперь ты часть клуба.";
+  return render("club-join-approved", {
+    CLUB_NAME: escapeHtml(v.clubName),
+    LEAD_TEXT: leadText,
+    CLUB_URL: v.clubUrl,
+    SETTINGS_URL: v.settingsUrl,
+  }, escapeHtml(`Ты в клубе «${v.clubName}»`));
+}
+
+function renderClubJoinRejected(v: {
+  firstName: string; clubName: string; clubsUrl: string; settingsUrl: string;
+}): string {
+  return render("club-join-rejected", {
+    CLUB_NAME: escapeHtml(v.clubName),
+    CLUBS_URL: v.clubsUrl,
+    SETTINGS_URL: v.settingsUrl,
+  }, escapeHtml(`Заявка в «${v.clubName}» не одобрена`));
 }
 
 function renderEventHourReminder(v: {
   firstName: string; title: string; dateStr: string;
   meetPoint: string | null; organizerName: string; eventUrl: string; settingsUrl: string;
 }): string {
-  return baseLayout({ title: `Через час поездка «${v.title}»`, body: `
-    <h1 style="font-size:22px;line-height:1.3;color:#1C1C1E;margin:0 0 16px;">🔔 Через час старт!</h1>
-    <p style="font-size:15px;line-height:1.5;color:#3F3F46;margin:0 0 20px;">
-      ${v.firstName !== "привет" ? escapeHtml(v.firstName) + ", н" : "Н"}е забудь — скоро поездка:
-    </p>
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F4F1;border-radius:12px;padding:16px;margin:0 0 24px;">
-      <tr><td style="font-size:14px;color:#1C1C1E;line-height:1.8;">
-        📅 <b>${escapeHtml(v.title)}</b><br/>
-        🗓 ${escapeHtml(v.dateStr)}<br/>
-        ${v.meetPoint ? `📍 ${escapeHtml(v.meetPoint)}<br/>` : ""}
-        👤 Организатор: ${escapeHtml(v.organizerName)}
-      </td></tr>
-    </table>
-    ${ctaButton("Открыть поездку →", v.eventUrl)}
-    <p style="font-size:12px;color:#A1A1AA;margin:24px 0 0;">
-      <a href="${v.settingsUrl}" style="color:#F4632A;text-decoration:none;">Настроить уведомления →</a>
-    </p>
-  `});
+  const leadText = v.firstName !== "привет"
+    ? `${escapeHtml(v.firstName)}, не забудь — скоро поездка:`
+    : "Не забудь — скоро поездка:";
+  return render("event-hour-reminder", {
+    LEAD_TEXT: leadText,
+    TITLE: escapeHtml(v.title),
+    DATE_STR: escapeHtml(v.dateStr),
+    MEET_POINT_ROW: v.meetPoint ? `📍 ${escapeHtml(v.meetPoint)}<br/>` : "",
+    ORGANIZER_NAME: escapeHtml(v.organizerName),
+    EVENT_URL: v.eventUrl,
+    SETTINGS_URL: v.settingsUrl,
+  }, escapeHtml(`Через час поездка «${v.title}»`));
 }
 
 function renderEventPostReport(v: {
   firstName: string; title: string; reportUrl: string; settingsUrl: string;
 }): string {
-  return baseLayout({ title: `Как покаталось на «${v.title}»?`, body: `
-    <h1 style="font-size:22px;line-height:1.3;color:#1C1C1E;margin:0 0 16px;">Расскажи, как прошло 🚴</h1>
-    <p style="font-size:15px;line-height:1.5;color:#3F3F46;margin:0 0 20px;">
-      ${v.firstName !== "привет" ? escapeHtml(v.firstName) + ", в" : "В"}чера была поездка «${escapeHtml(v.title)}».
-      Оставь пару слов и фото — это поможет другим выбрать маршрут.
-    </p>
-    ${ctaButton("Написать отчёт →", v.reportUrl)}
-    <p style="font-size:12px;color:#A1A1AA;margin:24px 0 0;">
-      Это последнее напоминание по этой поездке.<br/>
-      <a href="${v.settingsUrl}" style="color:#F4632A;text-decoration:none;">Настроить уведомления →</a>
-    </p>
-  `});
-}
-
-function renderClubJoinRejected(v: {
-  firstName: string; clubName: string; clubsUrl: string; settingsUrl: string;
-}): string {
-  return baseLayout({ title: `Заявка в «${v.clubName}» не одобрена`, body: `
-    <h1 style="font-size:22px;line-height:1.3;color:#1C1C1E;margin:0 0 16px;">
-      Заявку не одобрили
-    </h1>
-    <p style="font-size:15px;line-height:1.5;color:#3F3F46;margin:0 0 24px;">
-      К сожалению, владелец клуба «${escapeHtml(v.clubName)}» не принял твою заявку. Это
-      бывает — клуб мог быть закрыт по другим причинам.
-    </p>
-    <p style="font-size:14px;color:#71717A;margin:0 0 24px;">
-      Рядом есть другие клубы — возможно, там найдёшь компанию для катания.
-    </p>
-    ${ctaButton("Найти клуб →", v.clubsUrl)}
-    <p style="font-size:12px;color:#A1A1AA;margin:24px 0 0;">
-      <a href="${v.settingsUrl}" style="color:#F4632A;text-decoration:none;">Настроить уведомления →</a>
-    </p>
-  `});
-}
-
-function baseLayout(o: { title: string; body: string }): string {
-  return `<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${escapeHtml(o.title)}</title>
-</head>
-<body style="margin:0;padding:0;background:#F5F4F1;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F4F1;padding:40px 16px;">
-    <tr><td align="center">
-      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;">
-        <tr><td align="center" style="padding-bottom:24px;">
-          <span style="font-size:20px;font-weight:700;color:#1C1C1E;">Cycle</span><span style="font-size:20px;font-weight:700;color:#F4632A;">Connect</span>
-        </td></tr>
-        <tr><td style="background:#fff;border-radius:20px;border:1px solid #E4E4E7;padding:32px;">
-          ${o.body}
-        </td></tr>
-        <tr><td align="center" style="padding-top:16px;font-size:12px;color:#A1A1AA;">
-          CycleConnect — сообщество велоспорта
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+  const leadPrefix = v.firstName !== "привет" ? `${escapeHtml(v.firstName)}, в` : "В";
+  const leadText = `${leadPrefix}чера была поездка «${escapeHtml(v.title)}». Оставь пару слов и фото — это поможет другим выбрать маршрут.`;
+  return render("event-post-report", {
+    LEAD_TEXT: leadText,
+    REPORT_URL: v.reportUrl,
+    SETTINGS_URL: v.settingsUrl,
+  }, escapeHtml(`Как покаталось на «${v.title}»?`));
 }
