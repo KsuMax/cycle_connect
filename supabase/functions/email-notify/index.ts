@@ -32,6 +32,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { TEMPLATES } from "./templates.ts";
 
 // ── env ──────────────────────────────────────────────────────────────────────
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -64,18 +65,6 @@ function getSmtp(): SMTPClient {
     },
   });
   return smtpClient;
-}
-
-// ── шаблоны: загрузка при старте ────────────────────────────────────────────
-const TEMPLATES = new Map<string, string>();
-for (const n of [
-  "_base", "event-cancelled", "event-rescheduled", "event-rsvp-confirmation",
-  "event-new-rsvp", "announcement", "club-join-request", "club-join-approved",
-  "club-join-rejected", "event-hour-reminder", "event-post-report",
-]) {
-  TEMPLATES.set(n, await Deno.readTextFile(
-    new URL(`./templates/${n}.html`, import.meta.url).pathname,
-  ));
 }
 
 // ── основной обработчик ──────────────────────────────────────────────────────
@@ -689,6 +678,92 @@ Deno.serve(async (req: Request) => {
       if (deliveries.length) await adminDb.from("email_deliveries").insert(deliveries);
     }
     return json({ sent: totalSent, skipped: totalSkipped, failed: totalFailed, events: events?.length ?? 0 });
+  }
+
+  // ── route_report_for_interest ─────────────────────────────────────────────
+  // Кто-то опубликовал отчёт о маршруте, который ты отметил «Хочу».
+  // Вызывается клиентом после создания ride_report (fire-and-forget).
+  // Debounce: одно письмо на (получатель × маршрут) в сутки.
+  if (mode === "route_report_for_interest") {
+    const reportId = body.reportId as string | undefined;
+    if (!reportId) return json({ error: "reportId required" }, 400);
+
+    const { data: report } = await adminDb
+      .from("ride_reports")
+      .select("id, route_id, user_id, ridden_at, vibe, text, route:routes!route_id(title)")
+      .eq("id", reportId)
+      .single();
+    if (!report) return json({ error: "report not found" }, 404);
+    if (report.user_id !== user?.id) return json({ error: "forbidden" }, 403);
+
+    const routeId    = report.route_id as string;
+    const routeTitle = ((report.route as { title?: string } | null)?.title) ?? "маршрут";
+    const riddenAt   = report.ridden_at as string;
+    const vibe       = report.vibe as string | null;
+    const reportText = (report.text as string | null)?.slice(0, 140) ?? null;
+
+    const vibeLabels: Record<string, string> = {
+      chill: "Спокойно 🌿", push: "Энергично ⚡", epic: "Эпично 🏔",
+      suffer: "На грани 💀", explore: "Исследование 🧭",
+    };
+
+    // Кто ещё в пуле «Хочу» на этот маршрут
+    const { data: pool } = await adminDb
+      .from("route_interests")
+      .select("user_id, profile:profiles!user_id(name, email_notify_routes)")
+      .eq("route_id", routeId)
+      .neq("user_id", user?.id ?? "");
+
+    const poolIds = (pool ?? []).map((p) => p.user_id as string);
+    const emailByUser = await loadEmails(poolIds);
+
+    const { data: actorProfile } = await adminDb
+      .from("profiles").select("name").eq("id", user?.id ?? "").single();
+    const actorName = actorProfile?.name ?? "Кто-то";
+
+    const riddenDate = new Date(riddenAt).toLocaleDateString("ru-RU", {
+      day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Moscow",
+    });
+
+    let sent = 0, skipped = 0, failed = 0;
+    const deliveries: DeliveryRow[] = [];
+    const dayAgo = new Date(Date.now() - 24 * 3600_000).toISOString();
+
+    for (const p of pool ?? []) {
+      const uid  = p.user_id as string;
+      const prof = p.profile as { name?: string | null; email_notify_routes?: boolean } | null;
+      const email = emailByUser.get(uid);
+      if (!email || prof?.email_notify_routes === false) {
+        deliveries.push(makeDelivery(uid, "route_report_for_interest", routeId, "skipped", !email ? "no email" : "opted out"));
+        skipped++; continue;
+      }
+      // Debounce: одно письмо/сутки на маршрут
+      const { count } = await adminDb.from("email_deliveries").select("id", { count: "exact", head: true })
+        .eq("user_id", uid).eq("type", "route_report_for_interest").eq("related_id", routeId)
+        .eq("status", "sent").gte("created_at", dayAgo);
+      if ((count ?? 0) > 0) { skipped++; continue; }
+
+      const firstName = firstNameOf(prof?.name);
+      const leadText  = firstName !== "привет"
+        ? `${escapeHtml(firstName)}, ты отметил «Хочу» на маршрут «${escapeHtml(routeTitle)}». ${escapeHtml(actorName)} только что опубликовал отчёт.`
+        : `Ты отметил «Хочу» на маршрут «${escapeHtml(routeTitle)}». ${escapeHtml(actorName)} только что опубликовал отчёт.`;
+      const html = render("route-report-for-interest", {
+        LEAD_TEXT:    leadText,
+        ROUTE_TITLE:  escapeHtml(routeTitle),
+        ACTOR_NAME:   escapeHtml(actorName),
+        RIDDEN_AT:    riddenDate,
+        VIBE_ROW:     vibe && vibeLabels[vibe] ? `🎭 ${vibeLabels[vibe]}<br/>` : "",
+        EXCERPT_ROW:  reportText ? `📝 ${escapeHtml(reportText)}…<br/>` : "",
+        REPORT_URL:   `${SITE_URL}/routes/${routeId}/report/${reportId}`,
+        SETTINGS_URL: `${SITE_URL}/profile/settings`,
+      }, `Отчёт о маршруте «${routeTitle}»`);
+
+      const ok = await sendEmail(email, `${actorName} прокатал «${routeTitle}» — посмотри отчёт`, html);
+      ok ? (sent++, deliveries.push(makeDelivery(uid, "route_report_for_interest", routeId, "sent")))
+         : (failed++, deliveries.push(makeDelivery(uid, "route_report_for_interest", routeId, "failed", "smtp error")));
+    }
+    if (deliveries.length) await adminDb.from("email_deliveries").insert(deliveries);
+    return json({ sent, skipped, failed });
   }
 
   return json({ error: "unknown mode" }, 400);

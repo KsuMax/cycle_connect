@@ -73,7 +73,7 @@ function ReportForm({ routeId }: { routeId: string }) {
       }
 
       // 2. Insert report
-      const { error } = await supabase.from("ride_reports").insert({
+      const { data: reportData, error } = await supabase.from("ride_reports").insert({
         route_id: routeId,
         user_id: user.id,
         ride_id: rideId ?? null,
@@ -81,8 +81,15 @@ function ReportForm({ routeId }: { routeId: string }) {
         vibe: vibe ?? null,
         text: isEmptyRichText(text) ? null : text,
         photos: uploadedUrls,
-      });
+      }).select("id").single();
       if (error) throw error;
+
+      // Уведомляем тех, кто отметил «Хочу» на этот маршрут (fire-and-forget)
+      if (reportData?.id) {
+        supabase.functions.invoke("email-notify", {
+          body: { mode: "route_report_for_interest", reportId: reportData.id },
+        });
+      }
 
       showToast("Отчёт опубликован!", "success");
       router.push(`/routes/${routeId}`);
