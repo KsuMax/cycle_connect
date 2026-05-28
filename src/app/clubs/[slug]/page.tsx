@@ -177,6 +177,10 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
     setJoining(true);
     const status = club.visibility === "open" ? "active" : "pending";
     await supabase.from("club_members").insert({ club_id: club.id, user_id: user.id, status });
+    // Если клуб с заявками — уведомляем owner/admin по email (fire-and-forget)
+    if (status === "pending") {
+      supabase.functions.invoke("email-notify", { body: { mode: "club_join_request", clubId: club.id } });
+    }
     await loadClub();
     setJoining(false);
   }
@@ -198,6 +202,8 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
       .update({ status: "active" })
       .eq("club_id", club.id)
       .eq("user_id", userId);
+    // Email одобренному (fire-and-forget)
+    supabase.functions.invoke("email-notify", { body: { mode: "club_join_approved", clubId: club.id, memberId: userId } });
     setPendingMembers((prev) => prev.filter((m) => m.user_id !== userId));
     setClub((prev) => prev ? { ...prev, members_count: prev.members_count + 1 } : prev);
     // Refresh members list to show the newly approved member
@@ -213,6 +219,8 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
 
   async function handleReject(userId: string) {
     if (!club) return;
+    // Email отклонённому — шлём до удаления, пока userId ещё валиден
+    supabase.functions.invoke("email-notify", { body: { mode: "club_join_rejected", clubId: club.id, memberId: userId } });
     await supabase
       .from("club_members")
       .delete()

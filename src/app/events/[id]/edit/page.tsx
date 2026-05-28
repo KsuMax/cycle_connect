@@ -63,6 +63,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [organizerId, setOrganizerId] = useState<string | null>(null);
+  const [originalStartDate, setOriginalStartDate] = useState<string | null>(null);
 
   // Load event data and routes
   useEffect(() => {
@@ -88,6 +89,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         setDescription(ev.description ?? "");
         setRouteId(ev.route_id ?? "");
         setStartDate(ev.start_date ?? "");
+        setOriginalStartDate(ev.start_date ?? null);
         setMaxParticipants(ev.max_participants ? String(ev.max_participants) : "");
         setIsPrivate(ev.is_private ?? false);
         setCoverPreview(ev.cover_url ?? null);
@@ -171,6 +173,14 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
       setError("Не удалось сохранить изменения. Попробуй ещё раз.");
       setSubmitting(false);
       return;
+    }
+
+    // Если дата поменялась — уведомляем участников по email (fire-and-forget)
+    if (startDate && originalStartDate && startDate !== originalStartDate) {
+      supabase.functions.invoke("email-notify", {
+        body: { mode: "event_rescheduled", eventId: id, oldStartDate: originalStartDate },
+      });
+      setOriginalStartDate(startDate);
     }
 
     // 2. Upload cover if changed

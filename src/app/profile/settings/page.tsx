@@ -47,6 +47,10 @@ export default function SettingsPage() {
   const [tgLinked, setTgLinked] = useState(false);
   const [tgNotifyInterests, setTgNotifyInterests] = useState(true);
   const [tgLinking, setTgLinking] = useState(false);
+  const [emailNotifyEvents, setEmailNotifyEvents] = useState(true);
+  const [emailNotifyRoutes, setEmailNotifyRoutes] = useState(true);
+  const [emailNotifyClubs, setEmailNotifyClubs]   = useState(true);
+  const [emailNotifyDigest, setEmailNotifyDigest] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -74,6 +78,10 @@ export default function SettingsPage() {
       setTelegramUsername(profile.telegram_username ?? "");
       setTgLinked(!!profile.telegram_chat_id);
       setTgNotifyInterests(profile.tg_notify_interests !== false);
+      setEmailNotifyEvents(profile.email_notify_events !== false);
+      setEmailNotifyRoutes(profile.email_notify_routes !== false);
+      setEmailNotifyClubs(profile.email_notify_clubs !== false);
+      setEmailNotifyDigest(profile.email_notify_digest === true);
     }
     if (user) setEmail(user.email ?? "");
   }, [profile, user]);
@@ -166,6 +174,10 @@ export default function SettingsPage() {
       strava_url: stravaUrl.trim() || null,
       telegram_username: tgTrimmed || null,
       tg_notify_interests: tgNotifyInterests,
+      email_notify_events: emailNotifyEvents,
+      email_notify_routes: emailNotifyRoutes,
+      email_notify_clubs:  emailNotifyClubs,
+      email_notify_digest: emailNotifyDigest,
     };
     const { error: profileError } = await supabase
       .from("profiles")
@@ -338,6 +350,53 @@ export default function SettingsPage() {
                 Уведомлять о компании на маршрутах, которые я хочу проехать
               </label>
             )}
+          </Section>
+
+          {/* Email notifications */}
+          <Section title="Email-уведомления">
+            <p className="text-xs text-[#71717A] -mt-2">
+              Шлём на почту аккаунта. Транзакционные письма (отмена поездки, сброс пароля) приходят всегда.
+            </p>
+            {(
+              [
+                { id: "email-events",  label: "Поездки",  hint: "Новые участники, объявления, перенос даты", value: emailNotifyEvents, set: setEmailNotifyEvents },
+                { id: "email-routes",  label: "Маршруты", hint: "Кто-то прокатил маршрут из твоего «Хочу»",   value: emailNotifyRoutes, set: setEmailNotifyRoutes },
+                { id: "email-clubs",   label: "Клубы",    hint: "Заявки на вступление и решения по ним",      value: emailNotifyClubs,  set: setEmailNotifyClubs },
+              ] as const
+            ).map(({ id, label, hint, value, set }) => (
+              <label key={id} className="flex items-start gap-3 cursor-pointer select-none group">
+                <input
+                  type="checkbox"
+                  id={id}
+                  checked={value}
+                  onChange={(e) => set(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-[#E4E4E7] accent-[#F4632A] shrink-0"
+                />
+                <span>
+                  <span className="block text-sm font-medium text-[#1C1C1E] group-hover:text-[#F4632A] transition-colors">{label}</span>
+                  <span className="block text-xs text-[#71717A]">{hint}</span>
+                </span>
+              </label>
+            ))}
+            <div className="border-t border-[#F5F4F1] pt-3 mt-1">
+              <label className="flex items-start gap-3 cursor-pointer select-none group">
+                <input
+                  type="checkbox"
+                  id="email-digest"
+                  checked={emailNotifyDigest}
+                  onChange={(e) => setEmailNotifyDigest(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-[#E4E4E7] accent-[#F4632A] shrink-0"
+                />
+                <span>
+                  <span className="block text-sm font-medium text-[#1C1C1E] group-hover:text-[#F4632A] transition-colors">
+                    Еженедельная подборка
+                  </span>
+                  <span className="block text-xs text-[#71717A]">
+                    Поездки и горячие маршруты в твоём городе — каждый понедельник
+                  </span>
+                </span>
+              </label>
+            </div>
           </Section>
 
           {/* Account */}

@@ -194,8 +194,14 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     });
 
     if (!res.error) {
-      const { sent, no_tg } = res.data as { sent: number; no_tg: number };
+      const { sent, no_tg, announcement_id } = res.data as { sent: number; no_tg: number; announcement_id?: string };
       setAnnResult({ sent, no_tg });
+      // Дублируем по email тем, у кого нет TG (fire-and-forget)
+      if (no_tg > 0 && announcement_id) {
+        supabase.functions.invoke("email-notify", {
+          body: { mode: "event_announcement_email", eventId: event.id, announcementId: announcement_id },
+        });
+      }
       // Reload announcements to show the new one
       const { data } = await supabase
         .from("event_announcements")
@@ -248,12 +254,17 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       await supabase.from("event_participants").insert({ event_id: event.id, user_id: user!.id });
       showToast("Вы записались на поездку!", "success");
       checkAndAward("event_joined", {});
+      // Email: подтверждение участнику + уведомление организатору (fire-and-forget)
+      supabase.functions.invoke("email-notify", { body: { mode: "event_rsvp_confirmation", eventId: event.id } });
+      supabase.functions.invoke("email-notify", { body: { mode: "event_new_rsvp",          eventId: event.id } });
     }
   };
 
   const handleDelete = async () => {
     if (!user || !event) return;
     setDeleting(true);
+    // Сначала шлём email об отмене всем участникам, пока они ещё есть в таблице
+    await supabase.functions.invoke("email-notify", { body: { mode: "event_cancelled", eventId: event.id } });
     await supabase.from("event_participants").delete().eq("event_id", event.id);
     await supabase.from("event_days").delete().eq("event_id", event.id);
     await supabase.from("event_likes").delete().eq("event_id", event.id);

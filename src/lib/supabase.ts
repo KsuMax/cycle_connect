@@ -80,6 +80,12 @@ export interface DbProfile {
   tg_notify_interests?: boolean;
   // Onboarding (migration 026). NULL until the user completes /onboarding.
   onboarded_at?: string | null;
+  // Email notification preferences (migration 052). All default true except digest.
+  email_notify_account?: boolean;
+  email_notify_events?: boolean;
+  email_notify_routes?: boolean;
+  email_notify_clubs?: boolean;
+  email_notify_digest?: boolean;
 }
 
 /**
