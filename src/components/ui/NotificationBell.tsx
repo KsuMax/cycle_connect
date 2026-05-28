@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
-import { Bell } from "lucide-react";
+import { Bell, X, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useNotifications } from "@/lib/context/NotificationsContext";
 import { formatDate } from "@/lib/utils";
@@ -76,7 +76,7 @@ function formatNotification(n: DbNotification) {
 }
 
 export function NotificationBell() {
-  const { notifications, unreadCount, markAllRead } = useNotifications();
+  const { notifications, unreadCount, markAllRead, dismiss, clearAll } = useNotifications();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -124,6 +124,16 @@ export function NotificationBell() {
         >
           <div className="px-4 py-3 border-b border-[#E4E4E7] flex items-center justify-between">
             <span className="text-sm font-semibold text-[#1C1C1E]">Уведомления</span>
+            {notifications.length > 0 && (
+              <button
+                onClick={() => clearAll()}
+                className="flex items-center gap-1 text-xs text-[#71717A] hover:text-[#F4632A] transition-colors"
+                title="Очистить все"
+              >
+                <Trash2 size={12} />
+                <span>Очистить</span>
+              </button>
+            )}
           </div>
 
           <div className="max-h-80 overflow-y-auto">
@@ -143,33 +153,49 @@ export function NotificationBell() {
                     ? `/clubs/${data.club_slug as string}`
                     : actorId ? `/users/${actorId}` : "#";
                 return (
-                  <Link
+                  <div
                     key={n.id}
-                    href={href}
-                    onClick={() => setOpen(false)}
-                    className="flex items-start gap-3 px-4 py-3 hover:bg-[#F5F4F1] transition-colors border-b border-[#F5F4F1] last:border-0"
+                    className="group relative border-b border-[#F5F4F1] last:border-0"
                     style={{ backgroundColor: n.read ? undefined : "#FFFBF5" }}
                   >
-                    {/* Actor avatar */}
-                    <div
-                      className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center text-xs font-bold text-white shrink-0"
-                      style={{ backgroundColor: "#7C5CFC" }}
+                    <Link
+                      href={href}
+                      onClick={() => setOpen(false)}
+                      className="flex items-start gap-3 px-4 py-3 pr-9 hover:bg-[#F5F4F1] transition-colors"
                     >
-                      {actor?.avatar_url ? (
-                        <Image src={proxyImageUrl(actor.avatar_url) ?? actor.avatar_url} alt="" width={32} height={32} className="w-full h-full object-cover" />
-                      ) : (
-                        (actor?.name ?? "?")[0].toUpperCase()
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs text-[#1C1C1E] leading-snug">
-                        {formatNotification(n)}
+                      {/* Actor avatar */}
+                      <div
+                        className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center text-xs font-bold text-white shrink-0"
+                        style={{ backgroundColor: "#7C5CFC" }}
+                      >
+                        {actor?.avatar_url ? (
+                          <Image src={proxyImageUrl(actor.avatar_url) ?? actor.avatar_url} alt="" width={32} height={32} className="w-full h-full object-cover" />
+                        ) : (
+                          (actor?.name ?? "?")[0].toUpperCase()
+                        )}
                       </div>
-                      <div className="text-[10px] text-[#A1A1AA] mt-0.5">
-                        {formatDate(n.created_at)}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs text-[#1C1C1E] leading-snug">
+                          {formatNotification(n)}
+                        </div>
+                        <div className="text-[10px] text-[#A1A1AA] mt-0.5">
+                          {formatDate(n.created_at)}
+                        </div>
                       </div>
-                    </div>
-                  </Link>
+                    </Link>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        dismiss(n.id);
+                      }}
+                      className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full text-[#A1A1AA] hover:text-[#1C1C1E] hover:bg-[#E4E4E7] opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                      title="Скрыть"
+                      aria-label="Скрыть уведомление"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
                 );
               })
             )}

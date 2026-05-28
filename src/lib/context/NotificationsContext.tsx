@@ -11,6 +11,8 @@ interface NotificationsContextValue {
   loaded: boolean;
   markAsRead: (id: string) => Promise<void>;
   markAllRead: () => Promise<void>;
+  dismiss: (id: string) => Promise<void>;
+  clearAll: () => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -20,6 +22,8 @@ const DEFAULT_VALUE: NotificationsContextValue = {
   loaded: false,
   markAsRead: async () => {},
   markAllRead: async () => {},
+  dismiss: async () => {},
+  clearAll: async () => {},
   refresh: async () => {},
 };
 
@@ -81,12 +85,30 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           }
         },
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const deletedId = (payload.old as { id?: string }).id;
+          if (deletedId) {
+            setNotifications((prev) => prev.filter((n) => n.id !== deletedId));
+          } else {
+            // DELETE payload may be empty when REPLICA IDENTITY is DEFAULT — refetch as fallback.
+            loadNotifications();
+          }
+        },
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, loadNotifications]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -107,9 +129,28 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       .eq("read", false);
   }, [user]);
 
+  const dismiss = useCallback(async (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    const { error } = await supabase.from("notifications").delete().eq("id", id);
+    if (error) {
+      console.error("[NotificationsContext] failed to dismiss notification", error.message);
+      loadNotifications();
+    }
+  }, [loadNotifications]);
+
+  const clearAll = useCallback(async () => {
+    if (!user) return;
+    setNotifications([]);
+    const { error } = await supabase.from("notifications").delete().eq("user_id", user.id);
+    if (error) {
+      console.error("[NotificationsContext] failed to clear notifications", error.message);
+      loadNotifications();
+    }
+  }, [user, loadNotifications]);
+
   return (
     <NotificationsContext.Provider
-      value={{ notifications, unreadCount, loaded, markAsRead, markAllRead, refresh: loadNotifications }}
+      value={{ notifications, unreadCount, loaded, markAsRead, markAllRead, dismiss, clearAll, refresh: loadNotifications }}
     >
       {children}
     </NotificationsContext.Provider>
