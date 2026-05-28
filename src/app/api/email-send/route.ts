@@ -73,8 +73,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   // Return 200 immediately — SMTP runs in background.
   // On this VPS the Node process stays alive, so void promise is safe.
-  void sendMail(to, subject, html).catch((err) => {
-    console.error("[email-send] SMTP failed:", err?.message ?? err);
+  void sendMail(to, subject, html).then(() => {
+    console.log("[email-send] sent ok to", to, "|", subject);
+  }).catch((err) => {
+    console.error("[email-send] SMTP failed to", to, ":", err?.message ?? err);
   });
 
   return NextResponse.json({ ok: true });
