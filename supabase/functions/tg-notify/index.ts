@@ -90,8 +90,30 @@ Deno.serve(async (req: Request) => {
   const jwt = authHeader.replace("Bearer ", "").trim();
   if (!jwt) return json({ error: "unauthorized" }, 401);
 
-  const { data: { user }, error: authErr } = await adminDb.auth.getUser(jwt);
-  if (authErr || !user) return json({ error: "unauthorized" }, 401);
+  // Local JWT verification — avoids the slow GoTrue auth.getUser() round-trip
+  // which was causing wall-clock early-termination (same fix as email-notify).
+  let user: { id: string };
+  try {
+    const jwtSecret = Deno.env.get("JWT_SECRET")!;
+    const [hb, pb, sb] = jwt.split(".");
+    if (!hb || !pb || !sb) throw new Error("invalid jwt");
+    const key = await crypto.subtle.importKey(
+      "raw", new TextEncoder().encode(jwtSecret),
+      { name: "HMAC", hash: "SHA-256" }, false, ["verify"],
+    );
+    const valid = await crypto.subtle.verify(
+      "HMAC", key,
+      Uint8Array.from(atob(sb.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0)),
+      new TextEncoder().encode(`${hb}.${pb}`),
+    );
+    if (!valid) throw new Error("bad sig");
+    const payload = JSON.parse(atob(pb.replace(/-/g, "+").replace(/_/g, "/")));
+    if (!payload.sub) throw new Error("no sub");
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) throw new Error("expired");
+    user = { id: payload.sub as string };
+  } catch {
+    return json({ error: "unauthorized" }, 401);
+  }
 
   let body: {
     mode?: string;
