@@ -31,7 +31,9 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+// nodemailer generates standard RFC-2822 MIME with proper text/html parts.
+// denomailer 1.6.0 was sending only text/plain even when html: field was set.
+import nodemailer from "npm:nodemailer@6";
 import { TEMPLATES } from "./templates.ts";
 
 // ── env ──────────────────────────────────────────────────────────────────────
@@ -50,22 +52,14 @@ const adminDb = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false },
 });
 
-// SMTP-клиент держим лениво — создаём при первой реальной отправке.
-// Так dispatch-режим без получателей не тратит коннект и можно сделать
-// dry-run, не задев Beget.
-let smtpClient: SMTPClient | null = null;
-function getSmtp(): SMTPClient {
-  if (smtpClient) return smtpClient;
-  smtpClient = new SMTPClient({
-    connection: {
-      hostname: SMTP_HOST,
-      port: SMTP_PORT,
-      tls: SMTP_PORT === 465,             // 465 = implicit TLS, 587/2525 = STARTTLS
-      auth: { username: SMTP_USER, password: SMTP_PASS },
-    },
-  });
-  return smtpClient;
-}
+// Nodemailer transporter — создаём один раз при холодном старте функции.
+// secure:true = implicit TLS (port 465); false = STARTTLS (port 587/2525).
+const transporter = nodemailer.createTransport({
+  host: SMTP_HOST,
+  port: SMTP_PORT,
+  secure: SMTP_PORT === 465,
+  auth: { user: SMTP_USER, pass: SMTP_PASS },
+});
 
 // ── основной обработчик ──────────────────────────────────────────────────────
 Deno.serve(async (req: Request) => {
@@ -773,13 +767,12 @@ Deno.serve(async (req: Request) => {
 
 async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
   try {
-    const client = getSmtp();
-    await client.send({
-      from: `${SMTP_FROM_NAME} <${SMTP_FROM_EMAIL}>`,
+    await transporter.sendMail({
+      from: `"${SMTP_FROM_NAME}" <${SMTP_FROM_EMAIL}>`,
       to,
       subject,
-      content: stripHtml(html),  // plain-text fallback
       html,
+      text: stripHtml(html),  // plain-text fallback для старых клиентов
     });
     return true;
   } catch (err) {
