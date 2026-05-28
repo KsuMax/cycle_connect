@@ -45,7 +45,7 @@ export default function SettingsPage() {
   const [stravaUrl, setStravaUrl] = useState("");
   const [telegramUsername, setTelegramUsername] = useState("");
   const [tgLinked, setTgLinked] = useState(false);
-  const [tgNotifyInterests, setTgNotifyIntents] = useState(true);
+  const [tgNotifyInterests, setTgNotifyInterests] = useState(true);
   const [tgLinking, setTgLinking] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -332,7 +332,7 @@ export default function SettingsPage() {
                 <input
                   type="checkbox"
                   checked={tgNotifyInterests}
-                  onChange={(e) => setTgNotifyIntents(e.target.checked)}
+                  onChange={(e) => setTgNotifyInterests(e.target.checked)}
                   className="w-4 h-4 rounded border-[#E4E4E7] accent-[#F4632A]"
                 />
                 Уведомлять о компании на маршрутах, которые я хочу проехать
