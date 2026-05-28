@@ -22,6 +22,19 @@ jobs:
             cd /opt/cycleconnect
             git fetch origin main
             git reset --hard origin/main
+
+            # Sync edge functions (tg-notify, tg-webhook, email-notify)
+            FUNC_SRC=/opt/cycleconnect/supabase/functions
+            FUNC_DST=/root/supabase/docker/volumes/functions
+            for fn in tg-notify tg-webhook email-notify; do
+              if [ -d "$FUNC_SRC/$fn" ]; then
+                mkdir -p "$FUNC_DST/$fn"
+                cp -r "$FUNC_SRC/$fn/." "$FUNC_DST/$fn/"
+                echo "synced $fn"
+              fi
+            done
+            docker restart supabase-edge-functions
+
             docker build -t cycleconnect:latest .
             docker stop cycleconnect-app 2>/dev/null || true
             docker rm cycleconnect-app 2>/dev/null || true
@@ -35,4 +48,4 @@ jobs:
             docker builder prune -f
             docker image prune -f
             df -h / | tail -1
-            echo "✅ Deployed"
+            echo "Deployed"

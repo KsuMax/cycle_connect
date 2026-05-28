@@ -57,6 +57,21 @@ function formatNotification(n: DbNotification) {
     return `🔔 Завтра поездка «${eventTitle}»${date ? ` (${formatDate(date)})` : ""}`;
   }
 
+  if (n.type === "club_join_request" && data) {
+    const clubName = (data.club_name as string) ?? "клуб";
+    return `🙋 ${actorName} хочет вступить в «${clubName}»`;
+  }
+
+  if (n.type === "club_join_approved" && data) {
+    const clubName = (data.club_name as string) ?? "клуб";
+    return `✅ Тебя приняли в клуб «${clubName}»`;
+  }
+
+  if (n.type === "club_join_rejected" && data) {
+    const clubName = (data.club_name as string) ?? "клуб";
+    return `❌ Заявку в «${clubName}» не одобрили`;
+  }
+
   return `${actorName} — новое уведомление`;
 }
 
@@ -124,6 +139,8 @@ export function NotificationBell() {
                 const href =
                   (n.type === "club_event" || n.type === "event_reminder") && data?.event_id
                     ? `/events/${data.event_id as string}`
+                  : (n.type === "club_join_request" || n.type === "club_join_approved" || n.type === "club_join_rejected") && data?.club_slug
+                    ? `/clubs/${data.club_slug as string}`
                     : actorId ? `/users/${actorId}` : "#";
                 return (
                   <Link
