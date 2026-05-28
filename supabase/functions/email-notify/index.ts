@@ -31,9 +31,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-// nodemailer generates standard RFC-2822 MIME with proper text/html parts.
-// denomailer 1.6.0 was sending only text/plain even when html: field was set.
-import nodemailer from "npm:nodemailer@6";
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 import { TEMPLATES } from "./templates.ts";
 
 // ── env ──────────────────────────────────────────────────────────────────────
@@ -52,14 +50,22 @@ const adminDb = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false },
 });
 
-// Nodemailer transporter — создаём один раз при холодном старте функции.
-// secure:true = implicit TLS (port 465); false = STARTTLS (port 587/2525).
-const transporter = nodemailer.createTransport({
-  host: SMTP_HOST,
-  port: SMTP_PORT,
-  secure: SMTP_PORT === 465,
-  auth: { user: SMTP_USER, pass: SMTP_PASS },
-});
+// denomailer SMTP client — ленивая инициализация при первой отправке.
+// npm:nodemailer тестировался, но требует скачивания пакета с npm registry
+// на каждый холодный старт (блокируется на российских серверах).
+let smtpClient: SMTPClient | null = null;
+function getSmtp(): SMTPClient {
+  if (smtpClient) return smtpClient;
+  smtpClient = new SMTPClient({
+    connection: {
+      hostname: SMTP_HOST,
+      port: SMTP_PORT,
+      tls: SMTP_PORT === 465,
+      auth: { username: SMTP_USER, password: SMTP_PASS },
+    },
+  });
+  return smtpClient;
+}
 
 // ── основной обработчик ──────────────────────────────────────────────────────
 Deno.serve(async (req: Request) => {
@@ -94,11 +100,13 @@ Deno.serve(async (req: Request) => {
 
   const { mode, eventId, reason } = body;
 
-  // Cron-only modes: don't need a user. All other modes require a real user JWT.
+  // Strict mode routing:
+  //   cron token  → only cron modes allowed (user = null, no permission checks)
+  //   user token  → only user modes allowed (user guaranteed non-null)
   const CRON_MODES = ["event_hour_reminder", "event_post_report", "weekly_digest"];
-  if (!isCron && !user && !CRON_MODES.includes(mode ?? "")) {
-    return json({ error: "unauthorized" }, 401);
-  }
+  const isCronMode = CRON_MODES.includes(mode ?? "");
+  if (isCron && !isCronMode) return json({ error: "service token can only call cron modes" }, 403);
+  if (!isCron && !user)       return json({ error: "unauthorized" }, 401);
 
   // ── event_cancelled ────────────────────────────────────────────────────────
   if (mode === "event_cancelled") {
@@ -773,12 +781,15 @@ Deno.serve(async (req: Request) => {
 
 async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
   try {
-    await transporter.sendMail({
-      from: `"${SMTP_FROM_NAME}" <${SMTP_FROM_EMAIL}>`,
+    const client = getSmtp();
+    await client.send({
+      from: `${SMTP_FROM_NAME} <${SMTP_FROM_EMAIL}>`,
       to,
       subject,
+      // Отправляем ТОЛЬКО html — denomailer устанавливает Content-Type: text/html.
+      // Когда передавался content (plain text) одновременно с html, denomailer
+      // строил multipart/alternative, и Yandex выбирал text/plain часть.
       html,
-      text: stripHtml(html),  // plain-text fallback для старых клиентов
     });
     return true;
   } catch (err) {

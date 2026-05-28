@@ -145,30 +145,37 @@ Deno.serve(async (req: Request) => {
       `🚴 <b>${actorName}</b> хочет проехать «${routeTitle}»\n\n` +
       `<a href="${routeUrl}">Открыть маршрут</a>`;
 
-    let sent = 0, skipped = 0;
-    for (const p of pool ?? []) {
+    // Filter to TG-linked users who haven't opted out
+    const tgPool = (pool ?? []).filter((p) => {
       const prof = p.profile as { telegram_chat_id?: number | null; tg_notify_interests?: boolean } | null;
-      const uid = p.user_id as string;
-      if (!prof?.telegram_chat_id || prof.tg_notify_interests === false) { skipped++; continue; }
+      return prof?.telegram_chat_id && prof.tg_notify_interests !== false;
+    });
 
-      // Mirror the in-app trigger's hourly debounce: only ping if
-      // the recipient hasn't already heard about this route recently.
-      // We check notifications because the trigger writes one iff it
-      // decided to send; absence ≈ "trigger debounced this user too,
-      // and so should we".
-      const { count } = await adminDb
-        .from("notifications")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", uid)
-        .eq("type", "route_interest_new")
-        .eq("data->>route_id", routeId)
-        .gt("created_at", since);
+    if (tgPool.length === 0) return json({ sent: 0, skipped: (pool ?? []).length });
 
-      if ((count ?? 0) === 0) { skipped++; continue; }
+    // Batch debounce check: one query for all recipients instead of N queries
+    const tgUids = tgPool.map((p) => p.user_id as string);
+    const { data: recentNotifs } = await adminDb
+      .from("notifications")
+      .select("user_id")
+      .in("user_id", tgUids)
+      .eq("type", "route_interest_new")
+      .eq("data->>route_id", routeId)
+      .gt("created_at", since);
+    const notifiedSet = new Set((recentNotifs ?? []).map((n: { user_id: string }) => n.user_id));
 
-      (await sendTg(prof.telegram_chat_id, text)) ? sent++ : skipped++;
-    }
+    // Send TG messages in parallel
+    const results = await Promise.all(
+      tgPool.map(async (p) => {
+        const prof = p.profile as { telegram_chat_id?: number | null } | null;
+        const uid = p.user_id as string;
+        if (!notifiedSet.has(uid)) return "skipped";
+        return (await sendTg(prof!.telegram_chat_id!, text)) ? "sent" : "skipped";
+      })
+    );
 
+    const sent = results.filter((r) => r === "sent").length;
+    const skipped = results.filter((r) => r === "skipped").length;
     return json({ sent, skipped });
   }
 
