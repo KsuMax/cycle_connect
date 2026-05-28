@@ -31,7 +31,6 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 import { TEMPLATES } from "./templates.ts";
 
 // ── env ──────────────────────────────────────────────────────────────────────
@@ -50,22 +49,9 @@ const adminDb = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false },
 });
 
-// denomailer SMTP client — ленивая инициализация при первой отправке.
-// npm:nodemailer тестировался, но требует скачивания пакета с npm registry
-// на каждый холодный старт (блокируется на российских серверах).
-let smtpClient: SMTPClient | null = null;
-function getSmtp(): SMTPClient {
-  if (smtpClient) return smtpClient;
-  smtpClient = new SMTPClient({
-    connection: {
-      hostname: SMTP_HOST,
-      port: SMTP_PORT,
-      tls: SMTP_PORT === 465,
-      auth: { username: SMTP_USER, password: SMTP_PASS },
-    },
-  });
-  return smtpClient;
-}
+// Секрет для вызова /api/email-send на Next.js сервере.
+// Тот же CRON_SECRET, что уже используется в pg_cron — новых env не нужно.
+const EMAIL_SEND_SECRET = Deno.env.get("CRON_SECRET") ?? "";
 
 // ── основной обработчик ──────────────────────────────────────────────────────
 Deno.serve(async (req: Request) => {
@@ -780,20 +766,28 @@ Deno.serve(async (req: Request) => {
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
+  // Delegate actual SMTP to the Next.js /api/email-send route.
+  // This avoids the Supabase edge-runtime ~10 s wall-clock isolate limit:
+  // a full TLS SMTP exchange takes 7-10 s which reliably hits early-termination.
+  // The Next.js process runs without isolate limits on the same VPS.
+  // /api/email-send responds immediately (200 OK) and sends in background.
   try {
-    const client = getSmtp();
-    await client.send({
-      from: `${SMTP_FROM_NAME} <${SMTP_FROM_EMAIL}>`,
-      to,
-      subject,
-      // Отправляем ТОЛЬКО html — denomailer устанавливает Content-Type: text/html.
-      // Когда передавался content (plain text) одновременно с html, denomailer
-      // строил multipart/alternative, и Yandex выбирал text/plain часть.
-      html,
+    const res = await fetch(`${SITE_URL}/api/email-send`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Email-Secret": EMAIL_SEND_SECRET,
+      },
+      body: JSON.stringify({ to, subject, html }),
+      signal: AbortSignal.timeout(5000),  // HTTP to localhost is <10 ms
     });
-    return true;
+    if (!res.ok) {
+      const err = await res.text().catch(() => "");
+      console.error("[email-notify] email-send returned", res.status, err);
+    }
+    return res.ok;
   } catch (err) {
-    console.error("[email-notify] SMTP send failed:", err);
+    console.error("[email-notify] email-send request failed:", err);
     return false;
   }
 }
