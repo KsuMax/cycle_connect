@@ -821,15 +821,13 @@ async function sendEmail(to: string, subject: string, html: string): Promise<boo
 
 async function loadEmails(userIds: string[]): Promise<Map<string, string>> {
   if (userIds.length === 0) return new Map();
-  // Точечный запрос по id — не грузим всех пользователей.
-  // auth.users доступен через schema("auth") с service role key.
-  const { data } = await adminDb
-    .schema("auth")
-    .from("users")
-    .select("id, email")
-    .in("id", userIds);
+  // auth schema is not exposed via PostgREST → use a SECURITY DEFINER function
+  // in public schema that reads from auth.users.
+  // Faster than auth.admin.listUsers (no full-table scan) and works with
+  // service role without GoTrue round-trip.
+  const { data } = await adminDb.rpc("get_user_emails", { user_ids: userIds });
   const map = new Map<string, string>();
-  for (const u of (data ?? []) as { id: string; email: string | null }[]) {
+  for (const u of (data ?? []) as { id: string; email: string }[]) {
     if (u.email) map.set(u.id, u.email);
   }
   return map;
