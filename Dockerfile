@@ -27,6 +27,11 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# nodemailer is an external package used in /api/email-send.
+# Next.js standalone output doesn't auto-copy native/non-tree-shaken packages,
+# so we copy it explicitly here as a safety net alongside outputFileTracingIncludes.
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/nodemailer ./node_modules/nodemailer
+
 USER nextjs
 EXPOSE 4000
 ENV PORT=4000

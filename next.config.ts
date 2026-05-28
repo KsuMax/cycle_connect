@@ -133,8 +133,15 @@ const nextConfig: NextConfig = {
     ];
   },
   output: "standalone",
+  // nodemailer is used in /api/email-send for SMTP delivery.
+  // In standalone output it must be explicitly traced so Next.js
+  // copies it to .next/standalone/node_modules/.
+  serverExternalPackages: ["nodemailer"],
   experimental: {
     optimizePackageImports: [],
+    outputFileTracingIncludes: {
+      "/api/email-send": ["./node_modules/nodemailer/**/*"],
+    },
   },
   webpack: (config) => {
     config.resolve.alias = {
