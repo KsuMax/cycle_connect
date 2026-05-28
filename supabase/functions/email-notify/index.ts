@@ -62,15 +62,42 @@ Deno.serve(async (req: Request) => {
   if (!jwt) return json({ error: "unauthorized" }, 401);
 
   // Cron calls arrive with the service role key as the Bearer token.
-  // Detect this so cron modes can bypass user-level permission checks.
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const isCron = jwt === SERVICE_KEY;
 
   let user: { id: string } | null = null;
   if (!isCron) {
-    const { data, error: authErr } = await adminDb.auth.getUser(jwt);
-    if (authErr || !data.user) return json({ error: "unauthorized" }, 401);
-    user = data.user;
+    // Verify JWT locally using HMAC-SHA256 — avoids a slow GoTrue round-trip
+    // (auth.getUser() can take 5-10 s under load, triggering the edge-runtime
+    // ~10 s wall-clock isolate kill). The JWT_SECRET is the same key Supabase
+    // uses to sign JWTs, so local verification is fully equivalent for our
+    // use case (email notifications don't need session-revocation checks).
+    try {
+      const jwtSecret = Deno.env.get("JWT_SECRET")!;
+      const [headerB64, payloadB64, sigB64] = jwt.split(".");
+      if (!headerB64 || !payloadB64 || !sigB64) throw new Error("invalid jwt");
+
+      const key = await crypto.subtle.importKey(
+        "raw",
+        new TextEncoder().encode(jwtSecret),
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["verify"],
+      );
+      const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
+      // base64url → base64 → Uint8Array
+      const sig = Uint8Array.from(atob(sigB64.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+      const valid = await crypto.subtle.verify("HMAC", key, sig, data);
+      if (!valid) throw new Error("invalid signature");
+
+      const payload = JSON.parse(atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/")));
+      if (!payload.sub) throw new Error("no sub");
+      if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) throw new Error("expired");
+
+      user = { id: payload.sub as string };
+    } catch {
+      return json({ error: "unauthorized" }, 401);
+    }
   }
 
   let body: {
@@ -794,11 +821,16 @@ async function sendEmail(to: string, subject: string, html: string): Promise<boo
 
 async function loadEmails(userIds: string[]): Promise<Map<string, string>> {
   if (userIds.length === 0) return new Map();
-  // auth.users доступен только service role — adminDb это умеет.
-  const { data } = await adminDb.auth.admin.listUsers({ perPage: 1000 });
+  // Точечный запрос по id — не грузим всех пользователей.
+  // auth.users доступен через schema("auth") с service role key.
+  const { data } = await adminDb
+    .schema("auth")
+    .from("users")
+    .select("id, email")
+    .in("id", userIds);
   const map = new Map<string, string>();
-  for (const u of data?.users ?? []) {
-    if (userIds.includes(u.id) && u.email) map.set(u.id, u.email);
+  for (const u of (data ?? []) as { id: string; email: string | null }[]) {
+    if (u.email) map.set(u.id, u.email);
   }
   return map;
 }
