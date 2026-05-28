@@ -18,7 +18,7 @@ import type { DbRoute, DbEvent } from "@/lib/supabase";
 type LocationScope = "all" | "city" | "out";
 const LOCATION_SCOPES: { value: LocationScope; label: string }[] = [
   { value: "all",  label: "Все" },
-  { value: "out",  label: "За городом" },
+  { value: "out",  label: "Загород" },
   { value: "city", label: "Город" },
 ];
 
@@ -52,7 +52,7 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
   const [difficulty, setDifficulty] = useState<Difficulty | "all">("all");
   const [selectedTypes, setSelectedTypes] = useState<RouteType[]>([]);
   const [selectedSurfaces, setSelectedSurfaces] = useState<Surface[]>([]);
-  const [locationScope, setLocationScope] = useState<LocationScope>("out");
+  const [locationScope, setLocationScope] = useState<LocationScope>("all");
   const [minDistance, setMinDistance] = useState<string>("");
   const [maxDistance, setMaxDistance] = useState<string>("");
   const [region, setRegion] = useState("");

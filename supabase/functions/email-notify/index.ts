@@ -74,8 +74,17 @@ Deno.serve(async (req: Request) => {
   const jwt = authHeader.replace("Bearer ", "").trim();
   if (!jwt) return json({ error: "unauthorized" }, 401);
 
-  const { data: { user }, error: authErr } = await adminDb.auth.getUser(jwt);
-  if (authErr || !user) return json({ error: "unauthorized" }, 401);
+  // Cron calls arrive with the service role key as the Bearer token.
+  // Detect this so cron modes can bypass user-level permission checks.
+  const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const isCron = jwt === SERVICE_KEY;
+
+  let user: { id: string } | null = null;
+  if (!isCron) {
+    const { data, error: authErr } = await adminDb.auth.getUser(jwt);
+    if (authErr || !data.user) return json({ error: "unauthorized" }, 401);
+    user = data.user;
+  }
 
   let body: {
     mode?: string;
@@ -539,6 +548,137 @@ Deno.serve(async (req: Request) => {
     return json({ sent: ok ? 1 : 0 });
   }
 
+  // ── event_hour_reminder ───────────────────────────────────────────────────
+  // Cron-only. Finds events starting in 50–70 min, emails participants.
+  // Cron runs every 30 min so the ±10 min margin guarantees each event
+  // is caught exactly once even with scheduling drift.
+  if (mode === "event_hour_reminder") {
+    if (!isCron) return json({ error: "cron only" }, 403);
+
+    const now = new Date();
+    const from = new Date(now.getTime() + 50 * 60_000).toISOString();
+    const to   = new Date(now.getTime() + 70 * 60_000).toISOString();
+
+    const { data: events } = await adminDb
+      .from("events")
+      .select("id, title, start_date, meet_point, organizer_id, organizer:profiles!organizer_id(name), event_participants(user_id, profile:profiles!user_id(name, email_notify_events))")
+      .gte("start_date", from)
+      .lte("start_date", to)
+      .eq("is_private", false);
+
+    let totalSent = 0, totalSkipped = 0, totalFailed = 0;
+
+    for (const ev of events ?? []) {
+      const title    = String(ev.title ?? "поездка");
+      const dateStr  = ev.start_date ? formatDateTime(ev.start_date as string) : "";
+      const meetPoint = (ev.meet_point as string | null) ?? null;
+      const organizer = ev.organizer as { name?: string } | null;
+      const eventId   = ev.id as string;
+      const participants = (ev.event_participants as { user_id: string; profile: { name?: string | null; email_notify_events?: boolean } | null }[] | null) ?? [];
+      const uids = participants.filter((p) => p.user_id !== ev.organizer_id).map((p) => p.user_id);
+      const emailByUser = await loadEmails(uids);
+      const deliveries: DeliveryRow[] = [];
+
+      for (const p of participants) {
+        if (p.user_id === ev.organizer_id) continue;
+        const uid   = p.user_id as string;
+        const prof  = p.profile;
+        const email = emailByUser.get(uid);
+        if (!email || prof?.email_notify_events === false) {
+          deliveries.push(makeDelivery(uid, "event_hour_reminder", eventId, "skipped", !email ? "no email" : "opted out"));
+          totalSkipped++; continue;
+        }
+        // Идемпотентность: одно напоминание на (user × event)
+        const { count } = await adminDb.from("email_deliveries").select("id", { count: "exact", head: true })
+          .eq("user_id", uid).eq("type", "event_hour_reminder").eq("related_id", eventId).eq("status", "sent");
+        if ((count ?? 0) > 0) { totalSkipped++; continue; }
+
+        const html = renderEventHourReminder({
+          firstName: firstNameOf(prof?.name),
+          title, dateStr, meetPoint,
+          organizerName: organizer?.name ?? "Организатор",
+          eventUrl: `${SITE_URL}/events/${eventId}`,
+          settingsUrl: `${SITE_URL}/profile/settings`,
+        });
+        const ok = await sendEmail(email, `Через час поездка «${title}»`, html);
+        ok ? (totalSent++, deliveries.push(makeDelivery(uid, "event_hour_reminder", eventId, "sent")))
+           : (totalFailed++, deliveries.push(makeDelivery(uid, "event_hour_reminder", eventId, "failed", "smtp error")));
+      }
+      if (deliveries.length) await adminDb.from("email_deliveries").insert(deliveries);
+    }
+    return json({ sent: totalSent, skipped: totalSkipped, failed: totalFailed, events: events?.length ?? 0 });
+  }
+
+  // ── event_post_report ─────────────────────────────────────────────────────
+  // Cron-only. Finds events that ended 22–26 h ago, invites participants
+  // who haven't yet posted a ride_report to share theirs.
+  if (mode === "event_post_report") {
+    if (!isCron) return json({ error: "cron only" }, 403);
+
+    const now = new Date();
+    const from = new Date(now.getTime() - 26 * 3600_000).toISOString();
+    const to   = new Date(now.getTime() - 22 * 3600_000).toISOString();
+
+    const { data: events } = await adminDb
+      .from("events")
+      .select("id, title, start_date, route_id, organizer_id, event_participants(user_id, profile:profiles!user_id(name, email_notify_events))")
+      .gte("start_date", from)
+      .lte("start_date", to);
+
+    let totalSent = 0, totalSkipped = 0, totalFailed = 0;
+
+    for (const ev of events ?? []) {
+      const title    = String(ev.title ?? "поездка");
+      const eventId  = ev.id as string;
+      const routeId  = ev.route_id as string | null;
+      const participants = (ev.event_participants as { user_id: string; profile: { name?: string | null; email_notify_events?: boolean } | null }[] | null) ?? [];
+      const uids = participants.map((p) => p.user_id);
+      const emailByUser = await loadEmails(uids);
+
+      // Кто уже написал отчёт за вчера (дата поездки)?
+      const eventDate = ev.start_date ? (ev.start_date as string).slice(0, 10) : null;
+      let reportedSet = new Set<string>();
+      if (routeId && eventDate) {
+        const { data: reports } = await adminDb
+          .from("ride_reports")
+          .select("user_id")
+          .eq("route_id", routeId)
+          .eq("ridden_at", eventDate)
+          .in("user_id", uids);
+        reportedSet = new Set((reports ?? []).map((r: { user_id: string }) => r.user_id));
+      }
+
+      const deliveries: DeliveryRow[] = [];
+
+      for (const p of participants) {
+        const uid  = p.user_id as string;
+        const prof = p.profile;
+        if (reportedSet.has(uid)) { totalSkipped++; continue; }  // уже написал
+        const email = emailByUser.get(uid);
+        if (!email || prof?.email_notify_events === false) {
+          deliveries.push(makeDelivery(uid, "event_post_report", eventId, "skipped", !email ? "no email" : "opted out"));
+          totalSkipped++; continue;
+        }
+        // Идемпотентность
+        const { count } = await adminDb.from("email_deliveries").select("id", { count: "exact", head: true })
+          .eq("user_id", uid).eq("type", "event_post_report").eq("related_id", eventId).eq("status", "sent");
+        if ((count ?? 0) > 0) { totalSkipped++; continue; }
+
+        const html = renderEventPostReport({
+          firstName: firstNameOf(prof?.name),
+          title,
+          reportUrl: routeId ? `${SITE_URL}/routes/${routeId}/report/new` : `${SITE_URL}/routes`,
+          settingsUrl: `${SITE_URL}/profile/settings`,
+        });
+        const ok = await sendEmail(email, `Как покаталось на «${title}»?`, html);
+        ok ? (totalSent++, deliveries.push(makeDelivery(uid, "event_post_report", eventId, "sent")))
+           : (totalFailed++, deliveries.push(makeDelivery(uid, "event_post_report", eventId, "failed", "smtp error")));
+      }
+      if (deliveries.length) await adminDb.from("email_deliveries").insert(deliveries);
+    }
+    return json({ sent: totalSent, skipped: totalSkipped, failed: totalFailed, events: events?.length ?? 0 });
+  }
+
   return json({ error: "unknown mode" }, 400);
 });
 
@@ -834,6 +974,47 @@ function renderClubJoinApproved(v: {
     </p>
     ${ctaButton("Открыть клуб →", v.clubUrl)}
     <p style="font-size:12px;color:#A1A1AA;margin:24px 0 0;">
+      <a href="${v.settingsUrl}" style="color:#F4632A;text-decoration:none;">Настроить уведомления →</a>
+    </p>
+  `});
+}
+
+function renderEventHourReminder(v: {
+  firstName: string; title: string; dateStr: string;
+  meetPoint: string | null; organizerName: string; eventUrl: string; settingsUrl: string;
+}): string {
+  return baseLayout({ title: `Через час поездка «${v.title}»`, body: `
+    <h1 style="font-size:22px;line-height:1.3;color:#1C1C1E;margin:0 0 16px;">🔔 Через час старт!</h1>
+    <p style="font-size:15px;line-height:1.5;color:#3F3F46;margin:0 0 20px;">
+      ${v.firstName !== "привет" ? escapeHtml(v.firstName) + ", н" : "Н"}е забудь — скоро поездка:
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F4F1;border-radius:12px;padding:16px;margin:0 0 24px;">
+      <tr><td style="font-size:14px;color:#1C1C1E;line-height:1.8;">
+        📅 <b>${escapeHtml(v.title)}</b><br/>
+        🗓 ${escapeHtml(v.dateStr)}<br/>
+        ${v.meetPoint ? `📍 ${escapeHtml(v.meetPoint)}<br/>` : ""}
+        👤 Организатор: ${escapeHtml(v.organizerName)}
+      </td></tr>
+    </table>
+    ${ctaButton("Открыть поездку →", v.eventUrl)}
+    <p style="font-size:12px;color:#A1A1AA;margin:24px 0 0;">
+      <a href="${v.settingsUrl}" style="color:#F4632A;text-decoration:none;">Настроить уведомления →</a>
+    </p>
+  `});
+}
+
+function renderEventPostReport(v: {
+  firstName: string; title: string; reportUrl: string; settingsUrl: string;
+}): string {
+  return baseLayout({ title: `Как покаталось на «${v.title}»?`, body: `
+    <h1 style="font-size:22px;line-height:1.3;color:#1C1C1E;margin:0 0 16px;">Расскажи, как прошло 🚴</h1>
+    <p style="font-size:15px;line-height:1.5;color:#3F3F46;margin:0 0 20px;">
+      ${v.firstName !== "привет" ? escapeHtml(v.firstName) + ", в" : "В"}чера была поездка «${escapeHtml(v.title)}».
+      Оставь пару слов и фото — это поможет другим выбрать маршрут.
+    </p>
+    ${ctaButton("Написать отчёт →", v.reportUrl)}
+    <p style="font-size:12px;color:#A1A1AA;margin:24px 0 0;">
+      Это последнее напоминание по этой поездке.<br/>
       <a href="${v.settingsUrl}" style="color:#F4632A;text-decoration:none;">Настроить уведомления →</a>
     </p>
   `});
