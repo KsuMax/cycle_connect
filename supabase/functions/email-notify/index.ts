@@ -94,6 +94,12 @@ Deno.serve(async (req: Request) => {
 
   const { mode, eventId, reason } = body;
 
+  // Cron-only modes: don't need a user. All other modes require a real user JWT.
+  const CRON_MODES = ["event_hour_reminder", "event_post_report", "weekly_digest"];
+  if (!isCron && !user && !CRON_MODES.includes(mode ?? "")) {
+    return json({ error: "unauthorized" }, 401);
+  }
+
   // ── event_cancelled ────────────────────────────────────────────────────────
   if (mode === "event_cancelled") {
     if (!eventId) return json({ error: "eventId required" }, 400);
