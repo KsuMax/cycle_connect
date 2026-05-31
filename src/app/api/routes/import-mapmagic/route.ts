@@ -3,6 +3,15 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import polyline from "@mapbox/polyline";
+import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
+
+const MAX_NAME_LEN = 200;
+const MAX_DESC_LEN = 5000;
+
+/** Strip ASCII control characters that have no business in a route name/description. */
+function sanitizeText(s: string, max: number): string {
+  return s.replace(/[\u0000-\u001F\u007F]/g, "").slice(0, max);
+}
 
 function json(data: unknown, status = 200) {
   return NextResponse.json(data, { status });
@@ -90,6 +99,12 @@ export async function POST(req: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return json({ error: "unauthorized" }, 401);
+
+  // Each import hits mapmagic.app (up to 8 s) and writes to mapmagic_route_cache.
+  // 30/hour is well above any legitimate route-building workflow.
+  if (!(await checkRateLimit(rateLimitKey("mapmagic-import", req, user.id), 30, 3600))) {
+    return json({ error: "rate_limited" }, 429);
+  }
 
   let body: { url?: string };
   try {
@@ -192,8 +207,10 @@ export async function POST(req: NextRequest) {
     return fail("no_geometry");
   }
 
-  const name = t.variable_meta?.title ?? `MapMagic маршрут`;
-  const description = t.description ?? "";
+  // Strip control chars + clamp length before we persist into the 7-day cache —
+  // a malformed value would otherwise poison every later read of the same id_track.
+  const name = sanitizeText(t.variable_meta?.title ?? `MapMagic маршрут`, MAX_NAME_LEN);
+  const description = sanitizeText(t.description ?? "", MAX_DESC_LEN);
   const distanceKm = t.constant_meta?.distance
     ? Math.round(t.constant_meta.distance / 100) / 10
     : null;
