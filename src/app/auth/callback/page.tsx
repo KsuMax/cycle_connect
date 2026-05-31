@@ -4,74 +4,25 @@ import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Bike } from "lucide-react";
+import { ensureProfileAction } from "./actions";
 
-async function ensureProfile(
-  userId: string,
-  userMetadata: Record<string, string>,
-  email: string | undefined,
-) {
-  const { data: existing } = await supabase
-    .from("profiles")
-    .select("id, username")
-    .eq("id", userId)
-    .single();
-
-  const rawUsername =
-    userMetadata.username ||
-    email?.split("@")[0].toLowerCase().replace(/[^a-z0-9_]/g, "") ||
-    `user_${userId.slice(0, 8)}`;
-
-  const rawName =
-    userMetadata.name ||
-    userMetadata.full_name ||
-    email?.split("@")[0] ||
-    "Велосипедист";
-
-  if (existing) {
-    // Profile was created by the DB trigger but username/extra fields may be missing
-    if (!existing.username) {
-      // Check uniqueness before updating
-      const { data: taken } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("username", rawUsername)
-        .neq("id", userId)
-        .single();
-
-      const username = taken ? `${rawUsername}_${userId.slice(0, 4)}` : rawUsername;
-
-      await supabase
-        .from("profiles")
-        .update({
-          username,
-          telegram_username: userMetadata.telegram_username || null,
-          strava_url: userMetadata.strava_url || null,
-        })
-        .eq("id", userId);
-    }
-    return;
+/**
+ * Profile bootstrap moved to a Server Action — see ./actions.ts.
+ *
+ * Previously this file held a browser-side `ensureProfile(...)` that
+ * SELECT/INSERT/UPDATEd `public.profiles` with raw values from
+ * `user_metadata`. That trusted attacker-controlled data (a user can PATCH
+ * their own metadata via GoTrue) — closing it required a SECURITY DEFINER
+ * RPC + a server-side action so the values are validated where the user
+ * can't reach.
+ */
+async function ensureProfile(): Promise<void> {
+  const res = await ensureProfileAction();
+  if ("error" in res) {
+    // Soft-fail: log but don't block the redirect. The next page render
+    // will surface any missing-profile state (e.g. /onboarding will catch).
+    console.warn("[auth/callback] ensureProfileAction failed:", res.error);
   }
-
-  // Rare: profile doesn't exist yet — insert full row
-  const { data: taken } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("username", rawUsername)
-    .single();
-
-  const username = taken ? `${rawUsername}_${userId.slice(0, 4)}` : rawUsername;
-
-  await supabase.from("profiles").insert({
-    id: userId,
-    name: rawName,
-    username,
-    bio: null,
-    km_total: 0,
-    routes_count: 0,
-    events_count: 0,
-    telegram_username: userMetadata.telegram_username || null,
-    strava_url: userMetadata.strava_url || null,
-  });
 }
 
 function CallbackHandler() {
@@ -91,11 +42,7 @@ function CallbackHandler() {
           type: type as "magiclink" | "email",
         });
         if (!error && data.session) {
-          await ensureProfile(
-            data.session.user.id,
-            data.session.user.user_metadata as Record<string, string>,
-            data.session.user.email,
-          );
+          await ensureProfile();
           router.replace("/");
           return;
         }
@@ -105,11 +52,7 @@ function CallbackHandler() {
         // PKCE flow: exchange the one-time code for a session
         const { data, error } = await supabase.auth.exchangeCodeForSession(code);
         if (!error && data.session) {
-          await ensureProfile(
-            data.session.user.id,
-            data.session.user.user_metadata as Record<string, string>,
-            data.session.user.email,
-          );
+          await ensureProfile();
           router.replace("/");
           return;
         }
@@ -118,11 +61,7 @@ function CallbackHandler() {
       // Fallback: implicit flow (hash tokens) or session already set
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        await ensureProfile(
-          session.user.id,
-          session.user.user_metadata as Record<string, string>,
-          session.user.email,
-        );
+        await ensureProfile();
         router.replace("/");
         return;
       }
