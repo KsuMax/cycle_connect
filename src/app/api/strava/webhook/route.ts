@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getStravaEnv } from "@/lib/strava/env";
 import { createAdminSupabase } from "@/lib/supabase-admin";
 import type { StravaWebhookEvent } from "@/lib/strava/types";
+import { safeEqual } from "@/lib/secure-compare";
 
 /**
  * Strava Webhook endpoint.
@@ -50,11 +51,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "bad_request" }, { status: 400 });
   }
 
-  // Constant-time-ish string compare. String equality is fine here
-  // because the verify token is non-secret once subscription is set up
-  // (it's in Strava's dashboard), but we still avoid leaking which
-  // half mismatched by returning the same status for any failure.
-  if (verifyToken !== env.webhookVerifyToken) {
+  // Constant-time compare — the verify token is the only thing standing
+  // between us and a forged subscription handshake.
+  if (!verifyToken || !safeEqual(verifyToken, env.webhookVerifyToken)) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 

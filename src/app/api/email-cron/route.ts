@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase-admin";
+import { safeEqual } from "@/lib/secure-compare";
 
 /**
  * Email cron dispatcher.
@@ -30,7 +31,7 @@ function checkAuth(request: NextRequest): boolean {
   if (!secret) return false;
   const header = request.headers.get("authorization") ?? "";
   if (!header.startsWith("Bearer ")) return false;
-  return header.slice("Bearer ".length) === secret;
+  return safeEqual(header.slice("Bearer ".length), secret);
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {

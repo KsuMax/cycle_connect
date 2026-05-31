@@ -42,17 +42,15 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  // NOTE: Next 16 removed the `eslint` key from next.config — lint is no
+  // longer wired into `next build`. Run `npm run lint` separately.
+  // Currently `npm run lint` hangs/OOMs on this repo (eslint-config-next@16
+  // + typescript-eslint compat) — tracked as a separate task.
   images: {
-    // Allow next/image to optimise images from Supabase storage directly
-    // (used server-side by the optimiser; browser traffic goes via the /api/supabase proxy)
+    // Self-hosted Supabase only — browser traffic goes via the /api/supabase proxy,
+    // so remotePatterns only needs the canonical domain plus Google OAuth avatars.
     remotePatterns: [
-      { protocol: "https", hostname: "*.supabase.co" },
-      { protocol: "https", hostname: "*.supabase.in" },
       { protocol: "https", hostname: "api.cycleconnect.cc" },
-      // Google OAuth avatars
       { protocol: "https", hostname: "*.googleusercontent.com" },
     ],
   },
@@ -137,11 +135,12 @@ const nextConfig: NextConfig = {
   // In standalone output it must be explicitly traced so Next.js
   // copies it to .next/standalone/node_modules/.
   serverExternalPackages: ["nodemailer"],
+  // Moved out of `experimental` per Next 16 — top-level option now.
+  outputFileTracingIncludes: {
+    "/api/email-send": ["./node_modules/nodemailer/**/*"],
+  },
   experimental: {
     optimizePackageImports: [],
-    outputFileTracingIncludes: {
-      "/api/email-send": ["./node_modules/nodemailer/**/*"],
-    },
   },
   webpack: (config) => {
     config.resolve.alias = {

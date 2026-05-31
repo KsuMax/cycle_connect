@@ -12,6 +12,7 @@ import {
   recomputeStats,
   syncActivity,
 } from "@/lib/strava/sync";
+import { safeEqual } from "@/lib/secure-compare";
 
 /**
  * Queue drainer for Strava webhook events.
@@ -66,7 +67,7 @@ function checkAuth(request: NextRequest): boolean {
   const header = request.headers.get("authorization") ?? "";
   const prefix = "Bearer ";
   if (!header.startsWith(prefix)) return false;
-  return header.slice(prefix.length) === secret;
+  return safeEqual(header.slice(prefix.length), secret);
 }
 
 interface PendingEvent {

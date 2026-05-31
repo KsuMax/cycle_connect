@@ -22,13 +22,16 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
+import { safeEqual } from "@/lib/secure-compare";
 
 export const dynamic = "force-dynamic";
 
 function checkSecret(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
-  return req.headers.get("x-email-secret") === secret;
+  const provided = req.headers.get("x-email-secret");
+  if (!provided) return false;
+  return safeEqual(provided, secret);
 }
 
 async function sendMail(to: string, subject: string, html: string): Promise<void> {

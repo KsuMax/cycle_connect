@@ -16,18 +16,27 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // ipwho.is is HTTPS and accessible from RU without an API key.
     const res = await fetch(
-      `http://ip-api.com/json/${ip}?fields=status,lat,lon,city,regionName`,
+      `https://ipwho.is/${encodeURIComponent(ip)}?fields=success,latitude,longitude,city,region`,
       { next: { revalidate: 300 } }, // cache 5 min — IP rarely changes mid-session
     );
-    if (!res.ok) throw new Error("ip-api error");
-    const data = await res.json() as { status: string; lat: number; lon: number; city?: string; regionName?: string };
-    if (data.status !== "success") throw new Error("ip-api no result");
+    if (!res.ok) throw new Error("ipwho.is error");
+    const data = await res.json() as {
+      success: boolean;
+      latitude?: number;
+      longitude?: number;
+      city?: string;
+      region?: string;
+    };
+    if (!data.success || typeof data.latitude !== "number" || typeof data.longitude !== "number") {
+      throw new Error("ipwho.is no result");
+    }
     return NextResponse.json({
-      lat: data.lat,
-      lng: data.lon,
+      lat: data.latitude,
+      lng: data.longitude,
       city: data.city ?? null,
-      region: data.regionName ?? null,
+      region: data.region ?? null,
     });
   } catch {
     return NextResponse.json({ error: "unavailable" }, { status: 503 });
