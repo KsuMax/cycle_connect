@@ -71,19 +71,60 @@ export async function middleware(request: NextRequest) {
   }
 
   // Force first-time users through /onboarding before they can browse the app.
+  //
+  // To avoid hitting `profiles` on every single navigation (and to make the
+  // request latency uniform between onboarded and pending users — small
+  // anti-enumeration win), we cache the boolean in a signed-ish cookie.
+  //
+  // - `cc_onb=1`        → onboarded, skip the DB read entirely.
+  // - cookie missing    → fetch once and set it for 24 h.
+  // - on /onboarding    → invalidate the cookie so a successful finish makes
+  //                       the next nav re-check the DB row.
   if (user && shouldEnforceOnboarding(request.nextUrl.pathname)) {
-    const { data: prof } = await supabase
-      .from("profiles")
-      .select("onboarded_at")
-      .eq("id", user.id)
-      .maybeSingle();
+    const cached = request.cookies.get("cc_onb")?.value;
 
-    if (prof && prof.onboarded_at == null) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/onboarding";
-      url.search = "";
-      return NextResponse.redirect(url);
+    if (cached !== "1") {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("onboarded_at")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (prof && prof.onboarded_at == null) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/onboarding";
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
+
+      // Onboarded — cache the answer for a day. httpOnly so the client can't
+      // forge it from JS (a tampered cookie would only skip an extra DB read
+      // for the attacker themselves, but no reason to leave it tamperable).
+      supabaseResponse.cookies.set("cc_onb", "1", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24,
+      });
     }
+  } else if (
+    request.nextUrl.pathname === "/onboarding" ||
+    request.nextUrl.pathname.startsWith("/onboarding/") ||
+    request.nextUrl.pathname.startsWith("/auth/")
+  ) {
+    // Drop any stale cache:
+    //   • /onboarding/* — completing the flow needs the next nav to re-check.
+    //   • /auth/*       — different user may be signing in on the same browser;
+    //                     stale `cc_onb=1` from user A would skip the DB check
+    //                     and let user B (new account) past /onboarding.
+    supabaseResponse.cookies.set("cc_onb", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
   }
 
   return supabaseResponse;
