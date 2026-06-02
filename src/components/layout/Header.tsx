@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Map, Newspaper, HelpCircle, Users, Shield, Menu, X } from "lucide-react";
@@ -48,11 +49,11 @@ export function Header() {
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
 
           {/* Logo */}
-          <a href="/" onClick={handleClick("/")} className="shrink-0 select-none">
+          <Link href="/" onClick={handleClick("/")} className="shrink-0 select-none">
             <span className="text-[1.35rem] font-extrabold tracking-tight">
               <span style={{ color: "#1C1C1E" }}>Cycle</span><span style={{ color: "#F4632A" }}>Connect</span>
             </span>
-          </a>
+          </Link>
 
           {/* Desktop navigation */}
           <nav className="hidden sm:flex items-center gap-1">
@@ -62,7 +63,7 @@ export function Header() {
                 : (pathname.startsWith(href) && href !== "/") || pendingHref === href;
               const isPending = pendingHref === href;
               return (
-                <a
+                <Link
                   key={href}
                   href={href}
                   onClick={handleClick(href)}
@@ -74,7 +75,7 @@ export function Header() {
                 >
                   <Icon size={16} strokeWidth={isActive ? 2.5 : 2} />
                   <span>{label}</span>
-                </a>
+                </Link>
               );
             })}
           </nav>

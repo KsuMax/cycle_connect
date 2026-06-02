@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { Newspaper, Map, Plus, Calendar, User } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -74,7 +75,7 @@ export function BottomNav() {
         }}
       >
         <div className="flex items-center justify-around h-16 px-1">
-          <a
+          <Link
             href="/"
             onClick={handleClick("/")}
             className={cn(
@@ -85,9 +86,9 @@ export function BottomNav() {
           >
             <Newspaper size={20} strokeWidth={isActive("/", true) ? 2.5 : 2} />
             <span className="text-[10px] font-medium">Лента</span>
-          </a>
+          </Link>
 
-          <a
+          <Link
             href="/routes"
             onClick={handleClick("/routes")}
             className={cn(
@@ -98,7 +99,7 @@ export function BottomNav() {
           >
             <Map size={20} strokeWidth={isActive("/routes") ? 2.5 : 2} />
             <span className="text-[10px] font-medium">Маршруты</span>
-          </a>
+          </Link>
 
           <button
             onClick={() => setShowCreate(!showCreate)}
@@ -109,7 +110,7 @@ export function BottomNav() {
             <Plus size={24} strokeWidth={2.5} />
           </button>
 
-          <a
+          <Link
             href="/routes?tab=events"
             onClick={handleClick("/routes?tab=events")}
             className={cn(
@@ -120,9 +121,9 @@ export function BottomNav() {
           >
             <Calendar size={20} strokeWidth={pathname.startsWith("/events") ? 2.5 : 2} />
             <span className="text-[10px] font-medium">Поездки</span>
-          </a>
+          </Link>
 
-          <a
+          <Link
             href={user ? "/profile" : "/auth/login"}
             onClick={handleClick(user ? "/profile" : "/auth/login")}
             className={cn(
@@ -133,7 +134,7 @@ export function BottomNav() {
           >
             <User size={20} strokeWidth={isActive("/profile", true) ? 2.5 : 2} />
             <span className="text-[10px] font-medium">{user ? "Профиль" : "Войти"}</span>
-          </a>
+          </Link>
         </div>
       </nav>
 

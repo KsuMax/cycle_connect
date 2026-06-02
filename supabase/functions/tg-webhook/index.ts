@@ -234,8 +234,7 @@ async function parseAI(query: string): Promise<RouteFilters> {
       }),
     });
     if (!res.ok) throw new Error(`ollama HTTP ${res.status}`);
-    // deno-lint-ignore no-explicit-any
-    const data = await res.json() as any;
+    const data = await res.json() as { error?: string; message?: { content?: string } };
     if (data.error) throw new Error(`ollama: ${data.error}`);
     const content: string = data.message?.content ?? "{}";
     return JSON.parse(content) as RouteFilters;
@@ -264,8 +263,10 @@ async function parseAI(query: string): Promise<RouteFilters> {
         response_format: { type: "json_object" },
       }),
     });
-    // deno-lint-ignore no-explicit-any
-    const data = await res.json() as any;
+    const data = await res.json() as {
+      error?: { message?: string };
+      choices?: Array<{ message?: { content?: string } }>;
+    };
     if (data.error) throw new Error(`openrouter: ${data.error?.message}`);
     const raw: string = data.choices?.[0]?.message?.content ?? "";
     const match = raw.match(/\{[\s\S]*\}/);
@@ -304,7 +305,10 @@ function mergeFilters(ai: RouteFilters, regex: RouteFilters): RouteFilters {
 async function searchRoutes(filters: RouteFilters): Promise<DbRoute[]> {
   const hasTarget = filters.distance_target != null;
 
+  // Conditional chain of .eq()/.gte()/etc. reassigns to narrowed builder
+  // types — `any` is the pragmatic escape hatch the supabase-js docs use.
   // deno-lint-ignore no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let q: any = supabase
     .from("routes")
     .select("id, title, distance_km, elevation_m, difficulty, region")

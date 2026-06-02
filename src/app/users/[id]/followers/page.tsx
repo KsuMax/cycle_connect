@@ -10,7 +10,7 @@ import { useFollow } from "@/lib/context/FollowContext";
 import { ChevronLeft, UserPlus, UserCheck, Users } from "lucide-react";
 import type { DbProfile } from "@/lib/supabase";
 
-interface FollowerUser extends DbProfile {}
+type FollowerUser = DbProfile;
 
 export default function FollowersPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
