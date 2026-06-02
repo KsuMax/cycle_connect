@@ -1,6 +1,50 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+/**
+ * Per-request Content-Security-Policy with a fresh nonce.
+ *
+ * - The nonce goes on the `x-nonce` request header so Server Components
+ *   can read it via `headers()` and pass it to `<Script nonce={...}>`.
+ *   Next.js 16 also auto-attaches the same header value to its own inline
+ *   bootstrap scripts when CSP contains a matching nonce.
+ * - `'strict-dynamic'` lets any script loaded via a nonced root script load
+ *   further scripts without explicit host allow-listing — modern, simple.
+ * - `'unsafe-inline'` is included as a legacy fallback. CSP3-compliant
+ *   browsers ignore it once any `'nonce-*'` or `'strict-dynamic'` is
+ *   present, so it only kicks in on very old browsers (and there it just
+ *   restores the previous looser policy — no regression).
+ * - Dev mode skips strict-dynamic / nonce so Webpack HMR keeps working.
+ */
+function buildCsp(nonce: string): string {
+  const isProd = process.env.NODE_ENV === "production";
+  const scriptSrc = isProd
+    ? `'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-inline' https://mc.yandex.ru`
+    : `'self' 'unsafe-inline' 'unsafe-eval' https://mc.yandex.ru`;
+
+  return [
+    "default-src 'self'",
+    `script-src ${scriptSrc}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data:",
+    "connect-src 'self' https://api.cycleconnect.cc wss://api.cycleconnect.cc https://mc.yandex.ru",
+    "frame-src 'self' https://mapmagic.app https://*.mapmagic.app",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join("; ");
+}
+
+/** 16-byte cryptographic random encoded as base64 — CSP-compliant nonce. */
+function generateNonce(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  // base64 (not base64url) — CSP nonce-source must be base64.
+  return Buffer.from(bytes).toString("base64");
+}
+
 /** Routes that require an authenticated session */
 const PROTECTED_PATHS = [
   "/profile/settings",
@@ -34,7 +78,18 @@ function shouldEnforceOnboarding(pathname: string): boolean {
 }
 
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
+  // Generate the nonce first and stash it on the *request* headers so it
+  // flows through to Server Components via next/headers `headers()`.
+  const nonce = generateNonce();
+  const csp = buildCsp(nonce);
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("content-security-policy", csp);
+
+  let supabaseResponse = NextResponse.next({
+    request: { headers: requestHeaders },
+  });
+  supabaseResponse.headers.set("content-security-policy", csp);
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -48,7 +103,11 @@ export async function middleware(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value),
           );
-          supabaseResponse = NextResponse.next({ request });
+          supabaseResponse = NextResponse.next({
+            request: { headers: requestHeaders },
+          });
+          // The fresh NextResponse just clobbered our CSP — re-apply.
+          supabaseResponse.headers.set("content-security-policy", csp);
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options),
           );
@@ -67,7 +126,9 @@ export async function middleware(request: NextRequest) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/auth/login";
     loginUrl.searchParams.set("redirect", request.nextUrl.pathname);
-    return NextResponse.redirect(loginUrl);
+    const redirect = NextResponse.redirect(loginUrl);
+    redirect.headers.set("content-security-policy", csp);
+    return redirect;
   }
 
   // Force first-time users through /onboarding before they can browse the app.
@@ -94,7 +155,9 @@ export async function middleware(request: NextRequest) {
         const url = request.nextUrl.clone();
         url.pathname = "/onboarding";
         url.search = "";
-        return NextResponse.redirect(url);
+        const redirect = NextResponse.redirect(url);
+        redirect.headers.set("content-security-policy", csp);
+        return redirect;
       }
 
       // Onboarded — cache the answer for a day. httpOnly so the client can't

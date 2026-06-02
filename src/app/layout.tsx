@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import "./globals.css";
 import { FavoritesProvider } from "@/lib/context/FavoritesContext";
 import { LikesProvider } from "@/lib/context/LikesContext";
@@ -50,11 +51,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Per-request CSP nonce set in middleware.ts. Pass it down to any
+  // component that renders an inline <Script> so the inline payload matches
+  // the response CSP.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html lang="ru" className="h-full">
       <body className="min-h-full flex flex-col">
@@ -78,7 +84,7 @@ export default function RootLayout({
                                 <BottomNav />
                                 <UserFeatures />
                                 <CookieBanner />
-                                <YandexMetrika />
+                                <YandexMetrika nonce={nonce} />
                               </NotificationsProvider>
                             </AchievementsProvider>
                           </InterestsProvider>

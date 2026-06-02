@@ -13,26 +13,9 @@ const securityHeaders = [
     value:
       "camera=(), microphone=(), geolocation=(self), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=(), interest-cohort=()",
   },
-  {
-    key: "Content-Security-Policy",
-    value: [
-      "default-src 'self'",
-      // 'unsafe-eval' removed — Next.js + production webpack chunks don't need it.
-      // 'unsafe-inline' is still in place for next/script + Tiptap; the next
-      // hardening step is to switch inline scripts to a per-request nonce.
-      "script-src 'self' 'unsafe-inline' https://mc.yandex.ru",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https:",
-      "font-src 'self' data:",
-      // Self-hosted Supabase only — supabase.co/in wildcards removed.
-      "connect-src 'self' https://api.cycleconnect.cc wss://api.cycleconnect.cc https://mc.yandex.ru",
-      "frame-src 'self' https://mapmagic.app https://*.mapmagic.app",
-      "object-src 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-      "frame-ancestors 'none'",
-    ].join("; "),
-  },
+  // NOTE: Content-Security-Policy is set per-request from middleware.ts so
+  // we can attach a fresh nonce to each HTML response. Don't add a static
+  // CSP here or it will conflict with the dynamic one.
 ];
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -42,10 +25,8 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // NOTE: Next 16 removed the `eslint` key from next.config — lint is no
-  // longer wired into `next build`. Run `npm run lint` separately.
-  // Currently `npm run lint` hangs/OOMs on this repo (eslint-config-next@16
-  // + typescript-eslint compat) — tracked as a separate task.
+  // Next 16 removed the `eslint` key from next.config — lint is no longer
+  // wired into `next build`. Run `npm run lint` separately (CI/pre-commit).
   images: {
     // Self-hosted Supabase only — browser traffic goes via the /api/supabase proxy,
     // so remotePatterns only needs the canonical domain plus Google OAuth avatars.

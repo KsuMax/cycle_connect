@@ -20,13 +20,22 @@ function RouteTracker() {
   return null;
 }
 
-export function YandexMetrika() {
+/**
+ * Yandex Metrika loader.
+ *
+ * `nonce` comes from the per-request CSP nonce set in middleware.ts and
+ * forwarded from app/layout.tsx via `headers().get("x-nonce")`. Without it,
+ * the inline `ym(...)` snippet would be blocked by the production CSP
+ * (`script-src 'self' 'nonce-X' 'strict-dynamic' ...`).
+ */
+export function YandexMetrika({ nonce }: { nonce?: string }) {
   return (
     <>
       {/* Metrika tag loader — afterInteractive so it never blocks render */}
       <Script
         id="ym-loader"
         strategy="afterInteractive"
+        nonce={nonce}
         dangerouslySetInnerHTML={{
           __html: `
 (function(m,e,t,r,i,k,a){
