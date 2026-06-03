@@ -1,0 +1,452 @@
+{
+  "language": "ru",
+  "summary": {
+    "distanceKm": 51.2,
+    "gainM": 476,
+    "lossM": 474,
+    "minEleM": null,
+    "maxEleM": null,
+    "profile": "rolling",
+    "hasElevation": true,
+    "elevationUncalibrated": true,
+    "elevationSource": "gpx"
+  },
+  "climbs": [
+    {
+      "startKm": 3.7,
+      "endKm": 5.2,
+      "lengthKm": 1.6,
+      "gainM": 50,
+      "avgGradientPct": 3.2,
+      "maxGradientPct": 6.2,
+      "category": "easy"
+    },
+    {
+      "startKm": 33,
+      "endKm": 34.3,
+      "lengthKm": 1.3,
+      "gainM": 39,
+      "avgGradientPct": 3,
+      "maxGradientPct": 12.1,
+      "category": "easy"
+    }
+  ],
+  "segments": [
+    {
+      "fromKm": 0,
+      "toKm": 5,
+      "dominantLandscape": "settlement",
+      "landscapeCounts": {
+        "settlement": 1
+      },
+      "settlements": [
+        "Энколово"
+      ],
+      "namedFeatures": [
+        {
+          "km": 0,
+          "kind": "amenity",
+          "name": "Антрикот",
+          "subtype": "cafe"
+        },
+        {
+          "km": 2.2,
+          "kind": "amenity",
+          "name": "Big Brother`s",
+          "subtype": "fast_food"
+        },
+        {
+          "km": 2.4,
+          "kind": "viewpoint",
+          "name": "Въездная стела Ламбери",
+          "subtype": "attraction"
+        }
+      ],
+      "climbsInSegment": [
+        {
+          "startKm": 3.7,
+          "endKm": 5.2,
+          "gainM": 50,
+          "avgGradientPct": 3.2,
+          "category": "easy"
+        }
+      ]
+    },
+    {
+      "fromKm": 5,
+      "toKm": 10,
+      "dominantLandscape": "settlement",
+      "landscapeCounts": {
+        "settlement": 1
+      },
+      "settlements": [
+        "Мистолово"
+      ],
+      "namedFeatures": [
+        {
+          "km": 8.9,
+          "kind": "historic",
+          "name": "Братская могила 1941-1942",
+          "subtype": "memorial"
+        }
+      ],
+      "climbsInSegment": [
+        {
+          "startKm": 3.7,
+          "endKm": 5.2,
+          "gainM": 50,
+          "avgGradientPct": 3.2,
+          "category": "easy"
+        }
+      ]
+    },
+    {
+      "fromKm": 10,
+      "toKm": 15,
+      "dominantLandscape": "mixed",
+      "landscapeCounts": {},
+      "settlements": [],
+      "namedFeatures": [
+        {
+          "km": 11.6,
+          "kind": "historic",
+          "name": "Братская могила",
+          "subtype": "tomb"
+        },
+        {
+          "km": 12.1,
+          "kind": "historic",
+          "name": "Бывшее общежитие работников санатория",
+          "subtype": "ruins"
+        },
+        {
+          "km": 13.3,
+          "kind": "viewpoint",
+          "name": "Избушка",
+          "subtype": "attraction"
+        },
+        {
+          "km": 14.1,
+          "kind": "amenity",
+          "name": "У Зубра",
+          "subtype": "cafe"
+        }
+      ],
+      "climbsInSegment": []
+    },
+    {
+      "fromKm": 15,
+      "toKm": 20,
+      "dominantLandscape": "mixed",
+      "landscapeCounts": {},
+      "settlements": [],
+      "namedFeatures": [],
+      "climbsInSegment": []
+    },
+    {
+      "fromKm": 20,
+      "toKm": 25,
+      "dominantLandscape": "settlement",
+      "landscapeCounts": {
+        "settlement": 1
+      },
+      "settlements": [
+        "Осельки"
+      ],
+      "namedFeatures": [],
+      "climbsInSegment": []
+    },
+    {
+      "fromKm": 25,
+      "toKm": 30,
+      "dominantLandscape": "mixed",
+      "landscapeCounts": {},
+      "settlements": [],
+      "namedFeatures": [
+        {
+          "km": 27.6,
+          "kind": "viewpoint",
+          "name": "Чёртов камень (Pirukivi)",
+          "subtype": "attraction"
+        },
+        {
+          "km": 27.8,
+          "kind": "viewpoint",
+          "name": "Столбик ботаника",
+          "subtype": "attraction"
+        }
+      ],
+      "climbsInSegment": []
+    },
+    {
+      "fromKm": 30,
+      "toKm": 35,
+      "dominantLandscape": "mountain",
+      "landscapeCounts": {
+        "mountain": 3
+      },
+      "settlements": [],
+      "namedFeatures": [
+        {
+          "km": 32.5,
+          "kind": "viewpoint",
+          "name": "Шагающие сосны",
+          "subtype": "attraction"
+        }
+      ],
+      "climbsInSegment": [
+        {
+          "startKm": 33,
+          "endKm": 34.3,
+          "gainM": 39,
+          "avgGradientPct": 3,
+          "category": "easy"
+        }
+      ]
+    },
+    {
+      "fromKm": 35,
+      "toKm": 40,
+      "dominantLandscape": "mountain",
+      "landscapeCounts": {
+        "mountain": 3
+      },
+      "settlements": [],
+      "namedFeatures": [
+        {
+          "km": 35.1,
+          "kind": "amenity",
+          "name": "Телега",
+          "subtype": "cafe"
+        },
+        {
+          "km": 35.7,
+          "kind": "amenity",
+          "name": "Две козы",
+          "subtype": "restaurant"
+        },
+        {
+          "km": 35.7,
+          "kind": "amenity",
+          "name": "Токсовское",
+          "subtype": "cafe"
+        },
+        {
+          "km": 35.7,
+          "kind": "amenity",
+          "name": "Orange",
+          "subtype": "cafe"
+        },
+        {
+          "km": 35.7,
+          "kind": "amenity",
+          "name": "Шаверлэнд",
+          "subtype": "fast_food"
+        },
+        {
+          "km": 36.9,
+          "kind": "amenity",
+          "name": "Северный Склон",
+          "subtype": "restaurant"
+        },
+        {
+          "km": 36.9,
+          "kind": "amenity",
+          "name": "ItGo Загород (Токсово)",
+          "subtype": "restaurant"
+        },
+        {
+          "km": 37,
+          "kind": "waterway",
+          "name": "Большой Петровский канал",
+          "subtype": "canal"
+        },
+        {
+          "km": 37.1,
+          "kind": "amenity",
+          "name": "Кафе-шашлычная",
+          "subtype": "restaurant"
+        },
+        {
+          "km": 39.6,
+          "kind": "viewpoint",
+          "name": "Дом на высоком фундаменте",
+          "subtype": "attraction"
+        }
+      ],
+      "climbsInSegment": []
+    },
+    {
+      "fromKm": 40,
+      "toKm": 45,
+      "dominantLandscape": "mixed",
+      "landscapeCounts": {},
+      "settlements": [],
+      "namedFeatures": [],
+      "climbsInSegment": []
+    },
+    {
+      "fromKm": 45,
+      "toKm": 50,
+      "dominantLandscape": "settlement",
+      "landscapeCounts": {
+        "settlement": 2
+      },
+      "settlements": [
+        "Куялово",
+        "Кузьмолово"
+      ],
+      "namedFeatures": [],
+      "climbsInSegment": []
+    },
+    {
+      "fromKm": 50,
+      "toKm": 51.2,
+      "dominantLandscape": "mixed",
+      "landscapeCounts": {},
+      "settlements": [],
+      "namedFeatures": [
+        {
+          "km": 50.1,
+          "kind": "viewpoint",
+          "name": "Кузьмоловские горы",
+          "subtype": "viewpoint"
+        }
+      ],
+      "climbsInSegment": []
+    }
+  ],
+  "amenities": {
+    "waterSources": [
+      {
+        "km": 23.8,
+        "kind": "natural_feature",
+        "name": "источник",
+        "subtype": "spring"
+      },
+      {
+        "km": 40,
+        "kind": "amenity",
+        "name": "источник",
+        "subtype": "drinking_water"
+      }
+    ],
+    "cafesAndFood": [
+      {
+        "km": 0,
+        "kind": "amenity",
+        "name": "Антрикот",
+        "subtype": "cafe"
+      },
+      {
+        "km": 2.2,
+        "kind": "amenity",
+        "name": "Big Brother`s",
+        "subtype": "fast_food"
+      },
+      {
+        "km": 2.9,
+        "kind": "amenity",
+        "name": "restaurant",
+        "subtype": "restaurant"
+      },
+      {
+        "km": 14.1,
+        "kind": "amenity",
+        "name": "У Зубра",
+        "subtype": "cafe"
+      },
+      {
+        "km": 35.1,
+        "kind": "amenity",
+        "name": "Телега",
+        "subtype": "cafe"
+      },
+      {
+        "km": 35.7,
+        "kind": "amenity",
+        "name": "Две козы",
+        "subtype": "restaurant"
+      },
+      {
+        "km": 35.7,
+        "kind": "amenity",
+        "name": "Токсовское",
+        "subtype": "cafe"
+      },
+      {
+        "km": 35.7,
+        "kind": "amenity",
+        "name": "Orange",
+        "subtype": "cafe"
+      },
+      {
+        "km": 35.7,
+        "kind": "amenity",
+        "name": "Шаверлэнд",
+        "subtype": "fast_food"
+      },
+      {
+        "km": 36.9,
+        "kind": "amenity",
+        "name": "Северный Склон",
+        "subtype": "restaurant"
+      },
+      {
+        "km": 36.9,
+        "kind": "amenity",
+        "name": "ItGo Загород (Токсово)",
+        "subtype": "restaurant"
+      },
+      {
+        "km": 37.1,
+        "kind": "amenity",
+        "name": "Кафе-шашлычная",
+        "subtype": "restaurant"
+      }
+    ],
+    "shelters": [
+      {
+        "km": 11.9,
+        "kind": "amenity",
+        "name": "укрытие",
+        "subtype": "shelter"
+      }
+    ]
+  },
+  "settlementsAlongRoute": [
+    {
+      "name": "Энколово",
+      "km": 3.4,
+      "place": "village"
+    },
+    {
+      "name": "Мистолово",
+      "km": 5.2,
+      "place": "hamlet"
+    },
+    {
+      "name": "Осельки",
+      "km": 23.5,
+      "place": "hamlet"
+    },
+    {
+      "name": "Куялово",
+      "km": 48.1,
+      "place": "hamlet"
+    },
+    {
+      "name": "Кузьмолово",
+      "km": 49.6,
+      "place": "hamlet"
+    }
+  ],
+  "namedWaterways": [
+    {
+      "name": "Большой Петровский канал",
+      "km": 37
+    }
+  ],
+  "authorWaypoints": [],
+  "warnings": []
+}

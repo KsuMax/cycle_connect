@@ -1,0 +1,312 @@
+{
+  "language": "ru",
+  "summary": {
+    "distanceKm": 42.6,
+    "gainM": 244,
+    "lossM": 249,
+    "minEleM": 19,
+    "maxEleM": 102,
+    "profile": "flat",
+    "hasElevation": true,
+    "elevationUncalibrated": false,
+    "elevationSource": "srtm"
+  },
+  "climbs": [],
+  "segments": [
+    {
+      "fromKm": 0,
+      "toKm": 5,
+      "dominantLandscape": "settlement",
+      "landscapeCounts": {
+        "settlement": 1
+      },
+      "settlements": [
+        "Местерьярви"
+      ],
+      "namedFeatures": [
+        {
+          "km": 4,
+          "kind": "waterway",
+          "name": "Приветная",
+          "subtype": "stream"
+        }
+      ],
+      "climbsInSegment": []
+    },
+    {
+      "fromKm": 5,
+      "toKm": 10,
+      "dominantLandscape": "water_dominant",
+      "landscapeCounts": {
+        "water_dominant": 1
+      },
+      "settlements": [],
+      "namedFeatures": [
+        {
+          "km": 6,
+          "kind": "water_area",
+          "name": "озеро Приветное",
+          "subtype": "water"
+        }
+      ],
+      "climbsInSegment": []
+    },
+    {
+      "fromKm": 10,
+      "toKm": 15,
+      "dominantLandscape": "mixed",
+      "landscapeCounts": {},
+      "settlements": [],
+      "namedFeatures": [],
+      "climbsInSegment": []
+    },
+    {
+      "fromKm": 15,
+      "toKm": 20,
+      "dominantLandscape": "mixed",
+      "landscapeCounts": {},
+      "settlements": [],
+      "namedFeatures": [],
+      "climbsInSegment": []
+    },
+    {
+      "fromKm": 20,
+      "toKm": 25,
+      "dominantLandscape": "settlement",
+      "landscapeCounts": {
+        "settlement": 2
+      },
+      "settlements": [
+        "Уткино",
+        "Вишнёвка"
+      ],
+      "namedFeatures": [
+        {
+          "km": 21.8,
+          "kind": "historic",
+          "name": "Развалины финского дома",
+          "subtype": "ruins"
+        },
+        {
+          "km": 23.1,
+          "kind": "historic",
+          "name": "Финский фундамент",
+          "subtype": "ruins"
+        },
+        {
+          "km": 23.1,
+          "kind": "viewpoint",
+          "name": "Финский колодец из камней",
+          "subtype": "attraction"
+        }
+      ],
+      "climbsInSegment": []
+    },
+    {
+      "fromKm": 25,
+      "toKm": 30,
+      "dominantLandscape": "mixed",
+      "landscapeCounts": {},
+      "settlements": [],
+      "namedFeatures": [
+        {
+          "km": 29.9,
+          "kind": "viewpoint",
+          "name": "Финская подстанция",
+          "subtype": "attraction"
+        }
+      ],
+      "climbsInSegment": []
+    },
+    {
+      "fromKm": 30,
+      "toKm": 35,
+      "dominantLandscape": "settlement",
+      "landscapeCounts": {
+        "settlement": 1
+      },
+      "settlements": [
+        "Тарасово"
+      ],
+      "namedFeatures": [
+        {
+          "km": 33.2,
+          "kind": "historic",
+          "name": "В.И.Ленин",
+          "subtype": "memorial"
+        },
+        {
+          "km": 33.2,
+          "kind": "historic",
+          "name": "Бывший дом культуры",
+          "subtype": "ruins"
+        },
+        {
+          "km": 33.8,
+          "kind": "historic",
+          "name": "Дом Боткина",
+          "subtype": "ruins"
+        }
+      ],
+      "climbsInSegment": []
+    },
+    {
+      "fromKm": 35,
+      "toKm": 40,
+      "dominantLandscape": "settlement",
+      "landscapeCounts": {
+        "settlement": 1
+      },
+      "settlements": [
+        "Осетрово"
+      ],
+      "namedFeatures": [],
+      "climbsInSegment": []
+    },
+    {
+      "fromKm": 40,
+      "toKm": 42.6,
+      "dominantLandscape": "mixed",
+      "landscapeCounts": {},
+      "settlements": [],
+      "namedFeatures": [],
+      "climbsInSegment": []
+    }
+  ],
+  "amenities": {
+    "waterSources": [
+      {
+        "km": 15.8,
+        "kind": "natural_feature",
+        "name": "источник",
+        "subtype": "spring"
+      },
+      {
+        "km": 21.8,
+        "kind": "amenity",
+        "name": "источник",
+        "subtype": "drinking_water"
+      }
+    ],
+    "cafesAndFood": [],
+    "shelters": []
+  },
+  "settlementsAlongRoute": [
+    {
+      "name": "Местерьярви",
+      "km": 0,
+      "place": "hamlet"
+    },
+    {
+      "name": "Вишнёвка",
+      "km": 21,
+      "place": "hamlet"
+    },
+    {
+      "name": "Уткино",
+      "km": 24.7,
+      "place": "hamlet"
+    },
+    {
+      "name": "Тарасово",
+      "km": 32.9,
+      "place": "village"
+    },
+    {
+      "name": "Осетрово",
+      "km": 39.7,
+      "place": "hamlet"
+    }
+  ],
+  "namedWaterways": [
+    {
+      "name": "Приветная",
+      "km": 4
+    }
+  ],
+  "authorWaypoints": [
+    {
+      "km": 6.6,
+      "kind": "marker",
+      "rawType": "Marker"
+    },
+    {
+      "km": 7.6,
+      "kind": "marker",
+      "rawType": "Marker"
+    },
+    {
+      "km": 8.3,
+      "kind": "marker",
+      "rawType": "Marker"
+    },
+    {
+      "km": 8.6,
+      "kind": "marker",
+      "rawType": "Marker"
+    },
+    {
+      "km": 12,
+      "kind": "marker",
+      "rawType": "Marker"
+    },
+    {
+      "km": 12.3,
+      "kind": "marker",
+      "rawType": "Marker"
+    },
+    {
+      "km": 13.2,
+      "kind": "marker",
+      "rawType": "Marker"
+    },
+    {
+      "km": 13.2,
+      "kind": "viewpoint",
+      "name": "Красивый вид с высоты на озеро",
+      "rawType": "Viewpoint"
+    },
+    {
+      "km": 13.5,
+      "kind": "ford",
+      "name": "Проход по брёвнам через ручей",
+      "rawType": "Ford"
+    },
+    {
+      "km": 15.3,
+      "kind": "marker",
+      "rawType": "Marker"
+    },
+    {
+      "km": 15.6,
+      "kind": "marker",
+      "rawType": "Marker"
+    },
+    {
+      "km": 26.3,
+      "kind": "viewpoint",
+      "name": "Красивый вид",
+      "rawType": "Viewpoint"
+    },
+    {
+      "km": 33.5,
+      "kind": "viewpoint",
+      "name": "Красивый вид и атмосфера",
+      "rawType": "Viewpoint"
+    },
+    {
+      "km": 33.8,
+      "kind": "landmark",
+      "name": "Дом Боткина",
+      "rawType": "Marker"
+    },
+    {
+      "km": 34.6,
+      "kind": "hazard",
+      "name": "Грязь",
+      "description": "Здесь может быть грязновато, придётся проходить по краям",
+      "rawType": "Attention"
+    }
+  ],
+  "warnings": []
+}
