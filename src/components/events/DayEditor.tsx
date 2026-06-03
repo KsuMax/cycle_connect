@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -9,10 +10,16 @@ import { cn } from "@/lib/utils";
 interface DayEditorProps {
   placeholder?: string;
   content?: string;
+  /**
+   * Optional externally-controlled value. When this changes (and differs from
+   * the editor's current HTML) the editor body is replaced. Useful for
+   * server-generated content (e.g. AI description draft).
+   */
+  value?: string;
   onChange?: (html: string) => void;
 }
 
-export function DayEditor({ placeholder, content = "", onChange }: DayEditorProps) {
+export function DayEditor({ placeholder, content = "", value, onChange }: DayEditorProps) {
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -26,6 +33,13 @@ export function DayEditor({ placeholder, content = "", onChange }: DayEditorProp
       onChange?.(editor.getHTML());
     },
   });
+
+  // Sync external `value` into the editor when it changes.
+  useEffect(() => {
+    if (!editor || value === undefined) return;
+    if (editor.getHTML() === value) return;
+    editor.commands.setContent(value, { emitUpdate: true });
+  }, [editor, value]);
 
   if (!editor) return null;
 

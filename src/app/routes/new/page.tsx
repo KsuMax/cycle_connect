@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/Header";
-import { MapPin, Link as LinkIcon, ChevronRight, AlertCircle, Shield, Download, Loader2, CheckCircle2 } from "lucide-react";
+import { MapPin, Link as LinkIcon, ChevronRight, AlertCircle, Shield, Download, Loader2, CheckCircle2, Sparkles } from "lucide-react";
 import { ImageUpload } from "@/components/routes/ImageUpload";
 import { CoverUpload } from "@/components/routes/CoverUpload";
 import { GpxUpload } from "@/components/routes/GpxUpload";
@@ -59,6 +59,10 @@ export default function NewRoutePage() {
   const [importing, setImporting] = useState(false);
   const [importStatus, setImportStatus] = useState<"idle" | "success" | "error">("idle");
   const [importError, setImportError] = useState<string | null>(null);
+  // AI description generator
+  const [aiState, setAiState] = useState<"idle" | "loading" | "error">("idle");
+  const [aiStage, setAiStage] = useState<string>("");
+  const [aiWarnings, setAiWarnings] = useState<string[]>([]);
 
   useEffect(() => {
     supabase
@@ -115,6 +119,86 @@ export default function NewRoutePage() {
     setSeasonMonths((prev) =>
       allIn ? prev.filter((m) => !months.includes(m)) : [...new Set([...prev, ...months])]
     );
+  };
+
+  /**
+   * Convert plain-text LLM output (paragraphs separated by blank lines)
+   * into the HTML the Tiptap editor expects.
+   */
+  const textToHtml = (text: string): string => {
+    return text
+      .split(/\n\s*\n/)
+      .map((para) => para.trim())
+      .filter(Boolean)
+      .map((para) => `<p>${escapeHtml(para).replace(/\n/g, "<br>")}</p>`)
+      .join("");
+  };
+  const escapeHtml = (s: string): string =>
+    s
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+  const generateDescription = async () => {
+    if (!gpxFile) {
+      showToast("Сначала загрузи GPX-файл маршрута", "error");
+      return;
+    }
+    setAiState("loading");
+    setAiWarnings([]);
+    // Progress hints — purely informational, no streaming wire yet.
+    setAiStage("Читаю трек…");
+    const stageTimers: number[] = [];
+    stageTimers.push(window.setTimeout(() => setAiStage("Анализирую рельеф…"), 1500));
+    stageTimers.push(window.setTimeout(() => setAiStage("Ищу объекты по пути…"), 4000));
+    stageTimers.push(window.setTimeout(() => setAiStage("Пишу описание…"), 15000));
+
+    try {
+      const gpxText = await gpxFile.text();
+      const res = await fetch("/api/routes/generate-description", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gpx: gpxText }),
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(errBody.error ?? `HTTP ${res.status}`);
+      }
+      const data = await res.json() as {
+        description?: string;
+        guardrails?: { ok?: boolean; unknownQuoted?: string[]; unknownCapitalised?: string[] };
+        model?: string;
+      };
+      if (!data.description) throw new Error("empty description from server");
+
+      setDescription(textToHtml(data.description));
+
+      const warnings: string[] = [];
+      if (data.guardrails && data.guardrails.ok === false) {
+        if (data.guardrails.unknownQuoted?.length) {
+          warnings.push(`Имена в кавычках без проверки: ${data.guardrails.unknownQuoted.join(", ")}`);
+        }
+        if (data.guardrails.unknownCapitalised?.length) {
+          warnings.push(`Подозрительные имена: ${data.guardrails.unknownCapitalised.slice(0, 5).join(", ")}`);
+        }
+      }
+      setAiWarnings(warnings);
+      showToast(
+        warnings.length
+          ? "Черновик сгенерирован — проверь подсвеченные имена"
+          : "Черновик сгенерирован, можно править",
+        warnings.length ? "info" : "success"
+      );
+      setAiState("idle");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[ai-description] failed:", msg);
+      showToast(`Не получилось сгенерировать: ${msg}`, "error");
+      setAiState("error");
+    } finally {
+      for (const t of stageTimers) window.clearTimeout(t);
+      setAiStage("");
+    }
   };
 
   const handleImages = (previews: string[], files: File[]) => {
@@ -659,11 +743,42 @@ export default function NewRoutePage() {
 
           {/* Description */}
           <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-            <label className="block text-sm font-semibold text-[#1C1C1E] mb-2">Описание</label>
+            <div className="flex items-center justify-between mb-2 gap-2">
+              <label className="block text-sm font-semibold text-[#1C1C1E]">Описание</label>
+              <button
+                type="button"
+                onClick={generateDescription}
+                disabled={!gpxFile || aiState === "loading"}
+                title={!gpxFile ? "Загрузи GPX, чтобы сгенерировать описание" : "Сгенерировать черновик описания на основе GPX"}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: aiState === "loading" ? "#E4E4E7" : "#F4632A",
+                  color: aiState === "loading" ? "#71717A" : "white",
+                }}
+              >
+                {aiState === "loading" ? (
+                  <><Loader2 size={13} className="animate-spin" /> {aiStage || "Готовлю…"}</>
+                ) : (
+                  <><Sparkles size={13} /> Сгенерировать ИИ</>
+                )}
+              </button>
+            </div>
             <DayEditor
               placeholder="Расскажи о маршруте: что увидит велосипедист, какое покрытие, особенности..."
+              value={description}
               onChange={(html) => setDescription(html)}
             />
+            {aiWarnings.length > 0 && (
+              <div className="mt-2 flex gap-2 items-start text-xs text-amber-700">
+                <AlertCircle size={13} className="mt-0.5 shrink-0" />
+                <div>
+                  <div className="font-medium">Проверь подсвеченные имена — они не сверены с базой:</div>
+                  <ul className="mt-0.5 list-disc pl-4">
+                    {aiWarnings.map((w, i) => (<li key={i}>{w}</li>))}
+                  </ul>
+                </div>
+              </div>
+            )}
           </div>
 
           <div>

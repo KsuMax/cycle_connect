@@ -16,13 +16,11 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { analyzeElevation, type ElePoint } from "../src/lib/routes/elevation-profile";
+import { analyzeElevation } from "../src/lib/routes/elevation-profile";
 import { enrichElevation, type ElevationSource } from "../src/lib/routes/enrich-elevation";
+import { parseGpxServer } from "../src/lib/routes/gpx-parse-server";
 import { fetchOsmContext } from "../src/lib/routes/osm-context";
-import {
-  buildNarrativeContext,
-  type RawAuthorWaypoint,
-} from "../src/lib/routes/narrative-context";
+import { buildNarrativeContext } from "../src/lib/routes/narrative-context";
 import { SrtmReader, type HgtResolution } from "../src/lib/routes/srtm-reader";
 
 async function main() {
@@ -45,8 +43,7 @@ async function main() {
 
   const absPath = resolve(gpxPath);
   const xml = readFileSync(absPath, "utf-8");
-  const trackpoints = parseGpxTrack(xml);
-  const waypoints = parseGpxWaypoints(xml);
+  const { trackpoints, authorWaypoints: waypoints } = parseGpxServer(xml);
   if (trackpoints.length < 2) {
     console.error(`GPX at ${absPath} produced ${trackpoints.length} trackpoints — aborting.`);
     process.exit(1);
@@ -116,74 +113,6 @@ async function main() {
 
 function log(msg: string) {
   process.stderr.write(`[dry-run] ${msg}\n`);
-}
-
-/**
- * Parse the track (<trkpt>, falling back to <rtept>). Author markers come from
- * <wpt> and are extracted separately by parseGpxWaypoints.
- */
-function parseGpxTrack(xml: string): ElePoint[] {
-  let chosenTag: "trkpt" | "rtept" = "trkpt";
-  if (!/<trkpt\b/i.test(xml) && /<rtept\b/i.test(xml)) chosenTag = "rtept";
-  return collectElements(xml, chosenTag, (attrs, inner) => makePoint(attrs, inner));
-}
-
-/** Parse all <wpt> author markers with name/type/desc. */
-function parseGpxWaypoints(xml: string): RawAuthorWaypoint[] {
-  return collectElements(xml, "wpt", (attrs, inner) => {
-    const lat = parseFloat(attrs.match(/\blat\s*=\s*"([^"]+)"/i)?.[1] ?? "");
-    const lng = parseFloat(attrs.match(/\blon\s*=\s*"([^"]+)"/i)?.[1] ?? "");
-    if (!isFinite(lat) || !isFinite(lng)) return null;
-    const name = decodeXml(inner.match(/<name\b[^>]*>([\s\S]*?)<\/name>/i)?.[1]);
-    const rawType = decodeXml(inner.match(/<type\b[^>]*>([\s\S]*?)<\/type>/i)?.[1]);
-    const description = decodeXml(inner.match(/<desc\b[^>]*>([\s\S]*?)<\/desc>/i)?.[1]);
-    return { lat, lng, name, rawType, description };
-  });
-}
-
-function collectElements<T>(
-  xml: string,
-  tag: string,
-  build: (attrs: string, inner: string) => T | null
-): T[] {
-  const pairedRe = new RegExp(`<${tag}\\b([^>]*)>([\\s\\S]*?)<\\/${tag}>`, "gi");
-  const selfRe = new RegExp(`<${tag}\\b([^/>]*)/>`, "gi");
-  const ordered: Array<{ idx: number; value: T }> = [];
-  for (const match of xml.matchAll(pairedRe)) {
-    const v = build(match[1], match[2]);
-    if (v != null) ordered.push({ idx: match.index ?? 0, value: v });
-  }
-  for (const match of xml.matchAll(selfRe)) {
-    const v = build(match[1], "");
-    if (v != null) ordered.push({ idx: match.index ?? 0, value: v });
-  }
-  ordered.sort((a, b) => a.idx - b.idx);
-  return ordered.map((o) => o.value);
-}
-
-function makePoint(attrs: string, inner: string): ElePoint | null {
-  const lat = parseFloat(attrs.match(/\blat\s*=\s*"([^"]+)"/i)?.[1] ?? "");
-  const lng = parseFloat(attrs.match(/\blon\s*=\s*"([^"]+)"/i)?.[1] ?? "");
-  if (!isFinite(lat) || !isFinite(lng)) return null;
-  const eleStr = inner.match(/<ele\b[^>]*>([^<]+)<\/ele>/i)?.[1];
-  const ele = eleStr !== undefined ? parseFloat(eleStr) : undefined;
-  return {
-    lat,
-    lng,
-    ele: ele !== undefined && isFinite(ele) ? ele : undefined,
-  };
-}
-
-function decodeXml(s: string | undefined): string | undefined {
-  if (s === undefined) return undefined;
-  const trimmed = s.trim();
-  if (!trimmed) return undefined;
-  return trimmed
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'");
 }
 
 main().catch((err) => {
