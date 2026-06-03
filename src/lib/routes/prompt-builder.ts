@@ -13,6 +13,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type { ChatMessage } from "../llm/ollama-chat";
+import { EMBEDDED_FEW_SHOT } from "./few-shot-data";
 import type { NarrativeContext } from "./narrative-context";
 
 export interface FewShotExample {
@@ -57,10 +58,25 @@ const SYSTEM_PROMPT_RU = `Ты пишешь практичные описани�
 Отвечай только текстом описания. Без преамбул вида «Вот описание маршрута:».`;
 
 /**
- * Load all CONTEXT → DESCRIPTION pairs from data/few-shot/. Pure I/O — call
- * once at startup or behind a cache.
+ * Load all CONTEXT → DESCRIPTION pairs.
+ *
+ * Strategy:
+ *   1. Try the embedded `EMBEDDED_FEW_SHOT` constant — that's how production
+ *      runs, since the standalone Docker image doesn't ship `data/`.
+ *   2. Fall back to reading `data/few-shot/*` from disk — useful for the CLI
+ *      and for local dev where the embedded module may lag behind edits.
+ *
+ * The two should agree; if the embedded array is empty (e.g. someone wiped
+ * it) we fall through to disk so the endpoint still works.
  */
 export function loadFewShotExamples(repoRoot: string): FewShotExample[] {
+  if (EMBEDDED_FEW_SHOT.length > 0) {
+    return EMBEDDED_FEW_SHOT.map((e) => ({
+      id: e.id,
+      context: e.context,
+      description: e.description,
+    }));
+  }
   const dir = join(repoRoot, "data", "few-shot");
   const ids = ["route", "route-2", "route-3"];
   return ids.map((id) => {

@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
+    "build:few-shot": "node scripts/build-few-shot.mjs",
+    "prebuild": "npm run build:few-shot",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint --cache --cache-strategy content",

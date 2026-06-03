@@ -119,6 +119,9 @@ const nextConfig: NextConfig = {
   // Moved out of `experimental` per Next 16 — top-level option now.
   outputFileTracingIncludes: {
     "/api/email-send": ["./node_modules/nodemailer/**/*"],
+    // AI route description generator loads few-shot reference pairs from
+    // disk at runtime. Standalone output doesn't auto-trace static data.
+    "/api/routes/generate-description": ["./data/few-shot/**/*"],
   },
   experimental: {
     optimizePackageImports: [],
