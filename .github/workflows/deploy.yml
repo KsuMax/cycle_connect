@@ -44,6 +44,9 @@ jobs:
               -p 127.0.0.1:4000:4000 \
               --add-host=host.docker.internal:host-gateway \
               --env-file /opt/cycleconnect/.env.production \
+              -v /opt/srtm:/srv/srtm:ro \
+              -e SRTM_TILE_DIR=/srv/srtm \
+              -e SRTM_RESOLUTION=srtm1 \
               cycleconnect:latest
             docker builder prune -f
             docker image prune -f
