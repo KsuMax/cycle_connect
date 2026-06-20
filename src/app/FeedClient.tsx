@@ -4,8 +4,7 @@ import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { EventCard } from "@/components/events/EventCard";
-import { ReportCard } from "@/components/routes/ReportCard";
-import { Bike, TrendingUp, Calendar, Users, Plus, ArrowRight, BookOpen } from "lucide-react";
+import { Sparkles, Search, ArrowUp, TrendingUp, Calendar, Users, ArrowRight, BookOpen } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -18,28 +17,35 @@ interface Props {
   initialReports: DbRideReport[];
 }
 
+// Example prompts shown under the hero search field. Tapping one opens the
+// AI-search widget with the query prefilled and run.
+const HERO_EXAMPLES = [
+  "Маршруты рядом со мной",
+  "60 км несложный",
+  "Гравий с видами",
+  "С попутным ветром",
+];
+
+/** Opens the global AiSearchWidget, optionally prefilling + running a query. */
+function openSearch(query?: string) {
+  window.dispatchEvent(
+    new CustomEvent("ai-search:open", query ? { detail: { query } } : undefined),
+  );
+}
+
 export function FeedClient({ initialRoutes, initialEvents, initialReports }: Props) {
   const { user } = useAuth();
   // null = ещё грузим, true = есть клуб, false = нет клуба
   const [hasClub, setHasClub] = useState<boolean | null>(null);
-  const [hasOwnEvents, setHasOwnEvents] = useState(false);
 
   useEffect(() => {
     if (!user) { setHasClub(false); return; }
-    Promise.all([
-      supabase
-        .from("club_members")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("status", "active"),
-      supabase
-        .from("events")
-        .select("id", { count: "exact", head: true })
-        .eq("organizer_id", user.id),
-    ]).then(([clubRes, eventsRes]) => {
-      setHasClub((clubRes.count ?? 0) > 0);
-      setHasOwnEvents((eventsRes.count ?? 0) > 0);
-    });
+    supabase
+      .from("club_members")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .then(({ count }) => setHasClub((count ?? 0) > 0));
   }, [user]);
 
   const visibleEvents = initialEvents.filter(ev =>
@@ -54,30 +60,49 @@ export function FeedClient({ initialRoutes, initialEvents, initialReports }: Pro
 
           {/* Feed */}
           <div className="space-y-8">
-            {/* Welcome banner */}
-            <div className="rounded-2xl p-6 text-white relative overflow-hidden"
-              style={{ background: "linear-gradient(135deg, #F4632A 0%, #7C5CFC 100%)" }}>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-10">
-                <Bike size={120} strokeWidth={1} />
+            {/* AI-search hero */}
+            <section className="rounded-2xl p-6 text-white relative overflow-hidden"
+              style={{ background: "linear-gradient(135deg, #4B2FD6 0%, #7C5CFC 100%)" }}>
+              <div className="absolute right-4 top-4 opacity-10">
+                <Sparkles size={120} strokeWidth={1} />
               </div>
               <div className="relative">
-                <h1 className="text-2xl font-bold mb-1">Маршруты и поездки для велосипедистов</h1>
-                <p className="text-white/95 text-sm mb-4">Находи маршруты рядом, записывайся на групповые поездки, добавляй свои треки</p>
-                <div className="flex flex-wrap gap-2">
-                  <Link href="/routes"
-                    className="inline-flex items-center gap-2 bg-white font-semibold text-sm px-4 py-2.5 rounded-xl hover:bg-white/90 transition-colors"
-                    style={{ color: "#F4632A" }}>
-                    <Bike size={16} />
-                    Найти маршрут
-                  </Link>
-                  <Link href="/routes?tab=events"
-                    className="inline-flex items-center gap-2 bg-white/20 font-semibold text-sm px-4 py-2.5 rounded-xl hover:bg-white/30 transition-colors text-white">
-                    <Calendar size={16} />
-                    Ближайшие поездки
-                  </Link>
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-white/90 mb-2">
+                  <Sparkles size={14} />
+                  AI-поиск маршрутов
+                </div>
+                <h1 className="text-2xl font-bold mb-1">Опиши поездку — подберём маршрут</h1>
+                <p className="text-white/90 text-sm mb-4">
+                  Расстояние, сложность, покрытие, попутный ветер или места рядом — обычными словами
+                </p>
+
+                <button
+                  onClick={() => openSearch()}
+                  className="w-full bg-white rounded-xl px-4 py-3 flex items-center gap-3 text-left hover:bg-white/95 transition-colors"
+                >
+                  <Search size={18} style={{ color: "#7C5CFC" }} className="shrink-0" />
+                  <span className="text-sm text-[#A1A1AA] flex-1 truncate">
+                    Например: «60 км несложный с попутным ветром»
+                  </span>
+                  <span className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-white"
+                    style={{ backgroundColor: "#7C5CFC" }}>
+                    <ArrowUp size={16} strokeWidth={2.5} />
+                  </span>
+                </button>
+
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {HERO_EXAMPLES.map((ex) => (
+                    <button
+                      key={ex}
+                      onClick={() => openSearch(ex)}
+                      className="text-xs font-medium px-3 py-1.5 rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors"
+                    >
+                      {ex}
+                    </button>
+                  ))}
                 </div>
               </div>
-            </div>
+            </section>
 
             {/* Upcoming events */}
             {visibleEvents.length > 0 && (
@@ -92,76 +117,10 @@ export function FeedClient({ initialRoutes, initialEvents, initialReports }: Pro
                   </div>
                   <Link href="/routes?tab=events" className="text-sm font-medium hover:underline" style={{ color: "#F4632A" }}>Все →</Link>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
+                <div className="space-y-4">
                   {visibleEvents.map((event, i) => <EventCard key={event.id} event={event} priority={i === 0} />)}
                 </div>
               </section>
-            )}
-
-            {/* Recent ride reports */}
-            {initialReports.length > 0 && (
-              <section>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-1 h-6 rounded-full" style={{ backgroundColor: "#22A75B" }} />
-                  <h2 className="text-lg font-bold text-[#1C1C1E] flex items-center gap-2">
-                    <BookOpen size={18} style={{ color: "#22A75B" }} />
-                    Свежие отчёты
-                  </h2>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {initialReports.map((report) => (
-                    <ReportCard key={report.id} report={report} showRoute coverOnly currentUserId={user?.id ?? null} />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Inline create CTA */}
-            <div className="rounded-2xl p-5 flex items-center justify-between gap-4"
-              style={{ background: "linear-gradient(135deg, #0BBFB5 0%, #7C5CFC 100%)" }}>
-              <div>
-                <p className="text-white font-semibold text-sm mb-0.5">Планируешь поездку?</p>
-                <p className="text-white/80 text-xs">Создай мероприятие или нажми «Хочу проехать» на любом маршруте</p>
-              </div>
-              <Link href="/events/new"
-                className="shrink-0 bg-white font-semibold text-xs px-4 py-2.5 rounded-xl hover:bg-white/90 transition-colors whitespace-nowrap"
-                style={{ color: "#7C5CFC" }}>
-                Создать
-              </Link>
-            </div>
-
-            {/* Club discovery CTA — показываем только если у пользователя нет клуба */}
-            {hasClub === false && (
-              <div className="rounded-2xl border border-[#E4E4E7] bg-white p-5 flex items-start gap-4"
-                style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-                <div className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{ backgroundColor: "#F0EDFF" }}>
-                  <Users size={20} style={{ color: "#7C5CFC" }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm text-[#1C1C1E] mb-0.5">
-                    {user ? "Ты ещё не в клубе" : "Присоединяйся к сообществу"}
-                  </p>
-                  <p className="text-xs text-[#71717A] mb-3">
-                    {user
-                      ? "Клубы — место для регулярных поездок с командой, общей лентой и маршрутами"
-                      : "Велоклубы объединяют тех, кто катается регулярно. Найди своих или создай клуб"}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Link href="/clubs"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
-                      style={{ backgroundColor: "#7C5CFC", color: "white" }}>
-                      <ArrowRight size={13} /> Найти клуб
-                    </Link>
-                    {(user && hasOwnEvents) && (
-                      <Link href="/clubs/new"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#E4E4E7] text-[#71717A] hover:border-[#7C5CFC] hover:text-[#7C5CFC] transition-colors">
-                        <Plus size={13} /> Создать клуб
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              </div>
             )}
 
             {/* Popular routes */}
@@ -199,39 +158,79 @@ export function FeedClient({ initialRoutes, initialEvents, initialReports }: Pro
 
           {/* Sidebar */}
           <aside className="space-y-5">
-            <div className="rounded-2xl p-4 text-white"
-              style={{ background: "linear-gradient(135deg, #0BBFB5 0%, #7C5CFC 100%)" }}>
-              <h3 className="font-semibold mb-1 text-sm">Планируешь поездку?</h3>
-              <p className="text-white/80 text-xs mb-3">Создай мероприятие, опиши маршрут по дням и позови друзей</p>
-              <Link href="/events/new"
-                className="block text-center bg-white font-semibold text-sm px-4 py-2 rounded-xl hover:bg-white/90 transition-colors"
-                style={{ color: "#7C5CFC" }}>
-                Создать мероприятие
-              </Link>
-            </div>
-
-            {/* Club CTA в сайдбаре */}
-            {hasClub === false && (
-              <div className="rounded-2xl border border-[#E4E4E7] bg-white p-4"
-                style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-                <div className="flex items-center gap-2 mb-2">
-                  <Users size={16} style={{ color: "#7C5CFC" }} />
-                  <h3 className="font-semibold text-sm text-[#1C1C1E]">Велоклубы</h3>
-                </div>
-                <p className="text-xs text-[#71717A] mb-3">
-                  Регулярные поездки с командой, общие маршруты и лента событий клуба
-                </p>
-                <Link href="/clubs"
-                  className="block text-center font-semibold text-xs px-4 py-2 rounded-xl transition-colors mb-2"
-                  style={{ backgroundColor: "#F0EDFF", color: "#7C5CFC" }}>
-                  Найти клуб
+            {/* Кататься вместе — мероприятия + клубы в одну строку */}
+            <div>
+              <h3 className="font-semibold text-sm text-[#1C1C1E] mb-2.5 px-0.5">Кататься вместе</h3>
+              <div className="grid grid-cols-2 gap-2.5">
+                {/* Поездки */}
+                <Link href="/events/new"
+                  className={`rounded-2xl border border-[#E4E4E7] bg-white p-3.5 hover:border-[#7C5CFC]/50 transition-colors group ${hasClub === false ? "" : "col-span-2"}`}
+                  style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5"
+                    style={{ backgroundColor: "#EDE9FF" }}>
+                    <Calendar size={18} style={{ color: "#7C5CFC" }} />
+                  </div>
+                  <p className="text-sm font-semibold text-[#1C1C1E] mb-0.5 group-hover:text-[#7C5CFC] transition-colors">Поездки</p>
+                  <p className="text-xs text-[#71717A] leading-snug mb-2.5">Создай и позови друзей</p>
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: "#7C5CFC" }}>
+                    Создать <ArrowRight size={12} />
+                  </span>
                 </Link>
-                {user && hasOwnEvents && (
-                  <Link href="/clubs/new"
-                    className="block text-center font-semibold text-xs px-4 py-2 rounded-xl border border-[#E4E4E7] text-[#71717A] hover:border-[#7C5CFC] hover:text-[#7C5CFC] transition-colors">
-                    Создать свой клуб
+
+                {/* Клубы — только если пользователь ещё не в клубе */}
+                {hasClub === false && (
+                  <Link href="/clubs"
+                    className="rounded-2xl border border-[#E4E4E7] bg-white p-3.5 hover:border-[#7C5CFC]/50 transition-colors group"
+                    style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5"
+                      style={{ backgroundColor: "#EDE9FF" }}>
+                      <Users size={18} style={{ color: "#7C5CFC" }} />
+                    </div>
+                    <p className="text-sm font-semibold text-[#1C1C1E] mb-0.5 group-hover:text-[#7C5CFC] transition-colors">Клубы</p>
+                    <p className="text-xs text-[#71717A] leading-snug mb-2.5">Команда и регулярные катки</p>
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: "#7C5CFC" }}>
+                      Найти <ArrowRight size={12} />
+                    </span>
                   </Link>
                 )}
+              </div>
+            </div>
+
+            {/* Свежие отчёты — компактный блок «Из дневника» */}
+            {initialReports.length > 0 && (
+              <div className="rounded-2xl border border-[#E4E4E7] bg-white p-4"
+                style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+                <div className="flex items-center gap-2 mb-3">
+                  <BookOpen size={16} style={{ color: "#22A75B" }} />
+                  <h3 className="font-semibold text-sm text-[#1C1C1E]">Из дневника</h3>
+                </div>
+                <div className="space-y-3">
+                  {initialReports.slice(0, 3).map((report) => {
+                    const routeId = report.route_id ?? report.route?.id;
+                    const href = routeId ? `/routes/${routeId}/report/${report.id}` : "#";
+                    const thumb = report.photos?.[0] ?? report.route?.cover_url ?? null;
+                    return (
+                      <Link key={report.id} href={href} className="flex items-center gap-2.5 group">
+                        <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-[#F5F4F1] flex items-center justify-center">
+                          {thumb ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={thumb} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <BookOpen size={14} className="text-[#A1A1AA]" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-[#1C1C1E] truncate group-hover:text-[#22A75B] transition-colors">
+                            {report.route?.title ?? "Отчёт о поездке"}
+                          </p>
+                          <p className="text-[11px] text-[#A1A1AA] truncate">
+                            {report.author?.name ?? "Райдер"}
+                          </p>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </aside>

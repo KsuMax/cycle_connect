@@ -4,10 +4,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { Calendar, Bike, Heart, ChevronRight, Shield } from "lucide-react";
+import { Bike, Heart, MapPin, Shield } from "lucide-react";
 import { AvatarGroup } from "@/components/ui/Avatar";
-import { Badge } from "@/components/ui/Badge";
-import { formatDate } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useEventLikes } from "@/lib/context/EventLikesContext";
@@ -29,6 +27,16 @@ const GRADIENTS = [
 function pickGradient(id: string): string {
   const hash = id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
   return GRADIENTS[hash % GRADIENTS.length];
+}
+
+const MONTHS_SHORT = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+
+/** Splits an ISO date ("YYYY-MM-DD" or full ISO) into a day number + short month,
+ *  parsing the string directly to avoid timezone shifts. */
+function dateChip(iso: string): { day: string; month: string } {
+  const datePart = (iso ?? "").split("T")[0];
+  const [, m, d] = datePart.split("-");
+  return { day: String(Number(d) || ""), month: MONTHS_SHORT[Number(m) - 1] ?? "" };
 }
 
 interface EventCardProps {
@@ -86,21 +94,20 @@ export function EventCard({ event, priority = false }: EventCardProps) {
 
   const isMultiDay = event.days.length > 1;
   const totalKm = event.days.reduce((sum, d) => sum + d.distance_km, 0);
+  const startPoint = event.days[0]?.start_point;
   const hasCover = !!event.cover_url;
+  const { day, month } = dateChip(event.start_date);
 
   return (
-    <Link href={`/events/${event.id}`} className="group flex h-full">
+    <Link href={`/events/${event.id}`} className="group block">
       <div
-        className="bg-white rounded-2xl overflow-hidden border border-[#E4E4E7] hover:border-[#D1D1D6] transition-all duration-200 flex flex-col w-full"
+        className="bg-white rounded-2xl overflow-hidden border border-[#E4E4E7] hover:border-[#D1D1D6] transition-all duration-200 flex"
         style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}
       >
-        {/* Hero banner */}
+        {/* Left media */}
         <div
-          className="relative flex flex-col justify-end overflow-hidden"
-          style={{
-            height: 160,
-            background: hasCover ? undefined : pickGradient(event.id),
-          }}
+          className="relative w-[120px] sm:w-[150px] shrink-0 self-stretch overflow-hidden"
+          style={{ minHeight: 150, background: hasCover ? undefined : pickGradient(event.id) }}
         >
           {/* Cover photo */}
           {hasCover && (
@@ -110,13 +117,12 @@ export function EventCard({ event, priority = false }: EventCardProps) {
                 alt={event.title}
                 fill
                 className="object-cover"
-                sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                sizes="150px"
                 priority={priority}
               />
-              {/* Gradient overlay for text readability */}
               <div
                 className="absolute inset-0"
-                style={{ background: "linear-gradient(to top, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.1) 60%, transparent 100%)" }}
+                style={{ background: "linear-gradient(135deg, rgba(75,47,214,0.28) 0%, rgba(124,92,252,0.16) 100%)" }}
               />
             </>
           )}
@@ -124,92 +130,94 @@ export function EventCard({ event, priority = false }: EventCardProps) {
           {/* Wave decoration (gradient-only) */}
           {!hasCover && (
             <div className="absolute inset-0 opacity-10">
-              <svg viewBox="0 0 400 160" className="w-full h-full" preserveAspectRatio="none">
-                <path d="M0,80 Q50,35 100,65 Q150,95 200,45 Q250,5 300,55 Q350,85 400,35 L400,160 L0,160 Z" fill="white"/>
+              <svg viewBox="0 0 200 200" className="w-full h-full" preserveAspectRatio="none">
+                <path d="M0,110 Q40,70 80,95 Q120,120 160,80 Q190,55 200,75 L200,200 L0,200 Z" fill="white" />
               </svg>
             </div>
           )}
 
-          <div className="relative p-5">
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <Badge className="bg-white/30 text-white border-0 text-xs font-semibold backdrop-blur-sm">
-                📅 {isMultiDay ? `${event.days.length} дня · поход` : "Поездка"}
-              </Badge>
-              {event.club && (
-                <span
-                  role="link"
-                  tabIndex={0}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    router.push(`/clubs/${event.club!.slug}`);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      router.push(`/clubs/${event.club!.slug}`);
-                    }
-                  }}
-                  className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-md transition-opacity hover:opacity-80 cursor-pointer"
-                  style={{ backgroundColor: "rgba(11,191,181,0.25)", color: "white" }}
-                >
-                  <Shield size={10} />
-                  {event.club.name}
-                </span>
-              )}
-            </div>
-            <h3 className="text-white font-bold text-lg leading-tight group-hover:opacity-90 transition-opacity drop-shadow-sm">
-              {event.title}
-            </h3>
+          {/* Date chip */}
+          <div className="absolute top-2.5 left-2.5 bg-white rounded-xl text-center px-2 py-1.5"
+            style={{ boxShadow: "0 1px 4px 0 rgb(0 0 0 / 0.18)" }}>
+            <div className="text-lg font-bold text-[#1C1C1E] leading-none">{day}</div>
+            <div className="text-[10px] uppercase text-[#71717A] mt-0.5">{month}</div>
           </div>
         </div>
 
-        {/* Content */}
-        <div className="p-4 flex flex-col flex-1">
-          {/* Meta */}
-          <div className="flex items-center gap-3 text-sm text-[#71717A] mb-3">
-            <span className="flex items-center gap-1">
-              <Calendar size={14} />
-              {formatDate(event.start_date)}
+        {/* Right content */}
+        <div className="p-4 flex flex-col flex-1 min-w-0">
+          {event.club && (
+            <span
+              role="link"
+              tabIndex={0}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                router.push(`/clubs/${event.club!.slug}`);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  router.push(`/clubs/${event.club!.slug}`);
+                }
+              }}
+              className="inline-flex self-start items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full mb-2 transition-opacity hover:opacity-80 cursor-pointer"
+              style={{ backgroundColor: "#EDE9FF", color: "#7C5CFC" }}
+            >
+              <Shield size={10} />
+              {event.club.name}
             </span>
+          )}
+
+          <h3 className="text-[#1C1C1E] font-bold text-base leading-tight line-clamp-2 group-hover:text-[#7C5CFC] transition-colors">
+            {event.title}
+          </h3>
+
+          {/* Meta */}
+          <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1 text-xs text-[#71717A] mt-2 mb-3">
             <span className="flex items-center gap-1">
-              <Bike size={14} />
+              <Bike size={13} />
               {totalKm} км
             </span>
-            {isMultiDay && (
-              <span className="text-xs text-[#A1A1AA]">{event.days.length} дн.</span>
+            {isMultiDay && <span>· {event.days.length} дн.</span>}
+            {startPoint && (
+              <span className="flex items-center gap-1 min-w-0">
+                · <MapPin size={12} className="shrink-0" />
+                <span className="truncate">{startPoint}</span>
+              </span>
             )}
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between pt-2 border-t border-[#F5F4F1]">
+          <div className="flex items-center justify-between gap-2 mt-auto pt-2 border-t border-[#F5F4F1]">
             <AvatarGroup
               users={event.participants}
               max={3}
               label={`${event.participants.length}${event.max_participants ? `/${event.max_participants}` : ""} едут`}
             />
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
                 onClick={handleLike}
-                className="flex items-center gap-1 text-sm min-w-[44px] min-h-[44px] justify-center transition-colors"
+                aria-label="Нравится"
+                className="flex items-center gap-1 text-sm min-w-[40px] h-9 justify-center transition-colors"
                 style={{ color: liked ? "#F4632A" : "#A1A1AA" }}
               >
-                <Heart size={14} fill={liked ? "#F4632A" : "none"} />
+                <Heart size={15} fill={liked ? "#F4632A" : "none"} />
                 {likeCount}
               </button>
 
               <button
                 onClick={handleGoing}
                 disabled={goingBusy}
-                className="flex items-center gap-1.5 text-sm font-medium px-4 min-h-[44px] rounded-xl transition-colors disabled:opacity-70"
+                className="flex items-center gap-1.5 text-sm font-medium px-4 h-9 rounded-xl transition-colors disabled:opacity-70"
                 style={going
                   ? { backgroundColor: "#0BBFB5", color: "white" }
-                  : { backgroundColor: "#1C1C1E", color: "white" }
+                  : { backgroundColor: "#7C5CFC", color: "white" }
                 }
               >
-                {going ? "✓ Еду" : <>Я поеду <ChevronRight size={14} /></>}
+                {going ? "✓ Еду" : "Я поеду"}
               </button>
             </div>
           </div>

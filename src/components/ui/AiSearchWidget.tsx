@@ -427,6 +427,9 @@ export function AiSearchWidget() {
   const [isPersonalized, setIsPersonalized] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Latest handleSearch, so the global "ai-search:open" listener can prefill+run
+  // a query without re-binding on every render.
+  const handleSearchRef = useRef<((q: string) => void) | null>(null);
 
   const loading = phase !== "idle" && phase !== "done";
 
@@ -464,6 +467,19 @@ export function AiSearchWidget() {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
+  }, []);
+
+  // Open the widget from elsewhere (e.g. the feed AI-search hero), optionally
+  // prefilling and running a query. Dispatched as:
+  //   window.dispatchEvent(new CustomEvent("ai-search:open", { detail: { query } }))
+  useEffect(() => {
+    const handler = (e: Event) => {
+      setOpen(true);
+      const q = (e as CustomEvent<{ query?: string }>).detail?.query?.trim();
+      if (q) setTimeout(() => handleSearchRef.current?.(q), 120);
+    };
+    window.addEventListener("ai-search:open", handler);
+    return () => window.removeEventListener("ai-search:open", handler);
   }, []);
 
   function resetToFreshSearch() {
@@ -622,6 +638,8 @@ export function AiSearchWidget() {
       setPhase("done");
     }
   }
+
+  handleSearchRef.current = handleSearch;
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
