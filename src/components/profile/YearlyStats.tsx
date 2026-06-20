@@ -7,34 +7,36 @@ interface Props {
   stats: YearStat[] | null;
 }
 
-/** "По годам" — per-year breakdown of ridden routes (count + km) with a km bar. */
+function ridesWord(n: number): string {
+  if (n === 1) return "поездка";
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return "поездки";
+  return "поездок";
+}
+
+/**
+ * "По годам" — per-year breakdown of ridden routes (count + km) with a km bar.
+ * Renders inline (no card chrome) — meant to sit inside the profile stats panel.
+ */
 export function YearlyStats({ stats }: Props) {
-  // Hide entirely while loading or when there's nothing to show.
   if (!stats || stats.length === 0) return null;
 
   const maxKm = Math.max(...stats.map((s) => s.km), 1);
-  const totalKm = stats.reduce((sum, s) => sum + s.km, 0);
 
   return (
-    <div
-      className="bg-white rounded-2xl border border-[#E4E4E7] p-4 sm:p-5 mb-6"
-      style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}
-    >
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-bold text-sm text-[#1C1C1E] flex items-center gap-2">
-          <CalendarRange size={16} style={{ color: "#F4632A" }} />
-          По годам
-        </h3>
-        <span className="text-xs text-[#A1A1AA]">всего {totalKm.toLocaleString("ru-RU")} км</span>
-      </div>
-
-      <div className="flex flex-col gap-3.5">
+    <div>
+      <h3 className="font-bold text-xs uppercase tracking-wide text-[#71717A] flex items-center gap-1.5 mb-3">
+        <CalendarRange size={13} style={{ color: "#F4632A" }} />
+        По годам
+      </h3>
+      <div className="flex flex-col gap-3">
         {stats.map((s) => (
           <div key={s.year}>
             <div className="flex items-baseline justify-between mb-1.5">
               <span className="text-sm font-semibold text-[#1C1C1E]">{s.year}</span>
               <span className="text-xs text-[#71717A]">
-                {s.rides} {s.rides === 1 ? "поездка" : s.rides < 5 ? "поездки" : "поездок"}
+                {s.rides} {ridesWord(s.rides)}
                 {" · "}
                 <span className="font-semibold" style={{ color: "#F4632A" }}>
                   {s.km.toLocaleString("ru-RU")} км

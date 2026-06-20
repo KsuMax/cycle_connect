@@ -209,8 +209,11 @@ export default function ProfilePage() {
     e.target.value = "";
   };
 
-  const ridesKm = profile?.km_total ?? 0;
   const tripsCount = ridesData.length + myEvents.length;
+  // Profile stats are recomputed from route_rides (single source of truth),
+  // so the headline totals always match the per-year breakdown.
+  const totalKm = yearlyStats ? yearlyStats.reduce((sum, y) => sum + y.km, 0) : null;
+  const totalRides = yearlyStats ? yearlyStats.reduce((sum, y) => sum + y.rides, 0) : null;
 
   const initials = profile?.name
     ? profile.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
@@ -242,7 +245,39 @@ export default function ProfilePage() {
       <main className="max-w-4xl mx-auto px-4 py-8">
         {/* Profile header */}
         <div className="bg-white rounded-2xl p-6 border border-[#E4E4E7] mb-6" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-          <div className="flex items-start gap-5">
+          {/* Action buttons */}
+          <div className="flex items-center justify-end gap-0.5 mb-2 -mt-1">
+            <Link
+              href={`/users/${user.id}`}
+              target="_blank"
+              title="Посмотреть как гость"
+              className="flex items-center justify-center w-9 h-9 rounded-lg text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors"
+            >
+              <Eye size={16} />
+            </Link>
+            <button
+              onClick={async () => {
+                await navigator.clipboard.writeText(`${window.location.origin}/users/${user.id}`);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+              title="Скопировать ссылку на профиль"
+              className="flex items-center justify-center w-9 h-9 rounded-lg text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors"
+            >
+              {copied ? <Check size={16} className="text-green-500" /> : <Link2 size={16} />}
+            </button>
+            <Link
+              href="/profile/settings"
+              title="Настройки"
+              className="flex items-center gap-1.5 text-sm text-[#71717A] hover:text-[#1C1C1E] transition-colors h-9 px-2 rounded-lg hover:bg-[#F5F4F1]"
+            >
+              <Settings size={16} /><span className="hidden sm:inline">Настройки</span>
+            </Link>
+          </div>
+
+          <div className="flex flex-col lg:flex-row gap-6">
+            {/* Left: identity */}
+            <div className="flex items-start gap-5 lg:w-[42%] lg:shrink-0">
             <div className="relative shrink-0 group">
               <div
                 className={`w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center text-xl font-bold text-white${avatarUrl ? " cursor-pointer" : ""}`}
@@ -300,9 +335,9 @@ export default function ProfilePage() {
                 </div>
               )}
             </div>
-            <div className="flex-1">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
+            <div className="flex-1 min-w-0">
+              <div>
+                <div className="min-w-0">
                   <h1 className="text-xl font-bold text-[#1C1C1E] truncate">{profile?.name || "Участник"}</h1>
                   {profile?.username && <p className="text-sm font-medium mt-0.5" style={{ color: "#F4632A" }}>@{profile.username}</p>}
                   {profile?.bio && <p className="text-sm text-[#71717A] mt-1">{profile.bio}</p>}
@@ -330,47 +365,6 @@ export default function ProfilePage() {
                     </div>
                   )}
                 </div>
-                <div className="flex items-center gap-0.5 shrink-0">
-                  <Link
-                    href={`/users/${user.id}`}
-                    target="_blank"
-                    title="Посмотреть как гость"
-                    className="flex items-center justify-center w-9 h-9 rounded-lg text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors"
-                  >
-                    <Eye size={16} />
-                  </Link>
-                  <button
-                    onClick={async () => {
-                      await navigator.clipboard.writeText(`${window.location.origin}/users/${user.id}`);
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 2000);
-                    }}
-                    title="Скопировать ссылку на профиль"
-                    className="flex items-center justify-center w-9 h-9 rounded-lg text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors"
-                  >
-                    {copied ? <Check size={16} className="text-green-500" /> : <Link2 size={16} />}
-                  </button>
-                  <Link
-                    href="/profile/settings"
-                    title="Настройки"
-                    className="flex items-center gap-1.5 text-sm text-[#71717A] hover:text-[#1C1C1E] transition-colors h-9 px-2 rounded-lg hover:bg-[#F5F4F1]"
-                  >
-                    <Settings size={16} /><span className="hidden sm:inline">Настройки</span>
-                  </Link>
-                </div>
-              </div>
-              {/* Hero stats */}
-              <div className="flex gap-6 mt-4">
-                {[
-                  { value: Math.round(ridesKm).toLocaleString(), label: "км" },
-                  { value: (loadingRides || loadingEvents) ? "..." : tripsCount, label: "активностей" },
-                  { value: myRoutes.length, label: "маршрутов" },
-                ].map(({ value, label }) => (
-                  <div key={label} className="text-center">
-                    <div className="text-2xl font-bold" style={{ color: "#F4632A" }}>{value}</div>
-                    <div className="text-xs text-[#71717A]">{label}</div>
-                  </div>
-                ))}
               </div>
               {/* Social row */}
               <div className="flex items-center gap-2 mt-2.5 text-xs text-[#A1A1AA] flex-wrap">
@@ -386,6 +380,27 @@ export default function ProfilePage() {
                   {clubsCount} {clubsCount === 1 ? "клуб" : clubsCount < 5 ? "клуба" : "клубов"}
                 </Link>
               </div>
+            </div>
+            </div>
+
+            {/* Divider */}
+            <div className="hidden lg:block w-px self-stretch bg-[#F0EFEC]" />
+
+            {/* Right: stats dashboard */}
+            <div className="flex-1 min-w-0">
+              <div className="grid grid-cols-3 gap-2.5 mb-5">
+                {[
+                  { value: totalKm == null ? "…" : totalKm.toLocaleString("ru-RU"), label: "км всего", accent: true },
+                  { value: totalRides == null ? "…" : totalRides, label: "поездок", accent: false },
+                  { value: myRoutes.length, label: "маршрутов", accent: false },
+                ].map(({ value, label, accent }) => (
+                  <div key={label} className="bg-[#F5F4F1] rounded-xl px-3 py-2.5">
+                    <div className="text-2xl font-bold leading-none" style={{ color: accent ? "#F4632A" : "#1C1C1E" }}>{value}</div>
+                    <div className="text-[11px] text-[#71717A] mt-1">{label}</div>
+                  </div>
+                ))}
+              </div>
+              <YearlyStats stats={yearlyStats} />
             </div>
           </div>
         </div>
@@ -411,9 +426,6 @@ export default function ProfilePage() {
             onUploadAvatar={() => avatarInputRef.current?.click()}
           />
         )}
-
-        {/* Ridden routes by year */}
-        <YearlyStats stats={yearlyStats} />
 
         {/* Tabs */}
         <div className="flex gap-1 bg-white rounded-2xl p-1.5 border border-[#E4E4E7] mb-6" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
