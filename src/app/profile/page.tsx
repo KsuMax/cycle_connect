@@ -17,6 +17,8 @@ import { ProfileShowcase } from "@/components/ui/ProfileShowcase";
 import { ShowcasePicker } from "@/components/ui/ShowcasePicker";
 import { AvatarLightbox } from "@/components/ui/AvatarLightbox";
 import { SetupChecklist } from "@/components/ui/SetupChecklist";
+import { YearlyStats } from "@/components/profile/YearlyStats";
+import { useYearlyRideStats } from "@/lib/hooks/useYearlyRideStats";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
 import type { Route } from "@/types";
@@ -37,6 +39,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const { favorites } = useFavorites();
   const { rideCounts, ridesLoaded } = useRides();
+  const yearlyStats = useYearlyRideStats(user?.id);
   const { achievements, earnedIds, earnedMap, loaded: achievementsLoaded, showcaseIds, setShowcaseIds } = useAchievements();
 
   const earnedLevels: Record<string, number> = useMemo(() => {
@@ -409,6 +412,8 @@ export default function ProfilePage() {
           />
         )}
 
+        {/* Ridden routes by year */}
+        <YearlyStats stats={yearlyStats} />
 
         {/* Tabs */}
         <div className="flex gap-1 bg-white rounded-2xl p-1.5 border border-[#E4E4E7] mb-6" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
