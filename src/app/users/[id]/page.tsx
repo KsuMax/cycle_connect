@@ -15,6 +15,8 @@ import { useAchievements } from "@/lib/context/AchievementsContext";
 import { AchievementBadge } from "@/components/ui/AchievementBadge";
 import { ProfileShowcase } from "@/components/ui/ProfileShowcase";
 import { AvatarLightbox } from "@/components/ui/AvatarLightbox";
+import { YearlyStats } from "@/components/profile/YearlyStats";
+import { useYearlyRideStats } from "@/lib/hooks/useYearlyRideStats";
 import { formatDate } from "@/lib/utils";
 import type { Route } from "@/types";
 import type { DbProfile } from "@/lib/supabase";
@@ -43,6 +45,11 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [followBusy, setFollowBusy] = useState(false);
+
+  // Stats recomputed from route_rides — single source of truth (matches /profile).
+  const yearlyStats = useYearlyRideStats(id);
+  const totalKm = yearlyStats ? yearlyStats.reduce((sum, y) => sum + y.km, 0) : null;
+  const totalRides = yearlyStats ? yearlyStats.reduce((sum, y) => sum + y.rides, 0) : null;
 
   const [activeTab, setActiveTab] = useState<Tab>("routes");
   const [routes, setRoutes] = useState<Route[]>([]);
@@ -176,15 +183,42 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
       <main className="max-w-4xl mx-auto px-4 py-8">
         {/* Profile header */}
         <div className="bg-white rounded-2xl p-6 border border-[#E4E4E7] mb-6" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-          <div className="flex items-start gap-5">
+          {/* Action bar */}
+          {((!isOwnProfile && user && followLoaded) || isOwnProfile) && (
+            <div className="flex items-center justify-end mb-2 -mt-1">
+              {!isOwnProfile && user && followLoaded && (
+                <button
+                  onClick={handleFollowToggle}
+                  disabled={followBusy}
+                  className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-xl transition-colors disabled:opacity-60"
+                  style={following
+                    ? { backgroundColor: "#F5F4F1", color: "#71717A", border: "1px solid #E4E4E7" }
+                    : { backgroundColor: "#F4632A", color: "white" }}>
+                  {following
+                    ? <><UserCheck size={15} /> Подписан</>
+                    : <><UserPlus size={15} /> Подписаться</>}
+                </button>
+              )}
+              {isOwnProfile && (
+                <Link href="/profile/settings"
+                  className="text-sm text-[#71717A] hover:text-[#1C1C1E] border border-[#E4E4E7] px-3 py-2 rounded-xl hover:bg-[#F5F4F1] transition-colors">
+                  Настройки
+                </Link>
+              )}
+            </div>
+          )}
+
+          <div className="flex flex-col lg:flex-row gap-6">
+            {/* Left: identity */}
+            <div className="flex items-start gap-5 lg:w-[42%] lg:shrink-0">
             <div
               className={profile.avatar_url ? "cursor-pointer" : ""}
               onClick={() => profile.avatar_url && setShowAvatarLightbox(true)}
             >
               <Avatar user={userObj} size="lg" className="rounded-2xl w-16 h-16 shrink-0" sticker={getUserSticker(profile)} />
             </div>
-            <div className="flex-1">
-              <div className="flex items-start justify-between">
+            <div className="flex-1 min-w-0">
+              <div>
                 <div>
                   <h1 className="text-xl font-bold text-[#1C1C1E]">{profile.name}</h1>
                   {profile.username && (
@@ -222,48 +256,38 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                     </div>
                   )}
                 </div>
-                {!isOwnProfile && user && followLoaded && (
-                  <button
-                    onClick={handleFollowToggle}
-                    disabled={followBusy}
-                    className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-xl transition-colors disabled:opacity-60"
-                    style={following
-                      ? { backgroundColor: "#F5F4F1", color: "#71717A", border: "1px solid #E4E4E7" }
-                      : { backgroundColor: "#F4632A", color: "white" }}>
-                    {following
-                      ? <><UserCheck size={15} /> Подписан</>
-                      : <><UserPlus size={15} /> Подписаться</>}
-                  </button>
-                )}
-                {isOwnProfile && (
-                  <Link href="/profile/settings"
-                    className="text-sm text-[#71717A] hover:text-[#1C1C1E] border border-[#E4E4E7] px-3 py-2 rounded-xl hover:bg-[#F5F4F1] transition-colors">
-                    Настройки
-                  </Link>
-                )}
               </div>
+                {/* Social row */}
+                <div className="flex items-center gap-2 mt-2.5 text-xs text-[#A1A1AA] flex-wrap">
+                  <Link href={`/users/${id}/followers`} className="hover:text-[#71717A] hover:underline transition-colors">
+                    {followersCount} {followersCount === 1 ? "подписчик" : followersCount < 5 ? "подписчика" : "подписчиков"}
+                  </Link>
+                  <span>·</span>
+                  <Link href={`/users/${id}/following`} className="hover:text-[#71717A] hover:underline transition-colors">
+                    {followingCount} {followingCount === 1 ? "подписка" : followingCount < 5 ? "подписки" : "подписок"}
+                  </Link>
+                </div>
+              </div>
+            </div>
 
-              {/* Stats */}
-              <div className="flex gap-6 mt-4 flex-wrap">
+            {/* Divider */}
+            <div className="hidden lg:block w-px self-stretch bg-[#F0EFEC]" />
+
+            {/* Right: stats dashboard */}
+            <div className="flex-1 min-w-0">
+              <div className="grid grid-cols-3 gap-2.5 mb-5">
                 {[
-                  { value: Math.round(profile.km_total).toLocaleString(), label: "км всего", color: "#F4632A", href: null },
-                  { value: routes.length, label: "маршрутов", color: "#7C5CFC", href: null },
-                  { value: followersCount, label: "подписчиков", color: "#0BBFB5", href: `/users/${id}/followers` },
-                  { value: followingCount, label: "подписок", color: "#A1A1AA", href: `/users/${id}/following` },
-                ].map(({ value, label, color, href }) => (
-                  href ? (
-                    <Link key={label} href={href} className="text-center group">
-                      <div className="text-xl font-bold group-hover:underline" style={{ color }}>{value}</div>
-                      <div className="text-xs text-[#71717A]">{label}</div>
-                    </Link>
-                  ) : (
-                    <div key={label} className="text-center">
-                      <div className="text-xl font-bold" style={{ color }}>{value}</div>
-                      <div className="text-xs text-[#71717A]">{label}</div>
-                    </div>
-                  )
+                  { value: totalKm == null ? "…" : totalKm.toLocaleString("ru-RU"), label: "км всего", accent: true },
+                  { value: totalRides == null ? "…" : totalRides, label: "поездок", accent: false },
+                  { value: routes.length, label: "маршрутов", accent: false },
+                ].map(({ value, label, accent }) => (
+                  <div key={label} className="bg-[#F5F4F1] rounded-xl px-3 py-2.5">
+                    <div className="text-2xl font-bold leading-none" style={{ color: accent ? "#F4632A" : "#1C1C1E" }}>{value}</div>
+                    <div className="text-[11px] text-[#71717A] mt-1">{label}</div>
+                  </div>
                 ))}
               </div>
+              <YearlyStats stats={yearlyStats} />
             </div>
           </div>
         </div>
