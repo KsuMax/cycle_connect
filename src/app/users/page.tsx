@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
+import { CommunityTabs } from "@/components/layout/CommunityTabs";
 import { Avatar } from "@/components/ui/Avatar";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -97,6 +98,7 @@ export default function UsersPage() {
     <div className="min-h-screen bg-[#F5F4F1]">
       <Header />
       <main className="max-w-4xl mx-auto px-4 py-8">
+        <CommunityTabs />
         {/* Page header */}
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#F0ECFF" }}>

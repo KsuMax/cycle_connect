@@ -5,23 +5,23 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Map, Newspaper, HelpCircle, Users, Shield, Menu, X } from "lucide-react";
+import { Map, Newspaper, HelpCircle, Calendar, Shield, Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useNavigation } from "@/lib/context/NavigationContext";
 import { proxyImageUrl } from "@/lib/supabase";
 import { NotificationBell } from "@/components/ui/NotificationBell";
 
 const NAV_ITEMS = [
-  { href: "/",       label: "Лента",      icon: Newspaper },
-  { href: "/routes", label: "Маршруты",   icon: Map },
-  { href: "/users",  label: "Участники",  icon: Users },
-  { href: "/clubs",  label: "Клубы",      icon: Shield },
+  { href: "/",                  label: "Лента",    icon: Newspaper },
+  { href: "/routes",            label: "Маршруты", icon: Map },
+  { href: "/routes?tab=events", label: "Поездки",  icon: Calendar },
+  { href: "/clubs",             label: "Клубы",    icon: Shield },
 ];
 
-// Items not covered by BottomNav — shown in the mobile burger dropdown
+// Items not covered by BottomNav — shown in the mobile burger dropdown.
+// "Участники" lives as a tab inside the Clubs page, not as its own nav item.
 const BURGER_ITEMS = [
-  { href: "/users", label: "Участники", icon: Users },
-  { href: "/clubs", label: "Клубы",     icon: Shield },
+  { href: "/clubs", label: "Клубы", icon: Shield },
 ];
 
 export function Header() {
@@ -37,6 +37,17 @@ export function Header() {
     setMenuOpen(false);
     if (pathname === href) return;
     navigate(href);
+  };
+
+  // Active-state per nav href. "Поездки" and "Маршруты" share the /routes
+  // pathname (events is a tab there), so we match events by /events the same
+  // way BottomNav does. "Клубы" also covers /users, since Участники is a tab
+  // inside the Clubs section.
+  const navActive = (href: string): boolean => {
+    if (href === "/") return pathname === "/";
+    if (href === "/routes?tab=events") return pathname.startsWith("/events");
+    if (href === "/clubs") return pathname.startsWith("/clubs") || pathname.startsWith("/users");
+    return pathname.startsWith(href);
   };
 
   const initials = profile?.name
@@ -58,9 +69,7 @@ export function Header() {
           {/* Desktop navigation */}
           <nav className="hidden sm:flex items-center gap-1">
             {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-              const isActive = href === "/"
-                ? pathname === "/" || pendingHref === "/"
-                : (pathname.startsWith(href) && href !== "/") || pendingHref === href;
+              const isActive = navActive(href) || pendingHref === href;
               const isPending = pendingHref === href;
               return (
                 <Link
@@ -174,7 +183,7 @@ export function Header() {
           >
             <nav className="max-w-6xl mx-auto px-4 py-2 flex flex-col gap-0.5">
               {BURGER_ITEMS.map(({ href, label, icon: Icon }) => {
-                const isActive = pathname.startsWith(href) || pendingHref === href;
+                const isActive = navActive(href) || pendingHref === href;
                 return (
                   <a
                     key={href}

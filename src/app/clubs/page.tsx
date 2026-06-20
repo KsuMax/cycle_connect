@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
+import { CommunityTabs } from "@/components/layout/CommunityTabs";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase, proxyImageUrl } from "@/lib/supabase";
 import { CLUB_LIST_SELECT } from "@/lib/queries";
@@ -152,6 +153,7 @@ export default function ClubsPage() {
     <div className="min-h-screen bg-[#F5F4F1]">
       <Header />
       <main className="max-w-6xl mx-auto px-4 py-8 pb-24">
+        <CommunityTabs />
         {/* Title row */}
         <div className="flex items-end justify-between gap-3 mb-6 flex-wrap">
           <div>
