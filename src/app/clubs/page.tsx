@@ -10,12 +10,37 @@ import { supabase, proxyImageUrl } from "@/lib/supabase";
 import { CLUB_LIST_SELECT } from "@/lib/queries";
 import { dbToClub } from "@/lib/transforms";
 import type { Club } from "@/types";
-import { Shield, Plus, Users, MapPin, Search, Lock, Globe, X, CheckCircle, ArrowUpDown } from "lucide-react";
+import { Shield, Plus, Users, MapPin, Search, Lock, Globe, X, CheckCircle, ArrowUpDown, Calendar, Map as MapIcon } from "lucide-react";
 import type { ClubVisibility } from "@/types";
 
 type Tab = "mine" | "all";
 type Sort = "activity" | "members" | "new" | "name";
 type VisFilter = "any" | ClubVisibility;
+
+type ClubExtra = { nextEvent?: { title: string; start_date: string }; routesCount: number };
+
+const ACTIVE_WINDOW_DAYS = 21;
+
+function timeAgo(dateStr: string): string {
+  const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+  if (days < 1) return "сегодня";
+  if (days === 1) return "вчера";
+  if (days < 7) return `${days} дн. назад`;
+  if (days < 30) return `${Math.floor(days / 7)} нед. назад`;
+  if (days < 365) return `${Math.floor(days / 30)} мес. назад`;
+  return `${Math.floor(days / 365)} г. назад`;
+}
+
+function formatEventDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  const today = new Date();
+  const isToday = d.toDateString() === today.toDateString();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  if (isToday) return `сегодня, ${d.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })}`;
+  if (d.toDateString() === tomorrow.toDateString()) return `завтра, ${d.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })}`;
+  return d.toLocaleDateString("ru", { day: "numeric", month: "short" });
+}
 
 const VIS_LABELS: Record<VisFilter, string> = {
   any:     "Все",
@@ -65,6 +90,7 @@ export default function ClubsPage() {
   const [sort, setSort] = useState<Sort>("activity");
   const [vis, setVis] = useState<VisFilter>("any");
   const [city, setCity] = useState<string>("");
+  const [extras, setExtras] = useState<Record<string, ClubExtra>>({});
 
   useEffect(() => {
     if (authLoading) return;
@@ -84,6 +110,8 @@ export default function ClubsPage() {
       .select(CLUB_LIST_SELECT)
       .order("last_activity_at", { ascending: false, nullsFirst: false });
 
+    let clubs: Club[] = [];
+
     if (user) {
       const [{ data: allData }, { data: myIds }] = await Promise.all([
         allQ,
@@ -95,17 +123,50 @@ export default function ClubsPage() {
       ]);
 
       const memberSet = new Set((myIds ?? []).map((r: { club_id: string }) => r.club_id));
-      const clubs = (allData ?? []).map(dbToClub);
+      clubs = (allData ?? []).map(dbToClub);
 
       setMyClubs(clubs.filter((c) => memberSet.has(c.id)));
       setAllClubs(clubs);
     } else {
       const { data } = await allQ;
-      setAllClubs((data ?? []).map(dbToClub));
+      clubs = (data ?? []).map(dbToClub);
+      setAllClubs(clubs);
       setMyClubs([]);
     }
 
     setLoading(false);
+    loadExtras(clubs.map((c) => c.id));
+  }
+
+  async function loadExtras(ids: string[]) {
+    if (ids.length === 0) {
+      setExtras({});
+      return;
+    }
+
+    const [eventsRes, routesRes] = await Promise.all([
+      supabase
+        .from("events")
+        .select("club_id, title, start_date")
+        .in("club_id", ids)
+        .gte("start_date", new Date().toISOString())
+        .order("start_date", { ascending: true }),
+      supabase.from("routes").select("club_id").in("club_id", ids),
+    ]);
+
+    const next: Record<string, ClubExtra> = {};
+    for (const id of ids) next[id] = { routesCount: 0 };
+
+    for (const r of (routesRes.data ?? []) as { club_id: string | null }[]) {
+      if (r.club_id && next[r.club_id]) next[r.club_id].routesCount += 1;
+    }
+    for (const e of (eventsRes.data ?? []) as { club_id: string | null; title: string; start_date: string }[]) {
+      if (e.club_id && next[e.club_id] && !next[e.club_id].nextEvent) {
+        next[e.club_id].nextEvent = { title: e.title, start_date: e.start_date };
+      }
+    }
+
+    setExtras(next);
   }
 
   const myIdSet = new Set(myClubs.map((c) => c.id));
@@ -311,7 +372,12 @@ export default function ClubsPage() {
         ) : visibleList.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {visibleList.map((club) => (
-              <ClubCard key={club.id} club={club} isMember={myIdSet.has(club.id)} />
+              <ClubCard
+                key={club.id}
+                club={club}
+                isMember={myIdSet.has(club.id)}
+                extra={extras[club.id]}
+              />
             ))}
           </div>
         ) : (
@@ -391,104 +457,127 @@ function SelectControl({
   );
 }
 
-function ClubCard({ club, isMember }: { club: Club; isMember?: boolean }) {
+function ClubCard({
+  club,
+  isMember,
+  extra,
+}: {
+  club: Club;
+  isMember?: boolean;
+  extra?: ClubExtra;
+}) {
   const visibilityLabel =
     club.visibility === "request" ? "По заявке"
     : club.visibility === "closed" ? "Закрытый"
     : null;
 
+  const isActive =
+    !!club.last_activity_at &&
+    Date.now() - new Date(club.last_activity_at).getTime() < ACTIVE_WINDOW_DAYS * 86400000;
+  const dimmed = !extra?.nextEvent && !isActive;
+
   return (
     <Link
       href={`/clubs/${club.slug}`}
       className="group flex flex-col bg-white rounded-2xl border border-[#E4E4E7] overflow-hidden hover:border-[#0BBFB5]/50 hover:-translate-y-0.5 transition-all"
-      style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}
+      style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)", opacity: dimmed ? 0.7 : 1 }}
     >
-      {/* Cover */}
-      <div className="relative h-20 overflow-hidden shrink-0">
-        {club.cover_url ? (
-          <Image
-            src={proxyImageUrl(club.cover_url) ?? club.cover_url}
-            alt=""
-            width={400}
-            height={80}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full" style={{ background: "linear-gradient(135deg, #E8FAF9 0%, #F0ECFF 100%)" }} />
-        )}
-        {isMember && (
-          <span
-            className="absolute top-2 right-2 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full backdrop-blur"
-            style={{ backgroundColor: "rgba(11,191,181,0.92)", color: "white" }}
-          >
-            <CheckCircle size={10} />
-            Участник
-          </span>
-        )}
-      </div>
+      {/* Header: avatar + name + visibility */}
+      <div className="flex items-start gap-3 p-4 pb-3">
+        <div
+          className="relative w-11 h-11 rounded-xl overflow-hidden flex items-center justify-center text-white font-bold text-base shrink-0"
+          style={{ backgroundColor: "#0BBFB5" }}
+        >
+          {club.avatar_url ? (
+            <Image
+              src={proxyImageUrl(club.avatar_url) ?? club.avatar_url}
+              alt={club.name}
+              width={44}
+              height={44}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            club.name[0].toUpperCase()
+          )}
+          {isMember && (
+            <span
+              className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center border-2 border-white"
+              style={{ backgroundColor: "#0BBFB5" }}
+              title="Ты участник"
+            >
+              <CheckCircle size={9} color="white" />
+            </span>
+          )}
+        </div>
 
-      {/* Body */}
-      <div className="px-4 pb-4 pt-0 flex-1 flex flex-col relative">
-        {/* Avatar over cover */}
-        <div className="-mt-7 mb-2 relative z-10">
-          <div
-            className="w-12 h-12 rounded-xl overflow-hidden border-2 border-white flex items-center justify-center text-white font-bold text-base shrink-0"
-            style={{ backgroundColor: "#0BBFB5" }}
-          >
-            {club.avatar_url ? (
-              <Image
-                src={proxyImageUrl(club.avatar_url) ?? club.avatar_url}
-                alt={club.name}
-                width={48}
-                height={48}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              club.name[0].toUpperCase()
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start gap-2">
+            <h3 className="font-semibold text-sm text-[#1C1C1E] leading-snug line-clamp-2 flex-1">
+              {club.name}
+            </h3>
+            {visibilityLabel && (
+              <span
+                className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-[#F5F4F1] text-[#71717A] shrink-0 mt-0.5"
+                title={visibilityLabel}
+              >
+                <Lock size={9} />
+                {visibilityLabel}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2.5 mt-1 flex-wrap">
+            <span className="flex items-center gap-1 text-xs text-[#A1A1AA]">
+              <Users size={11} />
+              {club.members_count}
+            </span>
+            {club.city && (
+              <span className="flex items-center gap-1 text-xs text-[#A1A1AA]">
+                <MapPin size={11} />
+                {club.city}
+              </span>
             )}
           </div>
         </div>
+      </div>
 
-        {/* Name + visibility */}
-        <div className="flex items-start gap-2 mb-1.5">
-          <h3 className="font-semibold text-sm text-[#1C1C1E] leading-snug line-clamp-2 flex-1">
-            {club.name}
-          </h3>
-          {visibilityLabel && (
+      {/* Activity signal */}
+      <div className="px-4 mb-3">
+        {extra?.nextEvent ? (
+          <div
+            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5"
+            style={{ backgroundColor: "#E8FAF9" }}
+          >
+            <Calendar size={12} style={{ color: "#0BBFB5" }} className="shrink-0" />
+            <span className="text-xs font-medium truncate" style={{ color: "#085041" }}>
+              Заезд {formatEventDate(extra.nextEvent.start_date)}
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 text-xs text-[#A1A1AA]">
             <span
-              className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-[#F5F4F1] text-[#71717A] shrink-0 mt-0.5"
-              title={visibilityLabel}
-            >
-              <Lock size={9} />
-              {visibilityLabel}
-            </span>
-          )}
-        </div>
-
-        {/* Meta */}
-        <div className="flex items-center gap-3 mb-2 flex-wrap">
-          <span className="flex items-center gap-1 text-xs text-[#A1A1AA]">
-            <Users size={11} />
-            {club.members_count}
-          </span>
-          {club.city && (
-            <span className="flex items-center gap-1 text-xs text-[#A1A1AA]">
-              <MapPin size={11} />
-              {club.city}
-            </span>
-          )}
-          {!visibilityLabel && (
-            <span className="flex items-center gap-1 text-xs text-[#A1A1AA]">
-              <Globe size={11} />
-              Открытый
-            </span>
-          )}
-        </div>
-
-        {/* Description */}
-        {club.description && (
-          <p className="text-xs text-[#71717A] line-clamp-2 mt-auto">{club.description}</p>
+              className="w-1.5 h-1.5 rounded-full shrink-0"
+              style={{ backgroundColor: isActive ? "#0BBFB5" : "#D4D4D8" }}
+            />
+            {club.last_activity_at ? `Активность ${timeAgo(club.last_activity_at)}` : "Пока тихо"}
+          </div>
         )}
+      </div>
+
+      {/* Description */}
+      {club.description && (
+        <p className="px-4 text-xs text-[#71717A] line-clamp-2 mb-3">{club.description}</p>
+      )}
+
+      {/* Footer stats */}
+      <div className="mt-auto px-4 py-2.5 border-t border-[#F0F0EE] flex items-center justify-between text-xs text-[#A1A1AA]">
+        <span className="flex items-center gap-1">
+          <MapIcon size={11} />
+          {extra ? `${extra.routesCount} маршрутов` : "…"}
+        </span>
+        <span className="flex items-center gap-1">
+          {visibilityLabel ? <Lock size={11} /> : <Globe size={11} />}
+          {visibilityLabel ?? "Открытый"}
+        </span>
       </div>
     </Link>
   );

@@ -295,6 +295,10 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
   const isAdmin = myMembership?.role === "owner" || myMembership?.role === "admin";
   const isCaptain = isAdmin || myMembership?.role === "captain";
 
+  const nextEvent = events
+    .filter((e) => new Date(e.start_date).getTime() >= Date.now())
+    .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())[0];
+
   // Feed = merged events + routes sorted by created_at desc
   const feedItems: ({ type: "event"; data: CycleEvent } | { type: "route"; data: Route })[] = [
     ...events.map((e) => ({ type: "event" as const, data: e })),
@@ -320,7 +324,7 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
   return (
     <div className="min-h-screen bg-[#F5F4F1]">
       <Header />
-      <main className="max-w-2xl mx-auto px-4 py-8 pb-24">
+      <main className="max-w-4xl mx-auto px-4 py-8 pb-24">
         <Link
           href="/clubs"
           className="inline-flex items-center gap-1.5 text-sm text-[#71717A] hover:text-[#1C1C1E] transition-colors mb-4"
@@ -329,31 +333,15 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
           Клубы
         </Link>
 
-        {/* Club header card */}
-        <div
-          className="bg-white rounded-2xl border border-[#E4E4E7] overflow-hidden mb-4"
-          style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}
-        >
-          {/* Cover */}
-          {club.cover_url ? (
-            <div className="h-28 overflow-hidden">
-              <Image
-                src={proxyImageUrl(club.cover_url) ?? club.cover_url}
-                alt="Обложка клуба"
-                width={640}
-                height={112}
-                className="w-full h-full object-cover"
-              />
-            </div>
-          ) : (
-            <div className="h-28" style={{ background: "linear-gradient(135deg, #E8FAF9 0%, #F0ECFF 100%)" }} />
-          )}
-
-          <div className="px-5 pb-5">
-            {/* Avatar */}
-            <div className="flex items-end justify-between -mt-7 mb-3">
+        <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-5">
+          {/* Sidebar */}
+          <aside className="lg:sticky lg:top-8 lg:self-start space-y-4">
+            <div
+              className="bg-white rounded-2xl border border-[#E4E4E7] p-5"
+              style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}
+            >
               <div
-                className="w-14 h-14 rounded-xl overflow-hidden border-2 border-white flex items-center justify-center text-white font-bold text-xl shrink-0"
+                className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center text-white font-bold text-xl shrink-0 mb-3"
                 style={{ backgroundColor: "#0BBFB5" }}
               >
                 {club.avatar_url ? (
@@ -369,14 +357,58 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
                 )}
               </div>
 
+              <h1 className="text-lg font-bold text-[#1C1C1E] leading-snug">{club.name}</h1>
+              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                {club.city && (
+                  <span className="flex items-center gap-1 text-xs text-[#71717A]">
+                    <MapPin size={12} />
+                    {club.city}
+                  </span>
+                )}
+                <span className="flex items-center gap-1 text-xs text-[#71717A]">
+                  {club.visibility === "open" ? <Globe size={12} /> : <Lock size={12} />}
+                  {club.visibility === "open" ? "Открытый" : club.visibility === "request" ? "По заявке" : "Закрытый"}
+                </span>
+              </div>
+
+              {club.description && (
+                <p className="text-xs text-[#71717A] mt-3">{club.description}</p>
+              )}
+
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-[#F0F0EE]">
+                <div>
+                  <div className="text-sm font-bold text-[#1C1C1E]">{club.members_count}</div>
+                  <div className="text-[10px] text-[#A1A1AA]">участников</div>
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-[#1C1C1E]">{routes.length}</div>
+                  <div className="text-[10px] text-[#A1A1AA]">маршрутов</div>
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-[#1C1C1E]">{events.length}</div>
+                  <div className="text-[10px] text-[#A1A1AA]">событий</div>
+                </div>
+              </div>
+
+              {/* Next event */}
+              {nextEvent && (
+                <div className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 mt-4" style={{ backgroundColor: "#E8FAF9" }}>
+                  <Calendar size={13} style={{ color: "#0BBFB5" }} className="shrink-0" />
+                  <span className="text-xs font-medium" style={{ color: "#085041" }}>
+                    {new Date(nextEvent.start_date).toLocaleDateString("ru", { day: "numeric", month: "short" })} · {nextEvent.title}
+                  </span>
+                </div>
+              )}
+
               {/* Action buttons */}
               {user && (
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex flex-col gap-2 mt-4">
                   {!myMembership && (
                     <button
                       onClick={handleJoin}
                       disabled={joining}
-                      className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl text-white disabled:opacity-50"
+                      className="w-full inline-flex items-center justify-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl text-white disabled:opacity-50"
                       style={{ backgroundColor: "#0BBFB5" }}
                     >
                       <UserPlus size={15} />
@@ -385,17 +417,17 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
                   )}
                   {myMembership?.status === "pending" && (
                     <>
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl" style={{ backgroundColor: "#FFF9E6", color: "#B45309" }}>
+                      <span className="w-full inline-flex items-center justify-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl" style={{ backgroundColor: "#FFF9E6", color: "#B45309" }}>
                         <Clock size={13} />
                         Заявка на рассмотрении
                       </span>
-                      <button onClick={handleLeave} disabled={joining} className="text-xs text-[#71717A] hover:text-red-500 transition-colors px-2 py-1.5">
+                      <button onClick={handleLeave} disabled={joining} className="text-xs text-[#71717A] hover:text-red-500 transition-colors py-1">
                         Отменить
                       </button>
                     </>
                   )}
                   {myMembership?.status === "active" && myMembership.role === "owner" && (
-                    <span className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl" style={{ backgroundColor: "#E8FAF9", color: "#0BBFB5" }}>
+                    <span className="w-full inline-flex items-center justify-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl" style={{ backgroundColor: "#E8FAF9", color: "#0BBFB5" }}>
                       <CheckCircle size={13} />
                       Владелец
                     </span>
@@ -404,7 +436,7 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
                     <button
                       onClick={handleLeave}
                       disabled={joining}
-                      className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-xl border border-[#E4E4E7] text-[#71717A] hover:text-red-500 hover:border-red-200 transition-colors disabled:opacity-50"
+                      className="w-full inline-flex items-center justify-center gap-1.5 text-sm font-medium px-4 py-2 rounded-xl border border-[#E4E4E7] text-[#71717A] hover:text-red-500 hover:border-red-200 transition-colors disabled:opacity-50"
                     >
                       <UserMinus size={15} />
                       Выйти
@@ -413,7 +445,7 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
                   {isAdmin && (
                     <Link
                       href={`/clubs/${club.slug}/edit`}
-                      className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-xl border border-[#E4E4E7] text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors"
+                      className="w-full inline-flex items-center justify-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-xl border border-[#E4E4E7] text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors"
                     >
                       <Settings size={14} />
                       Изменить
@@ -421,64 +453,31 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
                   )}
                 </div>
               )}
-            </div>
 
-            {/* Name & meta */}
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <h1 className="text-xl font-bold text-[#1C1C1E]">{club.name}</h1>
-                <div className="flex items-center gap-3 mt-1 flex-wrap">
-                  <span className="flex items-center gap-1 text-sm text-[#71717A]">
-                    <Users size={14} />
-                    {club.members_count} участников
-                  </span>
-                  {club.city && (
-                    <span className="flex items-center gap-1 text-sm text-[#71717A]">
-                      <MapPin size={14} />
-                      {club.city}
-                    </span>
-                  )}
-                  {club.visibility !== "open" && (
-                    <span className="flex items-center gap-1 text-sm text-[#71717A]">
-                      <Lock size={14} />
-                      {club.visibility === "request" ? "По заявке" : "Закрытый"}
-                    </span>
-                  )}
-                  {club.visibility === "open" && (
-                    <span className="flex items-center gap-1 text-sm text-[#71717A]">
-                      <Globe size={14} />
-                      Открытый
-                    </span>
-                  )}
+              {/* Quick actions for admins */}
+              {isCaptain && (
+                <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-[#F0F0EE]">
+                  <Link
+                    href={`/events/new?club=${club.id}`}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-[#E4E4E7] text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors"
+                  >
+                    <Calendar size={13} />
+                    Создать событие
+                  </Link>
+                  <Link
+                    href={`/routes/new?club=${club.id}`}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-[#E4E4E7] text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors"
+                  >
+                    <Map size={13} />
+                    Добавить маршрут
+                  </Link>
                 </div>
-              </div>
+              )}
             </div>
+          </aside>
 
-            {club.description && (
-              <p className="text-sm text-[#71717A] mt-2">{club.description}</p>
-            )}
-
-            {/* Quick actions for admins */}
-            {isCaptain && (
-              <div className="flex gap-2 mt-4 flex-wrap">
-                <Link
-                  href={`/events/new?club=${club.id}`}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-[#E4E4E7] text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors"
-                >
-                  <Calendar size={13} />
-                  Создать событие
-                </Link>
-                <Link
-                  href={`/routes/new?club=${club.id}`}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-[#E4E4E7] text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors"
-                >
-                  <Map size={13} />
-                  Добавить маршрут
-                </Link>
-              </div>
-            )}
-          </div>
-        </div>
+          {/* Main content */}
+          <div className="min-w-0">
 
         {/* Tabs */}
         <div className="flex gap-1 bg-white rounded-2xl p-1.5 border border-[#E4E4E7] mb-6" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
@@ -712,6 +711,8 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
             )}
           </section>
         )}
+          </div>
+        </div>
       </main>
 
       {/* Poll creation modal */}
