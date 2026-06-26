@@ -15,7 +15,7 @@ import type { Club, ClubMember, Route, CycleEvent, ClubPoll, ClubPollOption } fr
 import {
   ArrowLeft, Users, MapPin, Lock, Globe, UserPlus, UserMinus,
   Clock, Map, Calendar, CheckCircle, Settings, Check, X, Trophy, Pin, PinOff,
-  Vote, Plus, Trash2,
+  Vote, Plus, Trash2, Archive, ChevronDown,
 } from "lucide-react";
 
 type Tab = "feed" | "routes" | "members" | "leaderboard" | "requests";
@@ -34,6 +34,7 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
   const [missing, setMissing] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("feed");
   const [joining, setJoining] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
 
   // Poll state
   const [activePoll, setActivePoll] = useState<ClubPoll | null>(null);
@@ -295,13 +296,18 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
   const isAdmin = myMembership?.role === "owner" || myMembership?.role === "admin";
   const isCaptain = isAdmin || myMembership?.role === "captain";
 
-  const nextEvent = events
-    .filter((e) => new Date(e.start_date).getTime() >= Date.now())
-    .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())[0];
+  const upcomingEvents = events.filter((e) => new Date(e.start_date).getTime() >= Date.now());
+  const pastEvents = events
+    .filter((e) => new Date(e.start_date).getTime() < Date.now())
+    .sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
 
-  // Feed = merged events + routes sorted by created_at desc
+  const nextEvent = [...upcomingEvents].sort(
+    (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime(),
+  )[0];
+
+  // Feed = upcoming events + routes sorted by created_at desc; past events live in the archive below
   const feedItems: ({ type: "event"; data: CycleEvent } | { type: "route"; data: Route })[] = [
-    ...events.map((e) => ({ type: "event" as const, data: e })),
+    ...upcomingEvents.map((e) => ({ type: "event" as const, data: e })),
     ...routes.map((r) => ({ type: "route" as const, data: r })),
   ].sort((a, b) => new Date(b.data.created_at).getTime() - new Date(a.data.created_at).getTime());
 
@@ -608,6 +614,32 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
                   ) : (
                     <RouteCard key={`r-${item.data.id}`} route={item.data} />
                   ),
+                )}
+              </div>
+            )}
+
+            {pastEvents.length > 0 && (
+              <div className="mt-6">
+                <button
+                  onClick={() => setShowArchive((v) => !v)}
+                  className="w-full flex items-center justify-between gap-2 py-2.5 px-1 text-sm font-medium text-[#71717A] hover:text-[#1C1C1E] transition-colors"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Archive size={14} />
+                    Архив мероприятий ({pastEvents.length})
+                  </span>
+                  <ChevronDown
+                    size={15}
+                    className="transition-transform"
+                    style={{ transform: showArchive ? "rotate(180deg)" : "none" }}
+                  />
+                </button>
+                {showArchive && (
+                  <div className="space-y-4 mt-3">
+                    {pastEvents.map((e) => (
+                      <EventCard key={`pe-${e.id}`} event={e} />
+                    ))}
+                  </div>
                 )}
               </div>
             )}
