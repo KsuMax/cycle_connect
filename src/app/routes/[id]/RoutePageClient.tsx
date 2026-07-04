@@ -22,7 +22,8 @@ import { useAchievements } from "@/lib/context/AchievementsContext";
 import { RouteInterestSection } from "@/components/routes/RouteInterestSection";
 import { RideReportsSection } from "@/components/routes/RideReportsSection";
 import { WindWidget } from "@/components/routes/WindWidget";
-import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users, Download, Train, Bus, CarTaxiFront, Route as RouteIcon, MoreVertical } from "lucide-react";
+import { SendToNavigator } from "@/components/routes/SendToNavigator";
+import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users, Train, Bus, CarTaxiFront, Route as RouteIcon, MoreVertical } from "lucide-react";
 import type { ExitPointKind } from "@/types";
 import { formatDate } from "@/lib/utils";
 import { sanitizeHtml } from "@/lib/sanitize";
@@ -443,11 +444,7 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
                   )}
                   {route.gpx_url && (
                     <>
-                      <a href={route.gpx_url} download
-                        className="inline-flex items-center gap-1.5 text-xs font-medium hover:underline"
-                        style={{ color: "#0BBFB5" }}>
-                        <Download size={13} /> Скачать GPX
-                      </a>
+                      <SendToNavigator routeId={route.id} routeTitle={route.title} />
                       <GpxFreshnessBadge updatedAt={route.gpx_updated_at} routeCreatedAt={route.created_at} />
                     </>
                   )}

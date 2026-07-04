@@ -3,8 +3,7 @@
 import Script from "next/script";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, Suspense } from "react";
-
-const COUNTER_ID = 109023773;
+import { YM_COUNTER_ID as COUNTER_ID } from "@/lib/ym";
 
 /** Fires ym('hit') on every client-side navigation (SPA) */
 function RouteTracker() {
