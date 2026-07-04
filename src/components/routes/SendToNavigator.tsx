@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ChevronDown, Download, QrCode, Share2, Smartphone, X } from "lucide-react";
 import { ymGoal } from "@/lib/ym";
 
@@ -55,8 +55,26 @@ const GUIDES: Guide[] = [
  * конкретные велокомпьютеры. Цель Метрики route_export замеряет спрос
  * по каналам перед мобильным приложением.
  */
-export function SendToNavigator({ routeId, routeTitle }: { routeId: string; routeTitle: string }) {
-  const [open, setOpen] = useState(false);
+export function SendToNavigator({
+  routeId,
+  routeTitle,
+  open: openProp,
+  onOpenChange,
+  hideTrigger,
+}: {
+  routeId: string;
+  routeTitle: string;
+  /** Внешнее управление открытием — если передано, свой триггер не рендерится (см. hideTrigger). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
+}) {
+  const [openState, setOpenState] = useState(false);
+  const open = openProp ?? openState;
+  const setOpen = useCallback((value: boolean) => {
+    setOpenState(value);
+    onOpenChange?.(value);
+  }, [onOpenChange]);
   // Ленивые инициализаторы вместо эффекта: при первом рендере шит закрыт,
   // поэтому расхождения с SSR-разметкой не возникает.
   const [canShareFiles] = useState(() => {
@@ -91,7 +109,7 @@ export function SendToNavigator({ routeId, routeTitle }: { routeId: string; rout
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setOpen(true);
     }
-  }, []);
+  }, [setOpen]);
 
   useEffect(() => {
     if (!open) return;
@@ -104,7 +122,7 @@ export function SendToNavigator({ routeId, routeTitle }: { routeId: string; rout
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
     };
-  }, [open]);
+  }, [open, setOpen]);
 
   function track(target: string) {
     ymGoal("route_export", { target, route_id: routeId });
@@ -157,13 +175,15 @@ export function SendToNavigator({ routeId, routeTitle }: { routeId: string; rout
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
-        style={{ backgroundColor: "#0BBFB5" }}
-      >
-        <Share2 size={13} /> Отправить на навигатор
-      </button>
+      {!hideTrigger && (
+        <button
+          onClick={() => setOpen(true)}
+          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+          style={{ backgroundColor: "#0BBFB5" }}
+        >
+          <Share2 size={13} /> Отправить на навигатор
+        </button>
+      )}
 
       {open && (
         <div

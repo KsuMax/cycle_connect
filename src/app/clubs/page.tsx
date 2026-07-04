@@ -3,9 +3,11 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { CommunityTabs } from "@/components/layout/CommunityTabs";
 import { useAuth } from "@/lib/context/AuthContext";
+import { useAuthModal } from "@/components/ui/AuthModal";
 import { supabase, proxyImageUrl } from "@/lib/supabase";
 import { CLUB_LIST_SELECT } from "@/lib/queries";
 import { dbToClub } from "@/lib/transforms";
@@ -81,6 +83,8 @@ function sortClubs(list: Club[], sort: Sort): Club[] {
 
 export default function ClubsPage() {
   const { user, loading: authLoading } = useAuth();
+  const { requireAuth } = useAuthModal();
+  const router = useRouter();
 
   const [myClubs, setMyClubs] = useState<Club[]>([]);
   const [allClubs, setAllClubs] = useState<Club[]>([]);
@@ -223,16 +227,17 @@ export default function ClubsPage() {
               Сообщества велосипедистов вокруг общих маршрутов
             </p>
           </div>
-          {user && (
-            <Link
-              href="/clubs/new"
-              className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl text-white shrink-0"
-              style={{ backgroundColor: "#0BBFB5" }}
-            >
-              <Plus size={16} />
-              Создать клуб
-            </Link>
-          )}
+          <button
+            onClick={() => {
+              if (!requireAuth("зарегистрировать клуб")) return;
+              router.push("/clubs/new");
+            }}
+            className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl text-white shrink-0"
+            style={{ backgroundColor: "#0BBFB5" }}
+          >
+            <Plus size={16} />
+            Зарегистрировать клуб
+          </button>
         </div>
 
         {/* Tabs + search */}

@@ -379,7 +379,7 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-[#1C1C1E] mb-1">
-              {activeTab === "routes" ? "Маршруты" : "Мероприятия"}
+              {activeTab === "routes" ? "Маршруты" : "Заезды"}
             </h1>
             <p className="text-[#71717A] text-sm">
               {activeTab === "routes"
@@ -400,7 +400,7 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
               className="flex items-center gap-2 px-4 min-h-[44px] rounded-xl text-sm font-semibold text-white transition-colors hover:opacity-90"
               style={{ backgroundColor: "#7C5CFC" }}>
               <Plus size={16} />
-              Создать мероприятие
+              Создать заезд
             </Link>
           )}
         </div>
@@ -423,7 +423,7 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
               ? { backgroundColor: "#1C1C1E", color: "white" }
               : { color: "#71717A" }}>
             <Calendar size={15} />
-            Мероприятия
+            Заезды
           </button>
         </div>
 
@@ -734,7 +734,7 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A1A1AA]" />
                 <input
                   type="text"
-                  placeholder={activeTab === "routes" ? "Поиск маршрутов..." : "Поиск мероприятий..."}
+                  placeholder={activeTab === "routes" ? "Поиск маршрутов..." : "Поиск заездов..."}
                   value={activeTab === "routes" ? search : eventSearch}
                   onChange={(e) => activeTab === "routes" ? setSearch(e.target.value) : setEventSearch(e.target.value)}
                   className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[#E4E4E7] bg-white text-sm outline-none focus:border-[#F4632A] transition-colors"
@@ -1050,7 +1050,7 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
                 <>
                   <div className="flex items-center justify-between mb-4">
                     <div className="text-sm text-[#71717A]">
-                      {filteredEvents.length === 0 ? "Мероприятия не найдены" : `${filteredEvents.length} мероприяти${filteredEvents.length === 1 ? "е" : filteredEvents.length < 5 ? "я" : "й"}`}
+                      {filteredEvents.length === 0 ? "Ничего не найдено" : `${filteredEvents.length} заезд${filteredEvents.length === 1 ? "" : filteredEvents.length < 5 ? "а" : "ов"}`}
                     </div>
                     <SortSelect
                       value={eventSortBy}
@@ -1082,10 +1082,22 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
                         </div>
                       )}
                     </>
+                  ) : events.length === 0 ? (
+                    <div className="text-center py-16 text-[#71717A]">
+                      <div className="text-4xl mb-3">🚴</div>
+                      <div className="font-medium mb-1">Пока никто не запланировал заезд</div>
+                      <div className="text-sm">Создай первый — собери компанию на выходные.</div>
+                      <Link href={user ? "/events/new" : "/auth/login"}
+                        className="inline-flex items-center gap-2 mt-4 px-4 min-h-[44px] rounded-xl text-sm font-semibold text-white transition-colors hover:opacity-90"
+                        style={{ backgroundColor: "#7C5CFC" }}>
+                        <Plus size={16} />
+                        Создать заезд
+                      </Link>
+                    </div>
                   ) : (
                     <div className="text-center py-16 text-[#71717A]">
                       <div className="text-4xl mb-3">🚴</div>
-                      <div className="font-medium mb-1">Мероприятия не найдены</div>
+                      <div className="font-medium mb-1">Ничего не нашлось</div>
                       <div className="text-sm">Попробуй изменить фильтры</div>
                       {hasActiveEventFilters && (
                         <button onClick={resetEventFilters} className="mt-4 text-sm hover:underline" style={{ color: "#7C5CFC" }}>

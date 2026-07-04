@@ -2,15 +2,13 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Newspaper, Map, Plus, Calendar, User } from "lucide-react";
+import { Home, Map, Plus, Calendar, Shield } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/lib/context/AuthContext";
 import { useNavigation } from "@/lib/context/NavigationContext";
 
 export function BottomNav() {
   const pathname = usePathname();
-  const { user } = useAuth();
   const { navigate, pendingHref } = useNavigation();
   const [showCreate, setShowCreate] = useState(false);
 
@@ -62,7 +60,7 @@ export function BottomNav() {
             className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-[#F5F4F1] text-sm font-medium text-[#1C1C1E] w-full text-left"
           >
             <Calendar size={18} style={{ color: "#7C5CFC" }} />
-            Создать мероприятие
+            Создать заезд
           </button>
         </div>
       )}
@@ -84,8 +82,8 @@ export function BottomNav() {
               isPending("/") && "opacity-70"
             )}
           >
-            <Newspaper size={20} strokeWidth={isActive("/", true) ? 2.5 : 2} />
-            <span className="text-[10px] font-medium">Лента</span>
+            <Home size={20} strokeWidth={isActive("/", true) ? 2.5 : 2} />
+            <span className="text-[10px] font-medium">Главная</span>
           </Link>
 
           <Link
@@ -120,20 +118,20 @@ export function BottomNav() {
             )}
           >
             <Calendar size={20} strokeWidth={pathname.startsWith("/events") ? 2.5 : 2} />
-            <span className="text-[10px] font-medium">Поездки</span>
+            <span className="text-[10px] font-medium">Заезды</span>
           </Link>
 
           <Link
-            href={user ? "/profile" : "/auth/login"}
-            onClick={handleClick(user ? "/profile" : "/auth/login")}
+            href="/clubs"
+            onClick={handleClick("/clubs")}
             className={cn(
               "flex flex-col items-center gap-0.5 min-w-[56px] min-h-[44px] justify-center rounded-xl transition-opacity",
-              isActive("/profile", true) ? "text-[#F4632A]" : "text-[#71717A]",
-              (isPending("/profile") || isPending("/auth/login")) && "opacity-70"
+              isActive("/clubs") ? "text-[#F4632A]" : "text-[#71717A]",
+              isPending("/clubs") && "opacity-70"
             )}
           >
-            <User size={20} strokeWidth={isActive("/profile", true) ? 2.5 : 2} />
-            <span className="text-[10px] font-medium">{user ? "Профиль" : "Войти"}</span>
+            <Shield size={20} strokeWidth={isActive("/clubs") ? 2.5 : 2} />
+            <span className="text-[10px] font-medium">Клубы</span>
           </Link>
         </div>
       </nav>

@@ -72,7 +72,7 @@ export function EventCard({ event, priority = false }: EventCardProps) {
     const newCount = willLike ? likeCount + 1 : likeCount - 1;
     setLikeCount(newCount);
     await toggleLike(event.id, likeCount);
-    showToast(willLike ? "Мероприятие отмечено" : "Лайк убран", "info");
+    showToast(willLike ? "Заезд отмечен" : "Лайк убран", "info");
   };
 
   const handleGoing = async (e: React.MouseEvent) => {

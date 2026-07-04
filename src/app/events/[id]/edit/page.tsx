@@ -131,7 +131,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
 
         setDays(loadedDays.length > 0 ? loadedDays : [newDay(0)]);
       } else {
-        setError("Мероприятие не найдено");
+        setError("Заезд не найден");
       }
       setLoading(false);
     }
@@ -254,11 +254,11 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         <main className="max-w-2xl mx-auto px-4 py-20 text-center">
           <AlertCircle size={48} className="mx-auto mb-4 text-[#F4632A]" />
           <h2 className="text-xl font-bold text-[#1C1C1E] mb-2">Нет доступа</h2>
-          <p className="text-[#71717A] mb-6">Только организатор может редактировать мероприятие</p>
+          <p className="text-[#71717A] mb-6">Только организатор может редактировать заезд</p>
           <Link href={`/events/${id}`}
             className="inline-block px-6 py-3 rounded-xl text-white text-sm font-semibold"
             style={{ backgroundColor: "#F4632A" }}>
-            К мероприятию
+            К заезду
           </Link>
         </main>
       </div>
@@ -272,11 +272,11 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
       <Header />
       <main className="max-w-3xl mx-auto px-4 py-8">
         <Link href={`/events/${id}`} className="inline-flex items-center gap-1.5 text-sm text-[#71717A] hover:text-[#1C1C1E] mb-6 transition-colors">
-          <ChevronLeft size={16} /> К мероприятию
+          <ChevronLeft size={16} /> К заезду
         </Link>
 
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-[#1C1C1E] mb-1">Редактировать мероприятие</h1>
+          <h1 className="text-2xl font-bold text-[#1C1C1E] mb-1">Редактировать заезд</h1>
           <p className="text-[#71717A] text-sm">Измени детали поездки</p>
         </div>
 
@@ -288,11 +288,11 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
           {/* Cover photo */}
           <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
             <h2 className="font-semibold text-[#1C1C1E] mb-1">Обложка</h2>
-            <p className="text-xs text-[#71717A] mb-3">Фото обложки — показывается в карточке мероприятия</p>
+            <p className="text-xs text-[#71717A] mb-3">Фото обложки — показывается в карточке заезда</p>
             <CoverUpload
               value={coverPreview}
               onChange={(preview, file) => { setCoverPreview(preview); setCoverFile(file); }}
-              label="мероприятия"
+              label="заезда"
             />
           </div>
 
@@ -337,7 +337,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
               <div className="flex items-center justify-between pt-1">
                 <div>
                   <div className="text-sm font-medium text-[#1C1C1E] flex items-center gap-1.5">
-                    <Lock size={13} className="text-[#71717A]" /> Закрытое мероприятие
+                    <Lock size={13} className="text-[#71717A]" /> Закрытый заезд
                   </div>
                   <div className="text-xs text-[#71717A]">Не отображается в списках — доступно только по прямой ссылке</div>
                 </div>
@@ -384,9 +384,9 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
 
           {/* GPX file (event-level) */}
           <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-            <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">GPX-файл мероприятия</label>
+            <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">GPX-файл заезда</label>
             <p className="text-xs text-[#71717A] mb-3">
-              Необязательно. Если загрузишь — участники смогут скачать его прямо с мероприятия.
+              Необязательно. Если загрузишь — участники смогут скачать его прямо с заезда.
               Иначе кнопка скачивания подтянется из выбранного маршрута.
             </p>
             <GpxUpload

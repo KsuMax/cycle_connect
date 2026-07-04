@@ -5,16 +5,16 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Map, Newspaper, HelpCircle, Calendar, Shield, Menu, X } from "lucide-react";
+import { Map, Home, HelpCircle, Calendar, Shield, Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useNavigation } from "@/lib/context/NavigationContext";
 import { proxyImageUrl } from "@/lib/supabase";
 import { NotificationBell } from "@/components/ui/NotificationBell";
 
 const NAV_ITEMS = [
-  { href: "/",                  label: "Лента",    icon: Newspaper },
+  { href: "/",                  label: "Главная",  icon: Home },
   { href: "/routes",            label: "Маршруты", icon: Map },
-  { href: "/routes?tab=events", label: "Поездки",  icon: Calendar },
+  { href: "/routes?tab=events", label: "Заезды",   icon: Calendar },
   { href: "/clubs",             label: "Клубы",    icon: Shield },
 ];
 
@@ -39,7 +39,7 @@ export function Header() {
     navigate(href);
   };
 
-  // Active-state per nav href. "Поездки" and "Маршруты" share the /routes
+  // Active-state per nav href. "Заезды" and "Маршруты" share the /routes
   // pathname (events is a tab there), so we match events by /events the same
   // way BottomNav does. "Клубы" also covers /users, since Участники is a tab
   // inside the Clubs section.
@@ -89,8 +89,37 @@ export function Header() {
             })}
           </nav>
 
-          {/* Mobile right: help + burger */}
+          {/* Mobile right: profile + help + burger */}
           <div className="sm:hidden flex items-center gap-0.5">
+            {user ? (
+              <a
+                href="/profile"
+                onClick={handleClick("/profile")}
+                aria-label="Профиль"
+                className={cn(
+                  "min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg transition-opacity",
+                  pendingHref === "/profile" && "opacity-70"
+                )}
+              >
+                <div
+                  className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center text-xs font-bold text-white shrink-0"
+                  style={{ backgroundColor: "#7C5CFC" }}
+                >
+                  {profile?.avatar_url
+                    ? <Image src={proxyImageUrl(profile.avatar_url) ?? profile.avatar_url} alt="" width={28} height={28} className="w-full h-full object-cover" />
+                    : initials}
+                </div>
+              </a>
+            ) : (
+              <a
+                href="/auth/login"
+                onClick={handleClick("/auth/login")}
+                className="text-sm font-medium px-3 min-h-[44px] flex items-center rounded-lg transition-colors"
+                style={{ color: "#71717A" }}
+              >
+                Войти
+              </a>
+            )}
             {user && (
               <button
                 onClick={() => navigate("/onboarding")}

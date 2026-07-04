@@ -24,7 +24,7 @@ import { RideReportsSection } from "@/components/routes/RideReportsSection";
 import { WindWidget } from "@/components/routes/WindWidget";
 import { SendToNavigator } from "@/components/routes/SendToNavigator";
 import { ymGoal } from "@/lib/ym";
-import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users, Download, Train, Bus, CarTaxiFront, Route as RouteIcon, MoreVertical } from "lucide-react";
+import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users, Download, Train, Bus, CarTaxiFront, Route as RouteIcon, MoreVertical, Navigation } from "lucide-react";
 import type { ExitPointKind } from "@/types";
 import { formatDate } from "@/lib/utils";
 import { sanitizeHtml } from "@/lib/sanitize";
@@ -146,6 +146,7 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
   const [showRideMenu, setShowRideMenu] = useState(false);
   const [removingRide, setRemovingRide] = useState(false);
   const [reportPromptRideId, setReportPromptRideId] = useState<string | null>(null);
+  const [sendSheetOpen, setSendSheetOpen] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -206,6 +207,9 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
 
   const isAuthor = user?.id === route.author.id;
   const today = new Date().toISOString().split("T")[0];
+  // TS не переносит сужение `route` (после notFound()) внутрь вложенной
+  // renderSummaryCard — даём ей заведомо non-null ссылку под тем же именем.
+  const routeNonNull = route;
 
   const handleDelete = async () => {
     if (!confirm("Удалить маршрут? Это действие нельзя отменить.")) return;
@@ -401,7 +405,7 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
           className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors"
           style={{ backgroundColor: "#1C1C1E", color: "white" }}
         >
-          Отметить проезд
+          Я проехал(а)
         </button>
         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap opacity-0 group-hover/ridebtn:opacity-100 transition-opacity pointer-events-none z-10"
           style={{ backgroundColor: "#1C1C1E", color: "white" }}>
@@ -412,11 +416,16 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
   }
 
   // Сводная карточка маршрута: на мобиле рендерится первой (над картой),
-  // на десктопе — в правой колонке. Один JSX — две точки монтирования.
-  const summaryCard = (
+  // на десктопе — в правой колонке. Функция с двумя точками монтирования —
+  // заголовок должен встречаться в DOM только один раз (единственный <h1>),
+  // поэтому во втором месте монтирования рендерим <p> с той же версткой.
+  function renderSummaryCard(titleAsH1: boolean) {
+    const TitleTag = titleAsH1 ? "h1" : "p";
+    const route = routeNonNull; // route уже проверен на null в рендере страницы выше
+    return (
     <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
       <div className="flex items-start justify-between mb-3">
-        <h1 className="text-xl font-bold text-[#1C1C1E] leading-tight">{route.title}</h1>
+        <TitleTag className="text-xl font-bold text-[#1C1C1E] leading-tight">{route.title}</TitleTag>
         <DifficultyBadge difficulty={route.difficulty} />
       </div>
 
@@ -458,49 +467,50 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
         </div>
       )}
 
-      {/* Actions */}
-      <div className="pt-1 border-t border-[#F4F4F5] mb-3 mt-1">
-        <span className="text-[11px] font-semibold text-[#A1A1AA] uppercase tracking-wide">История проездов</span>
-      </div>
-      <div className="flex gap-2">
-        <RideButton />
+      {/* Primary actions: получить маршрут в первую очередь, до отметки проезда */}
+      <div className="pt-1 border-t border-[#F4F4F5] mb-3 mt-1" />
+      {route.gpx_url && (
+        <>
+          <button
+            onClick={() => setSendSheetOpen(true)}
+            className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+            style={{ backgroundColor: "#1C1C1E", color: "white" }}
+          >
+            <Navigation size={16} /> В навигатор
+          </button>
+          <SendToNavigator
+            routeId={route.id}
+            routeTitle={route.title}
+            open={sendSheetOpen}
+            onOpenChange={setSendSheetOpen}
+            hideTrigger
+          />
+        </>
+      )}
+      <div className="flex gap-2 mt-2">
+        {route.gpx_url && (
+          <a href={`/api/routes/${route.id}/export`} download
+            onClick={() => ymGoal("route_export", { target: "download_direct", route_id: route.id })}
+            className="flex-1 py-2.5 rounded-xl border border-[#E4E4E7] text-sm font-semibold text-[#1C1C1E] flex items-center justify-center gap-1.5 hover:bg-[#F5F4F1] transition-colors">
+            <Download size={15} /> GPX
+          </a>
+        )}
         <button onClick={handleFavorite}
-          className="w-10 h-10 rounded-xl border flex items-center justify-center transition-colors"
+          className="flex-1 py-2.5 rounded-xl border text-sm font-semibold flex items-center justify-center gap-1.5 transition-colors"
           style={isFavorite(route.id)
             ? { backgroundColor: "#FFF0EB", borderColor: "#F4632A", color: "#F4632A" }
-            : { backgroundColor: "white", borderColor: "#E4E4E7", color: "#A1A1AA" }}>
-          <Bookmark size={16} fill={isFavorite(route.id) ? "#F4632A" : "none"} />
+            : { backgroundColor: "white", borderColor: "#E4E4E7", color: "#1C1C1E" }}>
+          <Bookmark size={15} fill={isFavorite(route.id) ? "#F4632A" : "none"} />
+          {isFavorite(route.id) ? "Сохранено" : "Сохранить"}
         </button>
         <button onClick={handleLike}
-          className="w-10 h-10 rounded-xl border flex items-center justify-center transition-colors gap-1 text-xs font-medium"
+          className="w-10 h-10 shrink-0 rounded-xl border flex items-center justify-center transition-colors"
           style={liked
             ? { backgroundColor: "#FFF0EB", borderColor: "#F4632A", color: "#F4632A" }
             : { backgroundColor: "white", borderColor: "#E4E4E7", color: "#A1A1AA" }}>
-          <Heart size={14} fill={liked ? "#F4632A" : "none"} />
+          <Heart size={15} fill={liked ? "#F4632A" : "none"} />
         </button>
       </div>
-
-      {/* Report prompt — shown after marking a ride */}
-      {reportPromptRideId !== null && (
-        <div className="mt-3 p-3 rounded-xl border border-[#E4E4E7] bg-[#FAFAF9] flex items-center justify-between gap-3">
-          <p className="text-xs text-[#3F3F46] font-medium">📝 Поделись впечатлениями?</p>
-          <div className="flex gap-2 shrink-0">
-            <button
-              onClick={() => setReportPromptRideId(null)}
-              className="text-xs text-[#A1A1AA] hover:text-[#71717A] transition-colors"
-            >
-              Потом
-            </button>
-            <Link
-              href={`/routes/${route.id}/report/new?rideId=${reportPromptRideId}`}
-              className="text-xs font-semibold px-3 py-1 rounded-lg text-white transition-colors"
-              style={{ backgroundColor: "#F4632A" }}
-            >
-              Написать
-            </Link>
-          </div>
-        </div>
-      )}
 
       {isAuthor && (
         <div className="mt-3 flex gap-2">
@@ -515,7 +525,8 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
         </div>
       )}
     </div>
-  );
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F5F4F1]">
@@ -529,7 +540,7 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
           {/* Left */}
           <div className="space-y-5">
             {/* Mobile: сводка первой — что за маршрут, до карты и фото */}
-            <div className="lg:hidden">{summaryCard}</div>
+            <div className="lg:hidden">{renderSummaryCard(true)}</div>
 
             {/* Map */}
             <div className="bg-white rounded-2xl overflow-hidden border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
@@ -553,18 +564,9 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
                     </a>
                   )}
                   {route.gpx_url && (
-                    <>
-                      <a href={`/api/routes/${route.id}/export`} download
-                        onClick={() => ymGoal("route_export", { target: "download_direct", route_id: route.id })}
-                        className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-opacity hover:opacity-80"
-                        style={{ backgroundColor: "#E6FAF9", color: "#0BBFB5" }}>
-                        <Download size={13} /> Скачать GPX
-                      </a>
-                      <SendToNavigator routeId={route.id} routeTitle={route.title} />
-                      <span className="ml-auto">
-                        <GpxFreshnessBadge updatedAt={route.gpx_updated_at} routeCreatedAt={route.created_at} />
-                      </span>
-                    </>
+                    <span className="ml-auto">
+                      <GpxFreshnessBadge updatedAt={route.gpx_updated_at} routeCreatedAt={route.created_at} />
+                    </span>
                   )}
                 </div>
               )}
@@ -585,6 +587,36 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
             {/* Gallery */}
             {route.images && route.images.length > 0 && <RouteGallery images={route.images} />}
 
+            {/* Ride history: отметка проезда — рядом с отчётами о поездках */}
+            <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+              <span className="text-[11px] font-semibold text-[#A1A1AA] uppercase tracking-wide">История проездов</span>
+              <div className="flex gap-2 mt-3">
+                <RideButton />
+              </div>
+
+              {/* Report prompt — shown after marking a ride */}
+              {reportPromptRideId !== null && (
+                <div className="mt-3 p-3 rounded-xl border border-[#E4E4E7] bg-[#FAFAF9] flex items-center justify-between gap-3">
+                  <p className="text-xs text-[#3F3F46] font-medium">📝 Поделись впечатлениями?</p>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => setReportPromptRideId(null)}
+                      className="text-xs text-[#A1A1AA] hover:text-[#71717A] transition-colors"
+                    >
+                      Потом
+                    </button>
+                    <Link
+                      href={`/routes/${route.id}/report/new?rideId=${reportPromptRideId}`}
+                      className="text-xs font-semibold px-3 py-1 rounded-lg text-white transition-colors"
+                      style={{ backgroundColor: "#F4632A" }}
+                    >
+                      Написать
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Ride reports */}
             <RideReportsSection routeId={route.id} routeTitle={route.title} />
 
@@ -594,8 +626,10 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
 
           {/* Right */}
           <aside className="space-y-4">
-            {/* Main card — desktop only; on mobile it renders above the map */}
-            <div className="hidden lg:block">{summaryCard}</div>
+            {/* Main card — desktop only; on mobile it renders above the map.
+                Заголовок здесь — <p>, а не <h1>: единственный <h1> страницы уже
+                отрендерен в мобильной точке монтирования выше (см. renderSummaryCard). */}
+            <div className="hidden lg:block">{renderSummaryCard(false)}</div>
 
             {/* Author */}
             <div className="bg-white rounded-2xl p-4 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
@@ -660,8 +694,8 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
                 <Calendar size={18} style={{ color: "#F4632A" }} />
               </div>
               <div>
-                <div className="text-sm font-semibold text-[#1C1C1E] group-hover:text-[#F4632A] transition-colors">Создать мероприятие</div>
-                <div className="text-xs text-[#A1A1AA]">Организуй поездку по этому маршруту</div>
+                <div className="text-sm font-semibold text-[#1C1C1E] group-hover:text-[#F4632A] transition-colors">Создать заезд</div>
+                <div className="text-xs text-[#A1A1AA]">Собери заезд по этому маршруту</div>
               </div>
             </Link>
 

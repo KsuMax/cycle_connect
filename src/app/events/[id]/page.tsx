@@ -231,7 +231,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const handleShare = async () => {
     const url = window.location.href;
     if (navigator.share) {
-      try { await navigator.share({ title: event?.title ?? "Мероприятие", url }); } catch { /* dismissed */ }
+      try { await navigator.share({ title: event?.title ?? "Заезд", url }); } catch { /* dismissed */ }
     } else {
       try {
         await navigator.clipboard.writeText(url);
@@ -271,7 +271,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     await supabase.from("events").delete().eq("id", event.id);
     const { data: profile } = await supabase.from("profiles").select("events_count").eq("id", user.id).single();
     await supabase.from("profiles").update({ events_count: Math.max(0, (profile?.events_count ?? 1) - 1) }).eq("id", user.id);
-    showToast("Мероприятие удалено", "info");
+    showToast("Заезд удалён", "info");
     router.push("/");
   };
 
@@ -319,7 +319,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     } else {
       setEvent((prev) => prev ? { ...prev, participants: prev.participants.filter((p) => p.id !== targetUserId) } : prev);
       if (user?.id === targetUserId) setGoing(false);
-      showToast(`${targetName} убран из мероприятия`, "info");
+      showToast(`${targetName} убран из заезда`, "info");
     }
     setRemovingUserId(null);
   };
@@ -343,7 +343,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         km_total: 0, routes_count: 0, events_count: 0,
       };
       setEvent((prev) => prev ? { ...prev, participants: [...prev.participants, newParticipant] } : prev);
-      showToast(`${targetName} добавлен в мероприятие`, "success");
+      showToast(`${targetName} добавлен в заезд`, "success");
     }
     setAddingUserId(null);
   };
@@ -459,7 +459,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   )}
                   <div className="px-4 py-2.5 border-t border-[#F5F4F1] flex items-center justify-between flex-wrap gap-x-4 gap-y-2">
                     <span className="text-xs text-[#71717A]">
-                      {event.route ? `Маршрут: ${event.route.title}` : "Трек мероприятия"}
+                      {event.route ? `Маршрут: ${event.route.title}` : "Трек заезда"}
                     </span>
                     <div className="flex items-center gap-4 flex-wrap">
                       {event.route?.mapmagic_url && (
@@ -799,7 +799,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                           <button
                             onClick={() => handleRemoveParticipant(p.id, p.name)}
                             disabled={isRemoving}
-                            title="Убрать из мероприятия"
+                            title="Убрать из заезда"
                             className="p-1.5 rounded-lg text-[#A1A1AA] hover:text-[#EF4444] hover:bg-[#FEF2F2] transition-colors disabled:opacity-50">
                             {isRemoving
                               ? <div className="w-3.5 h-3.5 border-2 border-[#EF4444] border-t-transparent rounded-full animate-spin" />
@@ -918,7 +918,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                       const wasLiked = isLiked(event.id);
                       setLikeCount((c) => wasLiked ? c - 1 : c + 1);
                       await toggleLike(event.id, likeCount);
-                      showToast(wasLiked ? "Лайк убран" : "Мероприятие отмечено", "info");
+                      showToast(wasLiked ? "Лайк убран" : "Заезд отмечен", "info");
                     }}
                     className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-[#E4E4E7] text-sm transition-colors hover:bg-[#F5F4F1]"
                     style={{ color: isLiked(event.id) ? "#F4632A" : "#71717A" }}>
@@ -1017,10 +1017,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               <div className="w-10 h-10 rounded-full bg-[#FEF2F2] flex items-center justify-center">
                 <Trash2 size={18} className="text-[#EF4444]" />
               </div>
-              <h2 className="font-bold text-[#1C1C1E] text-lg">Удалить мероприятие?</h2>
+              <h2 className="font-bold text-[#1C1C1E] text-lg">Удалить заезд?</h2>
             </div>
             <p className="text-sm text-[#71717A] mb-5">
-              Это действие нельзя отменить. Мероприятие «{event.title}» и все данные будут удалены.
+              Это действие нельзя отменить. Заезд «{event.title}» и все данные будут удалены.
             </p>
             <div className="flex gap-3">
               <button

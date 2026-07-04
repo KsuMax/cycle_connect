@@ -8,6 +8,7 @@ import { Header } from "@/components/layout/Header";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { EventCard } from "@/components/events/EventCard";
 import { useAuth } from "@/lib/context/AuthContext";
+import { useAuthModal } from "@/components/ui/AuthModal";
 import { supabase, proxyImageUrl } from "@/lib/supabase";
 import { CLUB_LIST_SELECT, CLUB_MEMBERS_SELECT, ROUTE_LIST_SELECT, EVENT_LIST_SELECT } from "@/lib/queries";
 import { dbToClub, dbToClubMember, dbToRoute, dbToEvent } from "@/lib/transforms";
@@ -23,6 +24,7 @@ type Tab = "feed" | "routes" | "members" | "leaderboard" | "requests";
 export default function ClubPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
   const { user } = useAuth();
+  const { requireAuth } = useAuthModal();
 
   const [club, setClub] = useState<Club | null>(null);
   const [myMembership, setMyMembership] = useState<ClubMember | null>(null);
@@ -174,7 +176,9 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
   }
 
   async function handleJoin() {
-    if (!user || !club) return;
+    if (!club) return;
+    if (!requireAuth(club.visibility === "open" ? "вступить в клуб" : "подать заявку в клуб")) return;
+    if (!user) return;
     setJoining(true);
     const status = club.visibility === "open" ? "active" : "pending";
     await supabase.from("club_members").insert({ club_id: club.id, user_id: user.id, status });
@@ -393,7 +397,7 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
                 </div>
                 <div>
                   <div className="text-sm font-bold text-[#1C1C1E]">{events.length}</div>
-                  <div className="text-[10px] text-[#A1A1AA]">событий</div>
+                  <div className="text-[10px] text-[#A1A1AA]">заездов</div>
                 </div>
               </div>
 
@@ -408,6 +412,19 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
               )}
 
               {/* Action buttons */}
+              {!user && (
+                <div className="flex flex-col gap-2 mt-4">
+                  <button
+                    onClick={handleJoin}
+                    disabled={joining}
+                    className="w-full inline-flex items-center justify-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl text-white disabled:opacity-50"
+                    style={{ backgroundColor: "#0BBFB5" }}
+                  >
+                    <UserPlus size={15} />
+                    {club.visibility === "open" ? "Вступить" : "Подать заявку"}
+                  </button>
+                </div>
+              )}
               {user && (
                 <div className="flex flex-col gap-2 mt-4">
                   {!myMembership && (
@@ -486,7 +503,7 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
           <div className="min-w-0">
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-white rounded-2xl p-1.5 border border-[#E4E4E7] mb-6" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+        <div className="flex gap-1 bg-white rounded-2xl p-1.5 border border-[#E4E4E7] mb-6 overflow-x-auto" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
           {(
             [
               { id: "feed",        label: "Лента",     icon: <Calendar size={15} />, count: feedItems.length },
@@ -501,7 +518,8 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-medium transition-all"
+              aria-label={tab.label}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-medium transition-all whitespace-nowrap shrink-0"
               style={
                 activeTab === tab.id
                   ? { backgroundColor: "#1C1C1E", color: "white" }
@@ -509,7 +527,7 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
               }
             >
               {tab.icon}
-              <span className="hidden sm:inline">{tab.label}</span>
+              <span>{tab.label}</span>
               {tab.count > 0 && (
                 <span
                   className="text-[11px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center"

@@ -194,7 +194,7 @@ function CreateEventForm() {
       .single();
 
     if (eventError || !eventData) {
-      setError("Не удалось сохранить мероприятие. Попробуй ещё раз.");
+      setError("Не удалось сохранить заезд. Попробуй ещё раз.");
       setSubmitting(false);
       return;
     }
@@ -266,7 +266,7 @@ function CreateEventForm() {
         .catch(() => { /* silent */ });
     }
 
-    showToast("Мероприятие опубликовано!", "success");
+    showToast("Заезд опубликован!", "success");
     checkAndAward("event_created", {});
     router.push(`/events/${eventData.id}`);
   };
@@ -278,7 +278,7 @@ function CreateEventForm() {
         <main className="max-w-2xl mx-auto px-4 py-20 text-center">
           <AlertCircle size={48} className="mx-auto mb-4 text-[#F4632A]" />
           <h2 className="text-xl font-bold text-[#1C1C1E] mb-2">Нужна авторизация</h2>
-          <p className="text-[#71717A] mb-6">Чтобы создать мероприятие, войди в аккаунт</p>
+          <p className="text-[#71717A] mb-6">Чтобы создать заезд, войди в аккаунт</p>
           <Link href="/auth/login"
             className="inline-block px-6 py-3 rounded-xl text-white text-sm font-semibold"
             style={{ backgroundColor: "#F4632A" }}>
@@ -299,7 +299,7 @@ function CreateEventForm() {
 
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-[#1C1C1E] mb-1">
-            {copySourceTitle ? "Повторить поездку" : "Новое мероприятие"}
+            {copySourceTitle ? "Повторить поездку" : "Новый заезд"}
           </h1>
           <p className="text-[#71717A] text-sm">
             {copySourceTitle
@@ -322,11 +322,11 @@ function CreateEventForm() {
           {/* Cover photo */}
           <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
             <h2 className="font-semibold text-[#1C1C1E] mb-1">Обложка</h2>
-            <p className="text-xs text-[#71717A] mb-3">Фото обложки — показывается в карточке мероприятия</p>
+            <p className="text-xs text-[#71717A] mb-3">Фото обложки — показывается в карточке заезда</p>
             <CoverUpload
               value={coverPreview}
               onChange={(preview, file) => { setCoverPreview(preview); setCoverFile(file); }}
-              label="мероприятия"
+              label="заезда"
             />
           </div>
 
@@ -337,7 +337,7 @@ function CreateEventForm() {
                 <Shield size={15} style={{ color: "#0BBFB5" }} />
                 Опубликовать от клуба
               </label>
-              <p className="text-xs text-[#71717A] mb-3">Мероприятие появится в ленте клуба и будет видно его участникам</p>
+              <p className="text-xs text-[#71717A] mb-3">Заезд появится в ленте клуба и будет видно его участникам</p>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -375,7 +375,7 @@ function CreateEventForm() {
                 <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
                   placeholder="Велопоход по Карелии" className={`w-full px-4 py-2.5 rounded-xl border text-sm outline-none focus:border-[#F4632A] transition-colors ${attempted && !title.trim() ? "border-red-300" : "border-[#E4E4E7]"}`} />
                 {attempted && !title.trim() && (
-                  <p className="text-xs text-red-500 mt-1.5">Введи название мероприятия</p>
+                  <p className="text-xs text-red-500 mt-1.5">Введи название заезда</p>
                 )}
               </div>
               <div>
@@ -406,7 +406,7 @@ function CreateEventForm() {
               {/* Private toggle */}
               <div className="flex items-center justify-between pt-1">
                 <div>
-                  <div className="text-sm font-medium text-[#1C1C1E]">Закрытое мероприятие</div>
+                  <div className="text-sm font-medium text-[#1C1C1E]">Закрытый заезд</div>
                   <div className="text-xs text-[#71717A]">Не отображается в списках — доступно только по прямой ссылке</div>
                 </div>
                 <button type="button" onClick={() => setIsPrivate(!isPrivate)}
@@ -452,9 +452,9 @@ function CreateEventForm() {
 
           {/* GPX file (event-level) */}
           <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-            <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">GPX-файл мероприятия</label>
+            <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">GPX-файл заезда</label>
             <p className="text-xs text-[#71717A] mb-3">
-              Необязательно. Если загрузишь — участники смогут скачать его прямо с мероприятия.
+              Необязательно. Если загрузишь — участники смогут скачать его прямо с заезда.
               Иначе кнопка скачивания подтянется из выбранного маршрута.
             </p>
             <GpxUpload
@@ -522,7 +522,7 @@ function CreateEventForm() {
 
           <div className="flex gap-3 pt-2">
             <Button type="submit" variant="secondary" size="lg" loading={submitting} className="flex-1">
-              Опубликовать мероприятие
+              Опубликовать заезд
             </Button>
             <Link href="/"><Button type="button" variant="outline" size="lg">Отмена</Button></Link>
           </div>

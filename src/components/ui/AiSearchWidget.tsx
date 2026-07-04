@@ -665,22 +665,6 @@ export function AiSearchWidget() {
 
   return (
     <>
-      {/* Floating button */}
-      <button
-        onClick={() => setOpen(true)}
-        aria-label="AI поиск маршрутов"
-        className="fixed right-4 z-40 flex items-center gap-2 px-4 py-3 rounded-2xl text-white text-sm font-semibold shadow-lg transition-transform active:scale-95 hover:brightness-110"
-        style={{
-          bottom: "calc(env(safe-area-inset-bottom) + 76px)",
-          backgroundColor: "#7C5CFC",
-          boxShadow: "0 4px 16px 0 rgb(124 92 252 / 0.45)",
-        }}
-      >
-        <Sparkles size={16} strokeWidth={2} />
-        <span className="sm:inline hidden">Найти маршрут с ИИ</span>
-        <span className="sm:hidden inline">AI поиск</span>
-      </button>
-
       {/* Backdrop */}
       {open && (
         <div

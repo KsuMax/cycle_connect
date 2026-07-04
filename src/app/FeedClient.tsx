@@ -112,7 +112,7 @@ export function FeedClient({ initialRoutes, initialEvents, initialReports }: Pro
                     <div className="w-1 h-6 rounded-full" style={{ backgroundColor: "#7C5CFC" }} />
                     <h2 className="text-lg font-bold text-[#1C1C1E] flex items-center gap-2">
                       <Calendar size={18} style={{ color: "#7C5CFC" }} />
-                      Ближайшие поездки
+                      Ближайшие заезды
                     </h2>
                   </div>
                   <Link href="/routes?tab=events" className="text-sm font-medium hover:underline" style={{ color: "#F4632A" }}>Все →</Link>
@@ -158,11 +158,11 @@ export function FeedClient({ initialRoutes, initialEvents, initialReports }: Pro
 
           {/* Sidebar */}
           <aside className="space-y-5">
-            {/* Кататься вместе — мероприятия + клубы в одну строку */}
+            {/* Кататься вместе — заезды + клубы в одну строку */}
             <div>
               <h3 className="font-semibold text-sm text-[#1C1C1E] mb-2.5 px-0.5">Кататься вместе</h3>
               <div className="grid grid-cols-2 gap-2.5">
-                {/* Поездки */}
+                {/* Заезды */}
                 <Link href="/events/new"
                   className={`rounded-2xl border border-[#E4E4E7] bg-white p-3.5 hover:border-[#7C5CFC]/50 transition-colors group ${hasClub === false ? "" : "col-span-2"}`}
                   style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
@@ -170,7 +170,7 @@ export function FeedClient({ initialRoutes, initialEvents, initialReports }: Pro
                     style={{ backgroundColor: "#EDE9FF" }}>
                     <Calendar size={18} style={{ color: "#7C5CFC" }} />
                   </div>
-                  <p className="text-sm font-semibold text-[#1C1C1E] mb-0.5 group-hover:text-[#7C5CFC] transition-colors">Поездки</p>
+                  <p className="text-sm font-semibold text-[#1C1C1E] mb-0.5 group-hover:text-[#7C5CFC] transition-colors">Заезды</p>
                   <p className="text-xs text-[#71717A] leading-snug mb-2.5">Создай и позови друзей</p>
                   <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: "#7C5CFC" }}>
                     Создать <ArrowRight size={12} />
