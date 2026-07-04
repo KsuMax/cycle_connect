@@ -23,7 +23,8 @@ import { RouteInterestSection } from "@/components/routes/RouteInterestSection";
 import { RideReportsSection } from "@/components/routes/RideReportsSection";
 import { WindWidget } from "@/components/routes/WindWidget";
 import { SendToNavigator } from "@/components/routes/SendToNavigator";
-import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users, Train, Bus, CarTaxiFront, Route as RouteIcon, MoreVertical } from "lucide-react";
+import { ymGoal } from "@/lib/ym";
+import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users, Download, Train, Bus, CarTaxiFront, Route as RouteIcon, MoreVertical } from "lucide-react";
 import type { ExitPointKind } from "@/types";
 import { formatDate } from "@/lib/utils";
 import { sanitizeHtml } from "@/lib/sanitize";
@@ -434,18 +435,26 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
                 </div>
               )}
               {(route.mapmagic_url || route.gpx_url) && (
-                <div className="p-3 border-t border-[#F5F4F1] flex flex-wrap gap-4 items-center">
+                <div className="p-3 border-t border-[#F5F4F1] flex flex-wrap gap-2 items-center">
                   {route.mapmagic_url && (
                     <a href={route.mapmagic_url} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs font-medium hover:underline"
-                      style={{ color: "#F4632A" }}>
+                      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-opacity hover:opacity-80"
+                      style={{ backgroundColor: "#FFF7ED", color: "#F4632A" }}>
                       <ExternalLink size={13} /> Открыть в MapMagic
                     </a>
                   )}
                   {route.gpx_url && (
                     <>
+                      <a href={`/api/routes/${route.id}/export`} download
+                        onClick={() => ymGoal("route_export", { target: "download_direct", route_id: route.id })}
+                        className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-opacity hover:opacity-80"
+                        style={{ backgroundColor: "#E6FAF9", color: "#0BBFB5" }}>
+                        <Download size={13} /> Скачать GPX
+                      </a>
                       <SendToNavigator routeId={route.id} routeTitle={route.title} />
-                      <GpxFreshnessBadge updatedAt={route.gpx_updated_at} routeCreatedAt={route.created_at} />
+                      <span className="ml-auto">
+                        <GpxFreshnessBadge updatedAt={route.gpx_updated_at} routeCreatedAt={route.created_at} />
+                      </span>
                     </>
                   )}
                 </div>
