@@ -411,6 +411,112 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
     );
   }
 
+  // Сводная карточка маршрута: на мобиле рендерится первой (над картой),
+  // на десктопе — в правой колонке. Один JSX — две точки монтирования.
+  const summaryCard = (
+    <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+      <div className="flex items-start justify-between mb-3">
+        <h1 className="text-xl font-bold text-[#1C1C1E] leading-tight">{route.title}</h1>
+        <DifficultyBadge difficulty={route.difficulty} />
+      </div>
+
+      {route.region && (
+        <div className="flex items-center gap-1.5 text-sm text-[#71717A] mb-4">
+          <MapPin size={14} /> {route.region}
+        </div>
+      )}
+
+      {/* Types */}
+      <div className="flex flex-wrap gap-1.5 mb-4">
+        {route.route_types.map((type) => (
+          <span key={type} className="text-[11px] font-semibold px-2 py-0.5 rounded-md"
+            style={{ backgroundColor: ROUTE_TYPE_COLORS[type].bg, color: ROUTE_TYPE_COLORS[type].text }}>
+            {ROUTE_TYPE_LABELS[type]}
+          </span>
+        ))}
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        {[
+          { icon: <Bike size={16} />, value: `${route.distance_km} км`, label: "Дистанция" },
+          { icon: <Mountain size={16} />, value: `${route.elevation_m} м`, label: "Набор" },
+          { icon: <Clock size={16} />, value: formatRouteDuration(route.duration_min, route.duration_days), label: route.duration_days ? "Длительность" : "Время" },
+        ].map(({ icon, value, label }) => (
+          <div key={label} className="text-center p-3 rounded-xl" style={{ backgroundColor: "#F5F4F1" }}>
+            <div className="flex justify-center mb-1 text-[#71717A]">{icon}</div>
+            <div className="text-sm font-semibold text-[#1C1C1E]">{value}</div>
+            <div className="text-xs text-[#A1A1AA]">{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Tags */}
+      {route.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {route.tags.map((tag) => <Badge key={tag} variant="outline">{tag}</Badge>)}
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="pt-1 border-t border-[#F4F4F5] mb-3 mt-1">
+        <span className="text-[11px] font-semibold text-[#A1A1AA] uppercase tracking-wide">История проездов</span>
+      </div>
+      <div className="flex gap-2">
+        <RideButton />
+        <button onClick={handleFavorite}
+          className="w-10 h-10 rounded-xl border flex items-center justify-center transition-colors"
+          style={isFavorite(route.id)
+            ? { backgroundColor: "#FFF0EB", borderColor: "#F4632A", color: "#F4632A" }
+            : { backgroundColor: "white", borderColor: "#E4E4E7", color: "#A1A1AA" }}>
+          <Bookmark size={16} fill={isFavorite(route.id) ? "#F4632A" : "none"} />
+        </button>
+        <button onClick={handleLike}
+          className="w-10 h-10 rounded-xl border flex items-center justify-center transition-colors gap-1 text-xs font-medium"
+          style={liked
+            ? { backgroundColor: "#FFF0EB", borderColor: "#F4632A", color: "#F4632A" }
+            : { backgroundColor: "white", borderColor: "#E4E4E7", color: "#A1A1AA" }}>
+          <Heart size={14} fill={liked ? "#F4632A" : "none"} />
+        </button>
+      </div>
+
+      {/* Report prompt — shown after marking a ride */}
+      {reportPromptRideId !== null && (
+        <div className="mt-3 p-3 rounded-xl border border-[#E4E4E7] bg-[#FAFAF9] flex items-center justify-between gap-3">
+          <p className="text-xs text-[#3F3F46] font-medium">📝 Поделись впечатлениями?</p>
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={() => setReportPromptRideId(null)}
+              className="text-xs text-[#A1A1AA] hover:text-[#71717A] transition-colors"
+            >
+              Потом
+            </button>
+            <Link
+              href={`/routes/${route.id}/report/new?rideId=${reportPromptRideId}`}
+              className="text-xs font-semibold px-3 py-1 rounded-lg text-white transition-colors"
+              style={{ backgroundColor: "#F4632A" }}
+            >
+              Написать
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {isAuthor && (
+        <div className="mt-3 flex gap-2">
+          <Link href={`/routes/${route.id}/edit`}
+            className="flex-1 py-2 rounded-xl border border-[#E4E4E7] text-sm text-[#71717A] flex items-center justify-center gap-2 hover:bg-[#F5F4F1] transition-colors">
+            <Pencil size={14} /> Редактировать
+          </Link>
+          <button onClick={handleDelete} disabled={deleting}
+            className="py-2 px-3 rounded-xl border border-red-200 text-sm text-red-500 flex items-center justify-center gap-1.5 hover:bg-red-50 transition-colors disabled:opacity-50">
+            <Trash2 size={14} /> {deleting ? "..." : "Удалить"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-[#F5F4F1]">
       <Header />
@@ -422,6 +528,9 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
           {/* Left */}
           <div className="space-y-5">
+            {/* Mobile: сводка первой — что за маршрут, до карты и фото */}
+            <div className="lg:hidden">{summaryCard}</div>
+
             {/* Map */}
             <div className="bg-white rounded-2xl overflow-hidden border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
               {route.mapmagic_embed ? (
@@ -461,12 +570,6 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
               )}
             </div>
 
-            {/* Exit points */}
-            <ExitPointsSection status={route.exit_points_status} points={route.exit_points ?? []} />
-
-            {/* Gallery */}
-            {route.images && route.images.length > 0 && <RouteGallery images={route.images} />}
-
             {/* Description */}
             {route.description && (
               <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
@@ -475,6 +578,12 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
                   dangerouslySetInnerHTML={{ __html: sanitizeHtml(route.description) }} />
               </div>
             )}
+
+            {/* Exit points */}
+            <ExitPointsSection status={route.exit_points_status} points={route.exit_points ?? []} />
+
+            {/* Gallery */}
+            {route.images && route.images.length > 0 && <RouteGallery images={route.images} />}
 
             {/* Ride reports */}
             <RideReportsSection routeId={route.id} routeTitle={route.title} />
@@ -485,108 +594,8 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
 
           {/* Right */}
           <aside className="space-y-4">
-            {/* Main card */}
-            <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-              <div className="flex items-start justify-between mb-3">
-                <h1 className="text-xl font-bold text-[#1C1C1E] leading-tight">{route.title}</h1>
-                <DifficultyBadge difficulty={route.difficulty} />
-              </div>
-
-              {route.region && (
-                <div className="flex items-center gap-1.5 text-sm text-[#71717A] mb-4">
-                  <MapPin size={14} /> {route.region}
-                </div>
-              )}
-
-              {/* Types */}
-              <div className="flex flex-wrap gap-1.5 mb-4">
-                {route.route_types.map((type) => (
-                  <span key={type} className="text-[11px] font-semibold px-2 py-0.5 rounded-md"
-                    style={{ backgroundColor: ROUTE_TYPE_COLORS[type].bg, color: ROUTE_TYPE_COLORS[type].text }}>
-                    {ROUTE_TYPE_LABELS[type]}
-                  </span>
-                ))}
-              </div>
-
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                {[
-                  { icon: <Bike size={16} />, value: `${route.distance_km} км`, label: "Дистанция" },
-                  { icon: <Mountain size={16} />, value: `${route.elevation_m} м`, label: "Набор" },
-                  { icon: <Clock size={16} />, value: formatRouteDuration(route.duration_min, route.duration_days), label: route.duration_days ? "Длительность" : "Время" },
-                ].map(({ icon, value, label }) => (
-                  <div key={label} className="text-center p-3 rounded-xl" style={{ backgroundColor: "#F5F4F1" }}>
-                    <div className="flex justify-center mb-1 text-[#71717A]">{icon}</div>
-                    <div className="text-sm font-semibold text-[#1C1C1E]">{value}</div>
-                    <div className="text-xs text-[#A1A1AA]">{label}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Tags */}
-              {route.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-4">
-                  {route.tags.map((tag) => <Badge key={tag} variant="outline">{tag}</Badge>)}
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="pt-1 border-t border-[#F4F4F5] mb-3 mt-1">
-                <span className="text-[11px] font-semibold text-[#A1A1AA] uppercase tracking-wide">История проездов</span>
-              </div>
-              <div className="flex gap-2">
-                <RideButton />
-                <button onClick={handleFavorite}
-                  className="w-10 h-10 rounded-xl border flex items-center justify-center transition-colors"
-                  style={isFavorite(route.id)
-                    ? { backgroundColor: "#FFF0EB", borderColor: "#F4632A", color: "#F4632A" }
-                    : { backgroundColor: "white", borderColor: "#E4E4E7", color: "#A1A1AA" }}>
-                  <Bookmark size={16} fill={isFavorite(route.id) ? "#F4632A" : "none"} />
-                </button>
-                <button onClick={handleLike}
-                  className="w-10 h-10 rounded-xl border flex items-center justify-center transition-colors gap-1 text-xs font-medium"
-                  style={liked
-                    ? { backgroundColor: "#FFF0EB", borderColor: "#F4632A", color: "#F4632A" }
-                    : { backgroundColor: "white", borderColor: "#E4E4E7", color: "#A1A1AA" }}>
-                  <Heart size={14} fill={liked ? "#F4632A" : "none"} />
-                </button>
-              </div>
-
-              {/* Report prompt — shown after marking a ride */}
-              {reportPromptRideId !== null && (
-                <div className="mt-3 p-3 rounded-xl border border-[#E4E4E7] bg-[#FAFAF9] flex items-center justify-between gap-3">
-                  <p className="text-xs text-[#3F3F46] font-medium">📝 Поделись впечатлениями?</p>
-                  <div className="flex gap-2 shrink-0">
-                    <button
-                      onClick={() => setReportPromptRideId(null)}
-                      className="text-xs text-[#A1A1AA] hover:text-[#71717A] transition-colors"
-                    >
-                      Потом
-                    </button>
-                    <Link
-                      href={`/routes/${route.id}/report/new?rideId=${reportPromptRideId}`}
-                      className="text-xs font-semibold px-3 py-1 rounded-lg text-white transition-colors"
-                      style={{ backgroundColor: "#F4632A" }}
-                    >
-                      Написать
-                    </Link>
-                  </div>
-                </div>
-              )}
-
-              {isAuthor && (
-                <div className="mt-3 flex gap-2">
-                  <Link href={`/routes/${route.id}/edit`}
-                    className="flex-1 py-2 rounded-xl border border-[#E4E4E7] text-sm text-[#71717A] flex items-center justify-center gap-2 hover:bg-[#F5F4F1] transition-colors">
-                    <Pencil size={14} /> Редактировать
-                  </Link>
-                  <button onClick={handleDelete} disabled={deleting}
-                    className="py-2 px-3 rounded-xl border border-red-200 text-sm text-red-500 flex items-center justify-center gap-1.5 hover:bg-red-50 transition-colors disabled:opacity-50">
-                    <Trash2 size={14} /> {deleting ? "..." : "Удалить"}
-                  </button>
-                </div>
-              )}
-            </div>
+            {/* Main card — desktop only; on mobile it renders above the map */}
+            <div className="hidden lg:block">{summaryCard}</div>
 
             {/* Author */}
             <div className="bg-white rounded-2xl p-4 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
