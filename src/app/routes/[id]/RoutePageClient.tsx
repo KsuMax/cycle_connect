@@ -23,8 +23,9 @@ import { RouteInterestSection } from "@/components/routes/RouteInterestSection";
 import { RideReportsSection } from "@/components/routes/RideReportsSection";
 import { WindWidget } from "@/components/routes/WindWidget";
 import { SendToNavigator } from "@/components/routes/SendToNavigator";
+import { PostRideSheet } from "@/components/routes/PostRideSheet";
 import { ymGoal } from "@/lib/ym";
-import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users, Download, Train, Bus, CarTaxiFront, Route as RouteIcon, MoreVertical, Navigation } from "lucide-react";
+import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users, Download, Train, Bus, CarTaxiFront, Route as RouteIcon, MoreVertical, Navigation, Star } from "lucide-react";
 import type { ExitPointKind } from "@/types";
 import { formatDate } from "@/lib/utils";
 import { sanitizeHtml } from "@/lib/sanitize";
@@ -57,6 +58,15 @@ type RideButtonState =
   | { type: "upcoming_event"; eventTitle: string; eventDate: string | null; eventId: string }
   | { type: "has_intent"; intentDate: string; intentId: string }
   | { type: "ridden"; count: number };
+
+/** 1 отчёт / 2 отчёта / 5 отчётов */
+function reportsPlural(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "отчёт";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "отчёта";
+  return "отчётов";
+}
 
 const EXIT_KIND_META: Record<ExitPointKind, { label: string; icon: React.ReactNode }> = {
   train: { label: "Электричка", icon: <Train size={14} /> },
@@ -128,7 +138,7 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
   const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { isLiked, toggleLike } = useLikes();
-  const { hasRidden, rideCount, addRide, removeRide } = useRides();
+  const { hasRidden, rideCount, removeRide } = useRides();
   const { requireAuth } = useAuthModal();
   const { showToast } = useToast();
   const { checkAndAward } = useAchievements();
@@ -145,8 +155,12 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
   const [interestsKey, setInterestsKey] = useState(0);
   const [showRideMenu, setShowRideMenu] = useState(false);
   const [removingRide, setRemovingRide] = useState(false);
-  const [reportPromptRideId, setReportPromptRideId] = useState<string | null>(null);
+  const [postRideOpen, setPostRideOpen] = useState(false);
   const [sendSheetOpen, setSendSheetOpen] = useState(false);
+  // Агрегат по отчётам для сводной карточки: количество + средняя оценка.
+  // reportsKey бампается после публикации из шита — рефетч агрегата и списка отчётов.
+  const [reportsAgg, setReportsAgg] = useState<{ count: number; avg: number | null }>({ count: 0, avg: null });
+  const [reportsKey, setReportsKey] = useState(0);
 
   useEffect(() => {
     async function load() {
@@ -189,6 +203,36 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
         if (data) setInterests(data as unknown as DbRouteInterest[]);
       });
   }, [id, interestsKey]);
+
+  // Aggregate ride reports: count + average rating for the summary card link.
+  // Колонки rating может ещё не быть в проде — тогда fallback на подсчёт по id.
+  useEffect(() => {
+    let cancelled = false;
+    async function loadReportsAgg() {
+      let count = 0;
+      let avg: number | null = null;
+      const { data, error } = await supabase
+        .from("ride_reports")
+        .select("rating")
+        .eq("route_id", id);
+      if (!error && data) {
+        count = data.length;
+        const ratings = (data as { rating: number | null }[])
+          .map((r) => r.rating)
+          .filter((r): r is number => r != null);
+        if (ratings.length > 0) avg = ratings.reduce((a, b) => a + b, 0) / ratings.length;
+      } else {
+        const { data: fallback } = await supabase
+          .from("ride_reports")
+          .select("id")
+          .eq("route_id", id);
+        count = fallback?.length ?? 0;
+      }
+      if (!cancelled) setReportsAgg({ count, avg });
+    }
+    loadReportsAgg();
+    return () => { cancelled = true; };
+  }, [id, reportsKey]);
 
   if (loading) {
     return (
@@ -279,6 +323,18 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
 
   const rideState = getRideButtonState();
 
+  // Открытие пост-райд шита «Как прокатилось?» — единая точка входа для отметки проезда
+  const openPostRideSheet = () => {
+    if (!requireAuth("отметить проезд")) return;
+    setPostRideOpen(true);
+  };
+
+  // После успешного сабмита шита: ачивки за проезд + рефетч агрегата и списка отчётов
+  const handleRidePublished = () => {
+    checkAndAward("ride_added", { routeId: routeNonNull.id, authorId: routeNonNull.author.id, distanceKm: routeNonNull.distance_km });
+    setReportsKey((k) => k + 1);
+  };
+
   function RideButton() {
     if (rideState.type === "upcoming_event") {
       return (
@@ -328,13 +384,7 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
           <div className="flex gap-2 group/rideactions">
             <div className="flex-1 relative group/ridebtn">
               <button
-                onClick={async () => {
-                  if (!requireAuth("отметить проезд")) return;
-                  const rideId = await addRide(route!.id, route!.distance_km);
-                  showToast("Проезд отмечен! +" + route!.distance_km + " км", "success");
-                  checkAndAward("ride_added", { routeId: route!.id, authorId: route!.author.id, distanceKm: route!.distance_km });
-                  setReportPromptRideId(rideId);
-                }}
+                onClick={openPostRideSheet}
                 className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors"
                 style={{ backgroundColor: "#F4632A", color: "white" }}
               >
@@ -395,13 +445,7 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
     return (
       <div className="flex-1 relative group/ridebtn">
         <button
-          onClick={async () => {
-            if (!requireAuth("отметить маршрут")) return;
-            const rideId = await addRide(route!.id, route!.distance_km);
-            showToast("Проезд отмечен! +" + route!.distance_km + " км", "success");
-            checkAndAward("ride_added", { routeId: route!.id, authorId: route!.author.id, distanceKm: route!.distance_km });
-            setReportPromptRideId(rideId);
-          }}
+          onClick={openPostRideSheet}
           className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors"
           style={{ backgroundColor: "#1C1C1E", color: "white" }}
         >
@@ -428,6 +472,28 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
         <TitleTag className="text-xl font-bold text-[#1C1C1E] leading-tight">{route.title}</TitleTag>
         <DifficultyBadge difficulty={route.difficulty} />
       </div>
+
+      {/* Отчёты как отзывы: «★ 4,8 · 12 отчётов» — скролл к секции #reports */}
+      {reportsAgg.count > 0 && (
+        <button
+          type="button"
+          onClick={() => document.getElementById("reports")?.scrollIntoView({ behavior: "smooth" })}
+          className="-mt-1 mb-3 flex items-center gap-1 text-sm transition-opacity hover:opacity-70"
+        >
+          {reportsAgg.avg != null && (
+            <>
+              <Star size={14} fill="#F4632A" style={{ color: "#F4632A" }} />
+              <span className="font-semibold text-[#1C1C1E]">
+                {reportsAgg.avg.toFixed(1).replace(".", ",")}
+              </span>
+              <span className="text-[#A1A1AA]">·</span>
+            </>
+          )}
+          <span className="text-[#71717A] underline decoration-[#D4D4D8] underline-offset-2">
+            {reportsAgg.count} {reportsPlural(reportsAgg.count)}
+          </span>
+        </button>
+      )}
 
       {route.region && (
         <div className="flex items-center gap-1.5 text-sm text-[#71717A] mb-4">
@@ -581,44 +647,33 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
               </div>
             )}
 
+            {/* Ride reports — отзывы сразу после описания маршрута; якорь для ссылки из сводки */}
+            <div id="reports" className="scroll-mt-24">
+              <RideReportsSection key={reportsKey} routeId={route.id} routeTitle={route.title} />
+            </div>
+
             {/* Exit points */}
             <ExitPointsSection status={route.exit_points_status} points={route.exit_points ?? []} />
 
             {/* Gallery */}
             {route.images && route.images.length > 0 && <RouteGallery images={route.images} />}
 
-            {/* Ride history: отметка проезда — рядом с отчётами о поездках */}
+            {/* Ride history: отметка проезда — открывает пост-райд шит «Как прокатилось?» */}
             <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
               <span className="text-[11px] font-semibold text-[#A1A1AA] uppercase tracking-wide">История проездов</span>
               <div className="flex gap-2 mt-3">
                 <RideButton />
               </div>
-
-              {/* Report prompt — shown after marking a ride */}
-              {reportPromptRideId !== null && (
-                <div className="mt-3 p-3 rounded-xl border border-[#E4E4E7] bg-[#FAFAF9] flex items-center justify-between gap-3">
-                  <p className="text-xs text-[#3F3F46] font-medium">📝 Поделись впечатлениями?</p>
-                  <div className="flex gap-2 shrink-0">
-                    <button
-                      onClick={() => setReportPromptRideId(null)}
-                      className="text-xs text-[#A1A1AA] hover:text-[#71717A] transition-colors"
-                    >
-                      Потом
-                    </button>
-                    <Link
-                      href={`/routes/${route.id}/report/new?rideId=${reportPromptRideId}`}
-                      className="text-xs font-semibold px-3 py-1 rounded-lg text-white transition-colors"
-                      style={{ backgroundColor: "#F4632A" }}
-                    >
-                      Написать
-                    </Link>
-                  </div>
-                </div>
-              )}
             </div>
 
-            {/* Ride reports */}
-            <RideReportsSection routeId={route.id} routeTitle={route.title} />
+            <PostRideSheet
+              routeId={route.id}
+              routeTitle={route.title}
+              routeDistanceKm={route.distance_km}
+              open={postRideOpen}
+              onOpenChange={setPostRideOpen}
+              onPublished={handleRidePublished}
+            />
 
             {/* Comments */}
             <RouteComments routeId={route.id} />

@@ -3,7 +3,7 @@
 import { useState, use, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, Loader2 } from "lucide-react";
+import { ChevronLeft, Loader2, Star } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { ImageUpload } from "@/components/routes/ImageUpload";
 import { DayEditor } from "@/components/events/DayEditorLazy";
@@ -11,15 +11,8 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useToast } from "@/lib/context/ToastContext";
 import { supabase } from "@/lib/supabase";
 import { isEmptyRichText } from "@/lib/richText";
+import { VIBES } from "@/lib/vibes";
 import type { RideReportVibe } from "@/lib/supabase";
-
-const VIBES: { value: RideReportVibe; emoji: string; label: string }[] = [
-  { value: "chill",   emoji: "😌", label: "Кайф" },
-  { value: "push",    emoji: "💪", label: "Жарили" },
-  { value: "epic",    emoji: "🔥", label: "Эпик" },
-  { value: "suffer",  emoji: "😵", label: "Страдали" },
-  { value: "explore", emoji: "🧭", label: "Открытие" },
-];
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -45,6 +38,7 @@ function ReportForm({ routeId }: { routeId: string }) {
   const today = new Date().toISOString().split("T")[0];
 
   const [vibe, setVibe] = useState<RideReportVibe | null>(null);
+  const [rating, setRating] = useState<number | null>(null);
   const [text, setText] = useState("");
   const [riddenAt, setRiddenAt] = useState(today);
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
@@ -73,7 +67,7 @@ function ReportForm({ routeId }: { routeId: string }) {
       }
 
       // 2. Insert report
-      const { data: reportData, error } = await supabase.from("ride_reports").insert({
+      const basePayload = {
         route_id: routeId,
         user_id: user.id,
         ride_id: rideId ?? null,
@@ -81,7 +75,20 @@ function ReportForm({ routeId }: { routeId: string }) {
         vibe: vibe ?? null,
         text: isEmptyRichText(text) ? null : text,
         photos: uploadedUrls,
-      }).select("id").single();
+      };
+
+      let { data: reportData, error } = await supabase.from("ride_reports")
+        .insert({ ...basePayload, ...(rating != null ? { rating } : {}) })
+        .select("id")
+        .single();
+
+      // Колонка rating может ещё не существовать в проде — тогда повторяем без неё
+      if (error && rating != null && (error.code === "42703" || /rating/i.test(error.message ?? ""))) {
+        ({ data: reportData, error } = await supabase.from("ride_reports")
+          .insert(basePayload)
+          .select("id")
+          .single());
+      }
       if (error) throw error;
 
       // Уведомляем тех, кто отметил «Хочу» на этот маршрут (fire-and-forget)
@@ -158,6 +165,31 @@ function ReportForm({ routeId }: { routeId: string }) {
                   }
                 >
                   {v.emoji} {v.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Rating */}
+          <div>
+            <label className="block text-sm font-semibold text-[#1C1C1E] mb-2">
+              Оценка маршрута{" "}
+              <span className="font-normal text-[#A1A1AA]">(необязательно)</span>
+            </label>
+            <div className="flex items-center gap-1">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setRating(rating === n ? null : n)}
+                  aria-label={`${n} из 5`}
+                  className="p-0.5"
+                >
+                  <Star
+                    size={26}
+                    color="#F4632A"
+                    fill={rating != null && n <= rating ? "#F4632A" : "none"}
+                  />
                 </button>
               ))}
             </div>

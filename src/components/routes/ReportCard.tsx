@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Pencil } from "lucide-react";
+import { Pencil, Star } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { richTextToPlain } from "@/lib/richText";
 import type { DbRideReport, RideReportVibe } from "@/lib/supabase";
@@ -15,7 +15,8 @@ const VIBE_CONFIG: Record<RideReportVibe, { emoji: string; label: string; color:
 };
 
 interface Props {
-  report: DbRideReport;
+  /** rating — опциональная оценка маршрута 1–5; колонки может ещё не быть в проде */
+  report: DbRideReport & { rating?: number | null };
   showRoute?: boolean;
   currentUserId?: string | null;
   coverOnly?: boolean;
@@ -23,6 +24,7 @@ interface Props {
 
 export function ReportCard({ report, showRoute = false, currentUserId, coverOnly = false }: Props) {
   const vibe = report.vibe ? VIBE_CONFIG[report.vibe] : null;
+  const rating = typeof report.rating === "number" ? report.rating : null;
   const photos = report.photos ?? [];
   const routeId = report.route_id ?? report.route?.id;
   const detailHref = routeId ? `/routes/${routeId}/report/${report.id}` : null;
@@ -93,8 +95,21 @@ export function ReportCard({ report, showRoute = false, currentUserId, coverOnly
                 </span>
               )}
             </div>
-            <div className="text-xs text-[#A1A1AA] mt-0.5">
-              {formatDate(report.ridden_at)} · отчёт о поездке
+            <div className="text-xs text-[#A1A1AA] mt-0.5 flex items-center gap-1.5 flex-wrap">
+              <span>{formatDate(report.ridden_at)}</span>
+              {rating != null && (
+                <span className="inline-flex items-center gap-px" title={`Оценка маршрута: ${rating} из 5`}>
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Star
+                      key={i}
+                      size={11}
+                      fill={i <= rating ? "#F4632A" : "none"}
+                      style={{ color: i <= rating ? "#F4632A" : "#D4D4D8" }}
+                    />
+                  ))}
+                </span>
+              )}
+              <span>· отчёт о поездке</span>
             </div>
           </div>
           {isOwner && editHref && (

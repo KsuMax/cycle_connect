@@ -3,7 +3,7 @@
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, Loader2, Trash2 } from "lucide-react";
+import { ChevronLeft, Loader2, Star, Trash2 } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { ImageUpload } from "@/components/routes/ImageUpload";
 import { DayEditor } from "@/components/events/DayEditorLazy";
@@ -11,15 +11,10 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useToast } from "@/lib/context/ToastContext";
 import { supabase } from "@/lib/supabase";
 import { isEmptyRichText } from "@/lib/richText";
+import { VIBES } from "@/lib/vibes";
 import type { DbRideReport, RideReportVibe } from "@/lib/supabase";
 
-const VIBES: { value: RideReportVibe; emoji: string; label: string }[] = [
-  { value: "chill",   emoji: "😌", label: "Кайф" },
-  { value: "push",    emoji: "💪", label: "Жарили" },
-  { value: "epic",    emoji: "🔥", label: "Эпик" },
-  { value: "suffer",  emoji: "😵", label: "Страдали" },
-  { value: "explore", emoji: "🧭", label: "Открытие" },
-];
+type DbRideReportWithRating = DbRideReport & { rating?: number | null };
 
 interface Props {
   params: Promise<{ id: string; reportId: string }>;
@@ -35,6 +30,7 @@ export default function EditReportPage({ params }: Props) {
   const [forbidden, setForbidden] = useState(false);
 
   const [vibe, setVibe] = useState<RideReportVibe | null>(null);
+  const [rating, setRating] = useState<number | null>(null);
   const [text, setText] = useState("");
   const [riddenAt, setRiddenAt] = useState("");
   const [existingPhotos, setExistingPhotos] = useState<string[]>([]);
@@ -47,13 +43,22 @@ export default function EditReportPage({ params }: Props) {
     if (!user) return;
     let cancel = false;
     (async () => {
-      const { data } = await supabase
+      let { data, error } = await supabase
         .from("ride_reports")
-        .select("id, route_id, user_id, ride_id, ridden_at, vibe, text, photos, created_at")
+        .select("id, route_id, user_id, ride_id, ridden_at, vibe, rating, text, photos, created_at")
         .eq("id", reportId)
         .maybeSingle();
+
+      // Колонка rating может ещё не существовать в проде — тогда повторяем без неё
+      if (error) {
+        ({ data, error } = await supabase
+          .from("ride_reports")
+          .select("id, route_id, user_id, ride_id, ridden_at, vibe, text, photos, created_at")
+          .eq("id", reportId)
+          .maybeSingle());
+      }
       if (cancel) return;
-      const r = data as unknown as DbRideReport | null;
+      const r = data as unknown as DbRideReportWithRating | null;
       if (!r) {
         setForbidden(true);
         setLoading(false);
@@ -65,6 +70,7 @@ export default function EditReportPage({ params }: Props) {
         return;
       }
       setVibe(r.vibe);
+      setRating(r.rating ?? null);
       setText(r.text ?? "");
       setRiddenAt(r.ridden_at);
       setExistingPhotos(r.photos ?? []);
@@ -95,15 +101,25 @@ export default function EditReportPage({ params }: Props) {
         uploadedUrls.push(publicUrl);
       }
 
-      const { error } = await supabase
+      const basePayload = {
+        ridden_at: riddenAt,
+        vibe: vibe ?? null,
+        text: isEmptyRichText(text) ? null : text,
+        photos: [...existingPhotos, ...uploadedUrls],
+      };
+
+      let { error } = await supabase
         .from("ride_reports")
-        .update({
-          ridden_at: riddenAt,
-          vibe: vibe ?? null,
-          text: isEmptyRichText(text) ? null : text,
-          photos: [...existingPhotos, ...uploadedUrls],
-        })
+        .update({ ...basePayload, ...(rating != null ? { rating } : {}) })
         .eq("id", reportId);
+
+      // Колонка rating может ещё не существовать в проде — тогда повторяем без неё
+      if (error && rating != null && (error.code === "42703" || /rating/i.test(error.message ?? ""))) {
+        ({ error } = await supabase
+          .from("ride_reports")
+          .update(basePayload)
+          .eq("id", reportId));
+      }
       if (error) throw error;
 
       showToast("Отчёт обновлён!", "success");
@@ -203,6 +219,30 @@ export default function EditReportPage({ params }: Props) {
                   }
                 >
                   {v.emoji} {v.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-[#1C1C1E] mb-2">
+              Оценка маршрута{" "}
+              <span className="font-normal text-[#A1A1AA]">(необязательно)</span>
+            </label>
+            <div className="flex items-center gap-1">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setRating(rating === n ? null : n)}
+                  aria-label={`${n} из 5`}
+                  className="p-0.5"
+                >
+                  <Star
+                    size={26}
+                    color="#F4632A"
+                    fill={rating != null && n <= rating ? "#F4632A" : "none"}
+                  />
                 </button>
               ))}
             </div>

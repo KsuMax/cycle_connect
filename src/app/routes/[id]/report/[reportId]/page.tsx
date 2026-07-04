@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, Pencil } from "lucide-react";
+import { ChevronLeft, Pencil, Star } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { sanitizeHtml } from "@/lib/sanitize";
@@ -10,6 +10,8 @@ import { formatDate } from "@/lib/utils";
 import type { DbRideReport, RideReportVibe } from "@/lib/supabase";
 
 const BASE_URL = "https://cycleconnect.cc";
+
+type DbRideReportWithRating = DbRideReport & { rating?: number | null };
 
 const VIBE_CONFIG: Record<RideReportVibe, { emoji: string; label: string; color: string }> = {
   chill:   { emoji: "😌", label: "Кайф",     color: "#0BBFB5" },
@@ -20,18 +22,32 @@ const VIBE_CONFIG: Record<RideReportVibe, { emoji: string; label: string; color:
 };
 
 const REPORT_SELECT =
+  "id, route_id, user_id, ride_id, ridden_at, vibe, rating, text, photos, created_at, " +
+  "author:profiles!user_id(name, avatar_url), " +
+  "route:routes!route_id(id, title, cover_url)";
+
+const REPORT_SELECT_NO_RATING =
   "id, route_id, user_id, ride_id, ridden_at, vibe, text, photos, created_at, " +
   "author:profiles!user_id(name, avatar_url), " +
   "route:routes!route_id(id, title, cover_url)";
 
-async function fetchReport(reportId: string): Promise<DbRideReport | null> {
+async function fetchReport(reportId: string): Promise<DbRideReportWithRating | null> {
   const supabase = await createServerSupabase();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("ride_reports")
     .select(REPORT_SELECT)
     .eq("id", reportId)
     .maybeSingle();
-  return (data as unknown as DbRideReport | null) ?? null;
+  if (error) {
+    // Колонка rating может ещё не существовать в проде — тогда повторяем без неё
+    const { data: fallbackData } = await supabase
+      .from("ride_reports")
+      .select(REPORT_SELECT_NO_RATING)
+      .eq("id", reportId)
+      .maybeSingle();
+    return (fallbackData as unknown as DbRideReportWithRating | null) ?? null;
+  }
+  return (data as unknown as DbRideReportWithRating | null) ?? null;
 }
 
 function plainTextExcerpt(html: string | null, max = 160): string {
@@ -76,12 +92,23 @@ export default async function ReportDetailPage({ params }: Props) {
   const { id: routeId, reportId } = await params;
   const supabase = await createServerSupabase();
 
-  const [{ data: reportData }, { data: userData }] = await Promise.all([
+  const [{ data: reportData, error: reportError }, { data: userData }] = await Promise.all([
     supabase.from("ride_reports").select(REPORT_SELECT).eq("id", reportId).maybeSingle(),
     supabase.auth.getUser(),
   ]);
 
-  const report = (reportData as unknown as DbRideReport | null) ?? null;
+  let finalReportData = reportData;
+  if (reportError) {
+    // Колонка rating может ещё не существовать в проде — тогда повторяем без неё
+    const { data: fallbackData } = await supabase
+      .from("ride_reports")
+      .select(REPORT_SELECT_NO_RATING)
+      .eq("id", reportId)
+      .maybeSingle();
+    finalReportData = fallbackData;
+  }
+
+  const report = (finalReportData as unknown as DbRideReportWithRating | null) ?? null;
   if (!report) notFound();
 
   const routeTitle = report.route?.title ?? "";
@@ -136,8 +163,20 @@ export default async function ReportDetailPage({ params }: Props) {
                     </span>
                   )}
                 </div>
-                <div className="text-xs text-[#A1A1AA] mt-0.5">
-                  {formatDate(report.ridden_at)} · отчёт о поездке
+                <div className="flex items-center gap-2 text-xs text-[#A1A1AA] mt-0.5">
+                  <span>{formatDate(report.ridden_at)} · отчёт о поездке</span>
+                  {report.rating != null && (
+                    <span className="inline-flex items-center gap-0.5">
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <Star
+                          key={n}
+                          size={12}
+                          color="#F4632A"
+                          fill={n <= report.rating! ? "#F4632A" : "none"}
+                        />
+                      ))}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
