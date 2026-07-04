@@ -25,6 +25,7 @@ import { WindWidget } from "@/components/routes/WindWidget";
 import { SendToNavigator } from "@/components/routes/SendToNavigator";
 import { PostRideSheet } from "@/components/routes/PostRideSheet";
 import { ymGoal } from "@/lib/ym";
+import { toMapMagicEmbed } from "@/lib/mapmagic";
 import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users, Download, Train, Bus, CarTaxiFront, Route as RouteIcon, MoreVertical, Navigation, Star } from "lucide-react";
 import type { ExitPointKind } from "@/types";
 import { formatDate } from "@/lib/utils";
@@ -611,7 +612,7 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
             {/* Map */}
             <div className="bg-white rounded-2xl overflow-hidden border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
               {route.mapmagic_embed ? (
-                <iframe src={route.mapmagic_embed} className="w-full" style={{ height: 400, border: "none" }} allowFullScreen />
+                <iframe src={toMapMagicEmbed(route.mapmagic_embed, route.title) ?? route.mapmagic_embed} className="w-full" style={{ height: 400, border: "none" }} allowFullScreen />
               ) : (
                 <div className="relative bg-gradient-to-br from-[#E6FAF9] to-[#D1FAF7] flex items-center justify-center" style={{ height: 400 }}>
                   <div className="text-center text-[#71717A]">

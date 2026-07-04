@@ -25,6 +25,7 @@ import { sanitizeHtml } from "@/lib/sanitize";
 import type { User, Route, EventDay, RouteType } from "@/types";
 import type { DbEvent, DbEventDay, DbProfile, DbRoute } from "@/lib/supabase";
 import { dbToRoute, dbToUser, gpxPathToUrl } from "@/lib/transforms";
+import { toMapMagicEmbed } from "@/lib/mapmagic";
 
 const md = new MarkdownIt({ html: false, linkify: true, breaks: true });
 
@@ -455,7 +456,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               return (
                 <div className="bg-white rounded-2xl overflow-hidden border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
                   {hasEmbed && (
-                    <iframe src={event.route!.mapmagic_embed} className="w-full" style={{ height: 380, border: "none" }} allowFullScreen title={event.route!.title} />
+                    <iframe src={toMapMagicEmbed(event.route!.mapmagic_embed, event.route!.title) ?? event.route!.mapmagic_embed} className="w-full" style={{ height: 380, border: "none" }} allowFullScreen title={event.route!.title} />
                   )}
                   <div className="px-4 py-2.5 border-t border-[#F5F4F1] flex items-center justify-between flex-wrap gap-x-4 gap-y-2">
                     <span className="text-xs text-[#71717A]">

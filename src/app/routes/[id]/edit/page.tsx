@@ -14,6 +14,7 @@ import { DayEditor } from "@/components/events/DayEditorLazy";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useToast } from "@/lib/context/ToastContext";
 import { supabase, proxyImageUrl } from "@/lib/supabase";
+import { toMapMagicEmbed } from "@/lib/mapmagic";
 import { parseGpxFile, computeGpxStats, toWktPoint, toWktLinestring } from "@/lib/gpx";
 import { ROUTE_TYPES, DIFFICULTIES, SURFACES, POI_TAGS, SEASONS } from "@/constants/routes";
 import type { RouteType, Difficulty, Surface, ExitPointsStatus } from "@/types";
@@ -211,16 +212,6 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
     }
   };
 
-  const buildEmbedUrl = (url: string) => {
-    if (!url) return null;
-    try {
-      const u = new URL(url);
-      u.searchParams.set("embed", "1");
-      return u.toString();
-    } catch {
-      return null;
-    }
-  };
 
   const handleMapUrlChange = (value: string) => {
     setMapUrl(value);
@@ -303,7 +294,7 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
         poi_tags: poiTags.length > 0 ? poiTags : null,
         season_months: seasonMonths.length > 0 ? seasonMonths : null,
         mapmagic_url: mapUrl || null,
-        mapmagic_embed: buildEmbedUrl(mapUrl),
+        mapmagic_embed: toMapMagicEmbed(mapUrl, title.trim()),
         exit_points_status: exitStatus,
         club_id: clubId,
       })

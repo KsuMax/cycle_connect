@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useToast } from "@/lib/context/ToastContext";
 import { useAchievements } from "@/lib/context/AchievementsContext";
 import { supabase } from "@/lib/supabase";
+import { toMapMagicEmbed } from "@/lib/mapmagic";
 import { parseGpxFile, computeGpxStats, toWktPoint, toWktLinestring } from "@/lib/gpx";
 import { ROUTE_TYPES, DIFFICULTIES, SURFACES, POI_TAGS, SEASONS } from "@/constants/routes";
 import type { RouteType, Difficulty, Surface, ExitPointsStatus } from "@/types";
@@ -290,16 +291,6 @@ export default function NewRoutePage() {
 
   const canSubmit = title.trim() && routeTypes.length > 0 && !submitting;
 
-  const buildEmbedUrl = (url: string) => {
-    if (!url) return null;
-    try {
-      const u = new URL(url);
-      u.searchParams.set("embed", "1");
-      return u.toString();
-    } catch {
-      return null;
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -331,7 +322,7 @@ export default function NewRoutePage() {
         poi_tags: poiTags.length > 0 ? poiTags : null,
         season_months: seasonMonths.length > 0 ? seasonMonths : null,
         mapmagic_url: mapUrl || null,
-        mapmagic_embed: buildEmbedUrl(mapUrl),
+        mapmagic_embed: toMapMagicEmbed(mapUrl, title.trim()),
         club_id: clubId || null,
         exit_points_status: exitStatus,
         likes_count: 0,
