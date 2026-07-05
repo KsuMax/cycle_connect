@@ -14,6 +14,7 @@ import { ROUTE_TYPES, DIFFICULTIES as BASE_DIFFICULTIES, SURFACES } from "@/cons
 import { dbToRoute, dbToEvent } from "@/lib/transforms";
 import { ROUTE_LIST_SELECT, EVENT_LIST_SELECT, PAGE_SIZE } from "@/lib/queries";
 import type { DbRoute, DbEvent } from "@/lib/supabase";
+import { ShelfChipRow, useRouteShelves } from "@/components/routes/ShelfChips";
 
 type LocationScope = "all" | "city" | "out";
 const LOCATION_SCOPES: { value: LocationScope; label: string }[] = [
@@ -72,6 +73,9 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
   const [routesOffset, setRoutesOffset] = useState(initialRoutes.length);
   const [hasMoreRoutes, setHasMoreRoutes] = useState(initialRoutes.length >= PAGE_SIZE);
   const [loadingMoreRoutes, setLoadingMoreRoutes] = useState(false);
+
+  // ── Personal shelves (Сохранённые / Проехано / Мои) ───────────────────────
+  const { activeShelf, shelfRoutes, shelfLoading, toggleShelf } = useRouteShelves(user?.id ?? null);
 
   // ── Near-me filter ────────────────────────────────────────────────────────
   const [nearMeActive, setNearMeActive] = useState(false);
@@ -299,7 +303,11 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
   const minKm = minDistance === "" ? null : Number(minDistance);
   const maxKm = maxDistance === "" ? null : Number(maxDistance);
 
-  const filtered = routes.filter((route) => {
+  // When a personal shelf is active, filter/sort operate on that shelf's
+  // (fully-fetched) route set instead of the paginated catalog list.
+  const routesSource = activeShelf ? (shelfRoutes[activeShelf] ?? []) : routes;
+
+  const filtered = routesSource.filter((route) => {
     if (nearMeActive && nearMeIds !== null && !nearMeIds.has(route.id)) return false;
     if (search && !route.title.toLowerCase().includes(search.toLowerCase())) return false;
     if (difficulty !== "all" && route.difficulty !== difficulty) return false;
@@ -728,6 +736,11 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
 
           {/* ── Content area ──────────────────────────────────────────────── */}
           <div>
+            {/* Personal shelves — routes tab only */}
+            {activeTab === "routes" && (
+              <ShelfChipRow activeShelf={activeShelf} onToggle={toggleShelf} />
+            )}
+
             {/* Search + mobile filter toggle */}
             <div className="flex gap-3 mb-5">
               <div className="flex-1 relative">
@@ -980,7 +993,7 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
 
             {/* ── Routes grid ───────────────────────────────────────────── */}
             {activeTab === "routes" && (
-              routesLoading ? (
+              routesLoading || (activeShelf && shelfLoading && shelfRoutes[activeShelf] === null) ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {[1, 2, 3, 4].map((i) => (
                     <div key={i} className="bg-white rounded-2xl h-64 animate-pulse border border-[#E4E4E7]" />
@@ -990,7 +1003,11 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
                 <>
                   <div className="flex items-center justify-between mb-4">
                     <div className="text-sm text-[#71717A]">
-                      {filtered.length === 0 ? "Маршруты не найдены" : `${filtered.length} маршрут${filtered.length === 1 ? "" : filtered.length < 5 ? "а" : "ов"}`}
+                      {filtered.length === 0
+                        ? "Маршруты не найдены"
+                        : activeShelf
+                          ? `${filtered.length} маршрутов`
+                          : `${filtered.length} маршрут${filtered.length === 1 ? "" : filtered.length < 5 ? "а" : "ов"}`}
                     </div>
                     <SortSelect
                       value={sortBy}
@@ -1007,7 +1024,7 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {filtered.map((route) => <RouteCard key={route.id} route={route} />)}
                       </div>
-                      {hasMoreRoutes && !hasActiveRouteFilters && (
+                      {hasMoreRoutes && !hasActiveRouteFilters && !activeShelf && (
                         <div className="mt-6 flex justify-center">
                           <button
                             onClick={loadMoreRoutes}
@@ -1022,6 +1039,29 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
                         </div>
                       )}
                     </>
+                  ) : activeShelf === "saved" ? (
+                    <div className="text-center py-16 text-[#71717A]">
+                      <div className="text-4xl mb-3">🗺️</div>
+                      <div className="font-medium mb-1">Пока ничего не сохранено</div>
+                      <div className="text-sm">жми «Сохранить» на маршруте</div>
+                    </div>
+                  ) : activeShelf === "ridden" ? (
+                    <div className="text-center py-16 text-[#71717A]">
+                      <div className="text-4xl mb-3">🗺️</div>
+                      <div className="font-medium mb-1">Отмечай проезды кнопкой «Я проехал(а)»</div>
+                      <div className="text-sm">они появятся здесь</div>
+                    </div>
+                  ) : activeShelf === "mine" ? (
+                    <div className="text-center py-16 text-[#71717A]">
+                      <div className="text-4xl mb-3">🗺️</div>
+                      <div className="font-medium mb-1">Ты ещё не создал ни одного маршрута</div>
+                      <Link href={user ? "/routes/new" : "/auth/login"}
+                        className="inline-flex items-center gap-2 mt-4 px-4 min-h-[44px] rounded-xl text-sm font-semibold text-white transition-colors hover:opacity-90"
+                        style={{ backgroundColor: "#F4632A" }}>
+                        <Plus size={16} />
+                        Добавить маршрут
+                      </Link>
+                    </div>
                   ) : (
                     <div className="text-center py-16 text-[#71717A]">
                       <div className="text-4xl mb-3">🗺️</div>

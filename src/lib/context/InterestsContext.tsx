@@ -14,6 +14,8 @@ interface InterestsContextValue {
   hasInterest: (routeId: string) => boolean;
   loaded: boolean;
   refresh: () => void;
+  addInterest: (routeId: string) => Promise<boolean>;
+  removeInterest: (routeId: string) => Promise<boolean>;
 }
 
 const InterestsContext = createContext<InterestsContextValue | null>(null);
@@ -59,8 +61,37 @@ export function InterestsProvider({ children }: { children: ReactNode }) {
     [statusMap]
   );
 
+  // Same insert + TG notify side effect as the "Хочу проехать" flow previously
+  // triggered from RouteInterestSection — now also reused by the unified save action.
+  const addInterest = useCallback(async (routeId: string) => {
+    if (!user) return false;
+    const { error } = await supabase
+      .from("route_interests")
+      .insert({ route_id: routeId, user_id: user.id });
+    if (error) return false;
+    load();
+
+    supabase.functions
+      .invoke("tg-notify", { body: { mode: "route_interest_new", routeId } })
+      .catch(() => { /* silent — non-critical */ });
+
+    return true;
+  }, [user, load]);
+
+  const removeInterest = useCallback(async (routeId: string) => {
+    if (!user) return false;
+    const { error } = await supabase
+      .from("route_interests")
+      .delete()
+      .eq("route_id", routeId)
+      .eq("user_id", user.id);
+    if (error) return false;
+    load();
+    return true;
+  }, [user, load]);
+
   return (
-    <InterestsContext.Provider value={{ getRouteInterest, hasInterest, loaded, refresh: load }}>
+    <InterestsContext.Provider value={{ getRouteInterest, hasInterest, loaded, refresh: load, addInterest, removeInterest }}>
       {children}
     </InterestsContext.Provider>
   );

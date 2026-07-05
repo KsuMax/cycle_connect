@@ -221,7 +221,7 @@ export default function ProfilePage() {
 
   const TABS: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode; count: number }[] = [
     { id: "routes",       label: "Мои маршруты", shortLabel: "Маршруты",   icon: <Map size={15} />,      count: myRoutes.length },
-    { id: "favorites",    label: "Избранное",    shortLabel: "Избранное",  icon: <Bookmark size={15} />, count: favoriteRoutes.length },
+    { id: "favorites",    label: "Сохранённые",  shortLabel: "Сохранённые", icon: <Bookmark size={15} />, count: favoriteRoutes.length },
     { id: "events",       label: "Активность",   shortLabel: "Активность", icon: <Calendar size={15} />, count: tripsCount },
     { id: "achievements", label: "Достижения",   shortLabel: "Достижения", icon: <Trophy size={15} />,   count: earnedIds.size },
   ];

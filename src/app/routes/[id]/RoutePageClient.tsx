@@ -57,7 +57,7 @@ const ROUTE_TYPE_COLORS: Record<RouteType, { bg: string; text: string }> = {
 type RideButtonState =
   | { type: "not_ridden" }
   | { type: "upcoming_event"; eventTitle: string; eventDate: string | null; eventId: string }
-  | { type: "has_intent"; intentDate: string; intentId: string }
+  | { type: "has_intent"; intentDate: string | null; intentId: string }
   | { type: "ridden"; count: number };
 
 /** 1 отчёт / 2 отчёта / 5 отчётов */
@@ -144,7 +144,7 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
   const { showToast } = useToast();
   const { checkAndAward } = useAchievements();
   const { getRouteEventStatus } = useEventRides();
-  const { getRouteInterest } = useInterests();
+  const { getRouteInterest, hasInterest, addInterest, removeInterest } = useInterests();
   const router = useRouter();
 
   const [route, setRoute] = useState<Route | null>(null);
@@ -275,11 +275,28 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
     showToast(willLike ? "Маршрут отмечен" : "Лайк убран", "info");
   };
 
-  const handleFavorite = () => {
-    if (!requireAuth("добавить в избранное")) return;
-    const willFav = !isFavorite(route.id);
-    toggleFavorite(route.id);
-    showToast(willFav ? "Добавлено в избранное" : "Убрано из избранного", "info");
+  // Единая точка «сохранения»: избранное + «хочу проехать» — теперь один и тот же
+  // пользовательский жест. Легаси-данные (есть одно, но не другое) считаем
+  // сохранённым состоянием; отмена убирает оба, повторное сохранение — добавляет оба.
+  const handleFavorite = async () => {
+    if (!requireAuth("сохранить маршрут")) return;
+    const wasFavorite = isFavorite(route.id);
+    const wasInterested = hasInterest(route.id);
+    const wasSaved = wasFavorite || wasInterested;
+
+    if (wasSaved) {
+      // Убираем оба — независимо от того, есть ли расхождение (легаси-данные,
+      // где стоит только одна из двух отметок).
+      if (wasFavorite) toggleFavorite(route.id);
+      if (wasInterested) await removeInterest(route.id);
+      showToast("Убрано из сохранённого", "info");
+    } else {
+      toggleFavorite(route.id);
+      await addInterest(route.id);
+      showToast("Сохранено — попадёшь в список желающих проехать", "success");
+    }
+    // Перезагрузить локальный список интересов — блок «Хотят проехать».
+    setInterestsKey((k) => k + 1);
   };
 
   // Visible events (public or user is participant)
@@ -359,22 +376,27 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
     }
 
     if (rideState.type === "has_intent") {
+      // Сохранён/запланирован, но ещё не отмечен как проеханный — «Я проехал(а)»
+      // важнее пассивной плашки: пользователю, который сохранил маршрут и уже
+      // прокатился, нужно в первую очередь отметить проезд.
       return (
-        <div className="flex-1 relative group/ridebtn">
-          <div
-            className="w-full py-2.5 rounded-xl text-sm font-semibold text-center cursor-default select-none"
-            style={{ backgroundColor: "#F0FDF4", color: "#16A34A" }}
-          >
-            Запланировано
+        <div className="flex-1 flex flex-col gap-1">
+          <div className="text-center text-xs font-medium" style={{ color: "#16A34A" }}>
+            {rideState.intentDate ? `Запланировано на ${formatDate(rideState.intentDate)}` : "В списке «Хочу проехать»"}
           </div>
-          {rideState.intentDate && (
-            <div
-              className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap opacity-0 group-hover/ridebtn:opacity-100 transition-opacity pointer-events-none z-10"
+          <div className="relative group/ridebtn">
+            <button
+              onClick={openPostRideSheet}
+              className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors"
               style={{ backgroundColor: "#1C1C1E", color: "white" }}
             >
-              {formatDate(rideState.intentDate)}
+              Я проехал(а)
+            </button>
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap opacity-0 group-hover/ridebtn:opacity-100 transition-opacity pointer-events-none z-10"
+              style={{ backgroundColor: "#1C1C1E", color: "white" }}>
+              Если ты уже ездил этот маршрут, нажимай, чтобы отметиться
             </div>
-          )}
+          </div>
         </div>
       );
     }
@@ -467,6 +489,9 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
   function renderSummaryCard(titleAsH1: boolean) {
     const TitleTag = titleAsH1 ? "h1" : "p";
     const route = routeNonNull; // route уже проверен на null в рендере страницы выше
+    // «Сохранено» = избранное ИЛИ отметка «хочу проехать» — легаси-данные,
+    // где есть только одно из двух, тоже считаем сохранённым состоянием.
+    const isSaved = isFavorite(route.id) || hasInterest(route.id);
     return (
     <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
       <div className="flex items-start justify-between mb-3">
@@ -564,11 +589,11 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
         )}
         <button onClick={handleFavorite}
           className="flex-1 py-2.5 rounded-xl border text-sm font-semibold flex items-center justify-center gap-1.5 transition-colors"
-          style={isFavorite(route.id)
+          style={isSaved
             ? { backgroundColor: "#FFF0EB", borderColor: "#F4632A", color: "#F4632A" }
             : { backgroundColor: "white", borderColor: "#E4E4E7", color: "#1C1C1E" }}>
-          <Bookmark size={15} fill={isFavorite(route.id) ? "#F4632A" : "none"} />
-          {isFavorite(route.id) ? "Сохранено" : "Сохранить"}
+          <Bookmark size={15} fill={isSaved ? "#F4632A" : "none"} />
+          {isSaved ? "Сохранено" : "Сохранить"}
         </button>
         <button onClick={handleLike}
           className="w-10 h-10 shrink-0 rounded-xl border flex items-center justify-center transition-colors"
@@ -736,11 +761,7 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
             )}
 
             {/* Interest pool */}
-            <RouteInterestSection
-              routeId={route.id}
-              interests={interests}
-              onChange={() => setInterestsKey(k => k + 1)}
-            />
+            <RouteInterestSection interests={interests} />
 
             {/* Create event */}
             <Link href={`/events/new?route=${route.id}`}
