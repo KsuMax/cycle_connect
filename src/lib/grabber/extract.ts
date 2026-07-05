@@ -1,6 +1,8 @@
 import { chatJSON } from "@/lib/llm/ollama-chat";
 import type { CandidateDraft, DetectedLink, RawPost } from "./types";
 
+const MIN_CONFIDENCE = 0.3;
+
 const SYSTEM_PROMPT = `Ты помогаешь находить посты о конкретных велосипедных маршрутах в постах из телеграм-каналов и на форумах.
 
 Тебе дают текст поста и список ссылок, уже найденных в нём (ссылка есть точно — это не твоя задача проверять). Определи, описывает ли пост конкретную велопоездку или маршрут (место, направление, детали пути), а не общие рассуждения, рекламу товара или пустой анонс без содержания.
@@ -16,6 +18,15 @@ const SYSTEM_PROMPT = `Ты помогаешь находить посты о к
 
 Не выдумывай факты, которых нет в тексте. Если не уверен — is_route: false, confidence ниже.`;
 
+/**
+ * Classify + extract one link-bearing post. Returns null only when the LLM
+ * affirmatively said "not a route" (or was too unsure). If the LLM itself
+ * is unavailable (chatJSON throws or returns an empty object — its
+ * all-providers-failed signature), we FAIL OPEN: the post already passed
+ * the founder's main filter (contains a link), so losing it forever because
+ * a free-tier model timed out is the worse outcome. The cursor advances
+ * past every post exactly once — there is no retry pass.
+ */
 export async function extractCandidate(
   post: RawPost,
   links: DetectedLink[]
@@ -23,7 +34,7 @@ export async function extractCandidate(
   const linksList = links.map((l) => `- ${l.url} (${l.type})`).join("\n");
   const userMessage = `Пост:\n"""\n${post.text.slice(0, 3000)}\n"""\n\nНайденные ссылки:\n${linksList}`;
 
-  let result: Record<string, unknown>;
+  let result: Record<string, unknown> | null;
   try {
     result = await chatJSON(
       [
@@ -32,15 +43,29 @@ export async function extractCandidate(
       ],
       15_000
     );
+    if (!("is_route" in result)) result = null;
   } catch (err) {
     console.error("[grabber/extract] chatJSON failed:", err instanceof Error ? err.message : err);
-    return null;
+    result = null;
+  }
+
+  if (result === null) {
+    return {
+      permalink: post.permalink,
+      title: null,
+      region: null,
+      summary: "⚠️ Не удалось классифицировать (LLM недоступен) — в посте есть ссылка, проверьте вручную.",
+      links,
+      confidence: 0,
+      rawSnippet: post.text.slice(0, 1000),
+    };
   }
 
   if (result.is_route !== true) return null;
 
   const confidenceRaw = typeof result.confidence === "number" ? result.confidence : 0;
   const confidence = Math.max(0, Math.min(1, confidenceRaw));
+  if (confidence < MIN_CONFIDENCE) return null;
 
   return {
     permalink: post.permalink,

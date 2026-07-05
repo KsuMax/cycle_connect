@@ -5,7 +5,6 @@ import { detectLinks, extractLinks } from "./link-detect";
 import { extractCandidate } from "./extract";
 import type { GrabberSource, RunSummary } from "./types";
 
-const MIN_CONFIDENCE = 0.3;
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://cycleconnect.cc";
 // api.telegram.org's Bot API is already reachable via the same reverse proxy
 // tg-notify/tg-webhook use (TELEGRAM_API_BASE) — no need for the SOCKS
@@ -48,8 +47,10 @@ async function processSource(admin: Admin, source: GrabberSource): Promise<RunSu
 
       const links = await detectLinks(post.text);
       summary.llmCalls++;
+      // Null means the LLM said "not a route"; the confidence gate and the
+      // fail-open path for LLM outages both live inside extractCandidate.
       const draft = await extractCandidate(post, links);
-      if (!draft || draft.confidence < MIN_CONFIDENCE) continue;
+      if (!draft) continue;
 
       const { error: insertErr } = await admin.from("grabber_candidates").upsert(
         {
