@@ -34,10 +34,13 @@ export default function NewRoutePage() {
   const [step, setStep] = useState(1);
   const [skippedTrack, setSkippedTrack] = useState(false);
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [mapUrl, setMapUrl] = useState("");
-  const [region, setRegion] = useState("");
+  // Prefilled from /admin/grabber "Импортировать" deep links (title/region/
+  // description/mapUrl query params) — mapUrl only makes sense when the
+  // grabber found an actual MapMagic link; other sources just prefill text.
+  const [title, setTitle] = useState(() => searchParams.get("title") ?? "");
+  const [description, setDescription] = useState(() => searchParams.get("description") ?? "");
+  const [mapUrl, setMapUrl] = useState(() => searchParams.get("mapUrl") ?? "");
+  const [region, setRegion] = useState(() => searchParams.get("region") ?? "");
   const [regions, setRegions] = useState<RegionOption[]>([]);
   const [distance, setDistance] = useState("");
   const [elevation, setElevation] = useState("");
