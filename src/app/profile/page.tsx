@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useFavorites } from "@/lib/context/FavoritesContext";
 import { useRides } from "@/lib/context/RidesContext";
 import { supabase, proxyImageUrl } from "@/lib/supabase";
-import { Bike, Map, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink, Trophy, Eye, Link2, Check } from "lucide-react";
+import { Bike, Map as MapIcon, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink, Trophy, Eye, Link2, Check, MoreHorizontal, Target } from "lucide-react";
 import { getUserSticker } from "@/lib/stickers";
 import { useAchievements } from "@/lib/context/AchievementsContext";
 import { AchievementBadge } from "@/components/ui/AchievementBadge";
@@ -17,15 +17,20 @@ import { ProfileShowcase } from "@/components/ui/ProfileShowcase";
 import { ShowcasePicker } from "@/components/ui/ShowcasePicker";
 import { AvatarLightbox } from "@/components/ui/AvatarLightbox";
 import { SetupChecklist } from "@/components/ui/SetupChecklist";
-import { YearlyStats } from "@/components/profile/YearlyStats";
-import { useYearlyRideStats } from "@/lib/hooks/useYearlyRideStats";
+import { ActivityHeatmap } from "@/components/profile/ActivityHeatmap";
+import { useRideActivity } from "@/lib/hooks/useYearlyRideStats";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
 import type { Route } from "@/types";
 import { dbToRoute } from "@/lib/transforms";
 
-type Tab = "routes" | "favorites" | "events" | "achievements";
-type EventsSubTab = "rides" | "events_list";
+type Tab = "routes" | "rides" | "achievements";
+type RoutesFilter = "mine" | "saved";
+
+/** Show the setup checklist only during the first two weeks after signup. */
+const CHECKLIST_WINDOW_MS = 14 * 24 * 3600 * 1000;
+/** Captured at module load so render stays pure (react-hooks/purity). */
+const PAGE_LOADED_AT = Date.now();
 
 interface ProfileEvent {
   id: string;
@@ -34,12 +39,17 @@ interface ProfileEvent {
   organizer: { name: string } | null;
 }
 
+/** One row of the unified "Заезды" feed: a ride or an event participation. */
+type FeedItem =
+  | { type: "ride"; date: string; km: number; route: Route | null; routeId: string | null; nth: number }
+  | { type: "event"; date: string | null; event: ProfileEvent };
+
 export default function ProfilePage() {
   const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
   const { favorites } = useFavorites();
   const { rideCounts, ridesLoaded } = useRides();
-  const yearlyStats = useYearlyRideStats(user?.id);
+  const { yearly, entries, loaded: activityLoaded } = useRideActivity(user?.id);
   const { achievements, earnedIds, earnedMap, loaded: achievementsLoaded, showcaseIds, setShowcaseIds } = useAchievements();
 
   const earnedLevels: Record<string, number> = useMemo(() => {
@@ -48,15 +58,13 @@ export default function ProfilePage() {
     return result;
   }, [earnedMap]);
 
-
   const [activeTab, setActiveTab] = useState<Tab>("routes");
-  const [eventsSubTab, setEventsSubTab] = useState<EventsSubTab>("rides");
-
+  const [routesFilter, setRoutesFilter] = useState<RoutesFilter>("mine");
 
   const [myRoutes, setMyRoutes] = useState<Route[]>([]);
   const [loadingRoutes, setLoadingRoutes] = useState(true);
 
-  const [ridesData, setRidesData] = useState<Route[]>([]);
+  const [riddenRoutes, setRiddenRoutes] = useState<Route[]>([]);
   const [loadingRides, setLoadingRides] = useState(true);
 
   const [favoriteRoutes, setFavoriteRoutes] = useState<Route[]>([]);
@@ -75,6 +83,7 @@ export default function ProfilePage() {
   const [clubsCount, setClubsCount] = useState(0);
   const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
   const [showShowcasePicker, setShowShowcasePicker] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -95,12 +104,12 @@ export default function ProfilePage() {
       });
   }, [user]);
 
-  // Load ridden routes from context rideCounts Map (which handles Supabase + localStorage fallback)
+  // Load ridden routes (for feed row titles) from context rideCounts Map
   useEffect(() => {
     if (!user || !ridesLoaded) return;
     const routeIds = Array.from(rideCounts.keys());
     if (routeIds.length === 0) {
-      setRidesData([]);
+      setRiddenRoutes([]);
       setLoadingRides(false);
       return;
     }
@@ -109,7 +118,7 @@ export default function ProfilePage() {
       .select("*, author:profiles!author_id(*), route_images(url)")
       .in("id", routeIds)
       .then(({ data }) => {
-        if (data) setRidesData(data.map(dbToRoute));
+        if (data) setRiddenRoutes(data.map(dbToRoute));
         setLoadingRides(false);
       });
   }, [rideCounts, ridesLoaded, user]);
@@ -209,21 +218,88 @@ export default function ProfilePage() {
     e.target.value = "";
   };
 
-  const tripsCount = ridesData.length + myEvents.length;
-  // Profile stats are recomputed from route_rides (single source of truth),
-  // so the headline totals always match the per-year breakdown.
-  const totalKm = yearlyStats ? yearlyStats.reduce((sum, y) => sum + y.km, 0) : null;
-  const totalRides = yearlyStats ? yearlyStats.reduce((sum, y) => sum + y.rides, 0) : null;
+  const copyProfileLink = async () => {
+    await navigator.clipboard.writeText(`${window.location.origin}/users/${user!.id}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  // ---- Derived activity numbers. Everything comes from `entries`,
+  // so headline totals, heatmap, goal and feed always agree. ----
+  const totalKm = yearly ? yearly.reduce((sum, y) => sum + y.km, 0) : null;
+
+  const currentYear = new Date().getFullYear();
+
+  // Event participations without a marked ride still count as activity:
+  // they join the heatmap, the year facts and the feed as km-less entries.
+  const allActivity = useMemo(() => {
+    const covered = new Set(entries.map((e) => e.eventId).filter(Boolean));
+    const extras = myEvents
+      .filter((ev) => !covered.has(ev.id) && ev.start_date)
+      .map((ev) => ({ date: ev.start_date!, km: 0, routeId: null, eventId: ev.id }));
+    return [...entries, ...extras];
+  }, [entries, myEvents]);
+
+  const yearEntries = useMemo(
+    () => allActivity.filter((e) => e.date.slice(0, 4) === String(currentYear)),
+    [allActivity, currentYear],
+  );
+  const seasonKm = Math.round(yearEntries.reduce((s, e) => s + e.km, 0));
+  const longestKm = Math.round(yearEntries.reduce((m, e) => Math.max(m, e.km), 0));
+  const activeWeeks = useMemo(() => {
+    const weeks = new Set<string>();
+    for (const e of yearEntries) {
+      const d = new Date(e.date.slice(0, 10) + "T00:00:00Z");
+      d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); // Monday of that week
+      weeks.add(d.toISOString().slice(0, 10));
+    }
+    return weeks.size;
+  }, [yearEntries]);
+
+  const seasonGoal = profile?.season_goal_km ?? null;
+  const goalPct = seasonGoal ? Math.min(100, Math.round((seasonKm / seasonGoal) * 100)) : 0;
+
+  // ---- Unified "Заезды" feed: dated rides + event participations
+  // not already represented by a ride entry. Newest first. ----
+  const feed: FeedItem[] = useMemo(() => {
+    const routeById = new Map(riddenRoutes.map((r) => [r.id, r]));
+    // nth ride per route, counted from the oldest entry
+    const seen = new Map<string, number>();
+    const rideItems: FeedItem[] = [...entries]
+      .reverse()
+      .map((e) => {
+        const nth = e.routeId ? (seen.get(e.routeId) ?? 0) + 1 : 1;
+        if (e.routeId) seen.set(e.routeId, nth);
+        return {
+          type: "ride" as const,
+          date: e.date,
+          km: Math.round(e.km),
+          route: e.routeId ? routeById.get(e.routeId) ?? null : null,
+          routeId: e.routeId,
+          nth,
+        };
+      });
+    const coveredEvents = new Set(entries.map((e) => e.eventId).filter(Boolean));
+    const eventItems: FeedItem[] = myEvents
+      .filter((ev) => !coveredEvents.has(ev.id))
+      .map((ev) => ({ type: "event" as const, date: ev.start_date, event: ev }));
+    return [...rideItems, ...eventItems].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  }, [entries, riddenRoutes, myEvents]);
+
+  const loadingFeed = !activityLoaded || loadingEvents || loadingRides;
+
+  const isNewUser = profile
+    ? PAGE_LOADED_AT - new Date(profile.created_at).getTime() < CHECKLIST_WINDOW_MS
+    : false;
 
   const initials = profile?.name
     ? profile.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
     : "?";
 
   const TABS: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode; count: number }[] = [
-    { id: "routes",       label: "Мои маршруты", shortLabel: "Маршруты",   icon: <Map size={15} />,      count: myRoutes.length },
-    { id: "favorites",    label: "Сохранённые",  shortLabel: "Сохранённые", icon: <Bookmark size={15} />, count: favoriteRoutes.length },
-    { id: "events",       label: "Активность",   shortLabel: "Активность", icon: <Calendar size={15} />, count: tripsCount },
-    { id: "achievements", label: "Достижения",   shortLabel: "Достижения", icon: <Trophy size={15} />,   count: earnedIds.size },
+    { id: "routes",       label: "Маршруты",   shortLabel: "Маршруты",   icon: <MapIcon size={15} />,    count: myRoutes.length },
+    { id: "rides",        label: "Заезды",     shortLabel: "Заезды",     icon: <Bike size={15} />,   count: feed.length },
+    { id: "achievements", label: "Достижения", shortLabel: "Достижения", icon: <Trophy size={15} />, count: earnedIds.size },
   ];
 
   if (authLoading) {
@@ -245,39 +321,52 @@ export default function ProfilePage() {
       <main className="max-w-4xl mx-auto px-4 py-8">
         {/* Profile header */}
         <div className="bg-white rounded-2xl p-6 border border-[#E4E4E7] mb-6" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-          {/* Action buttons */}
-          <div className="flex items-center justify-end gap-0.5 mb-2 -mt-1">
-            <Link
-              href={`/users/${user.id}`}
-              target="_blank"
-              title="Посмотреть как гость"
-              className="flex items-center justify-center w-9 h-9 rounded-lg text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors"
-            >
-              <Eye size={16} />
-            </Link>
-            <button
-              onClick={async () => {
-                await navigator.clipboard.writeText(`${window.location.origin}/users/${user.id}`);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-              }}
-              title="Скопировать ссылку на профиль"
-              className="flex items-center justify-center w-9 h-9 rounded-lg text-[#71717A] hover:text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors"
-            >
-              {copied ? <Check size={16} className="text-green-500" /> : <Link2 size={16} />}
-            </button>
+          {/* Action buttons: settings is the frequent action, the rest lives in "…" */}
+          <div className="flex items-center justify-end gap-1 mb-2 -mt-1">
             <Link
               href="/profile/settings"
-              title="Настройки"
-              className="flex items-center gap-1.5 text-sm text-[#71717A] hover:text-[#1C1C1E] transition-colors h-9 px-2 rounded-lg hover:bg-[#F5F4F1]"
+              className="flex items-center gap-1.5 text-sm text-[#52525B] hover:text-[#1C1C1E] transition-colors h-9 px-3 rounded-lg border border-[#E4E4E7] hover:bg-[#F5F4F1]"
             >
-              <Settings size={16} /><span className="hidden sm:inline">Настройки</span>
+              <Settings size={15} /><span className="hidden sm:inline">Настройки</span>
             </Link>
+            <div className="relative">
+              <button
+                onClick={() => setMenuOpen((v) => !v)}
+                title="Ещё"
+                aria-label="Ещё"
+                className="flex items-center justify-center w-9 h-9 rounded-lg text-[#71717A] hover:text-[#1C1C1E] border border-[#E4E4E7] hover:bg-[#F5F4F1] transition-colors"
+              >
+                <MoreHorizontal size={16} />
+              </button>
+              {menuOpen && (
+                <>
+                  <div className="fixed inset-0 z-20" onClick={() => setMenuOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1 z-30 w-56 bg-white rounded-xl border border-[#E4E4E7] py-1" style={{ boxShadow: "0 4px 16px 0 rgb(0 0 0 / 0.1)" }}>
+                    <Link
+                      href={`/users/${user.id}`}
+                      target="_blank"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors"
+                    >
+                      <Eye size={15} className="text-[#71717A]" /> Посмотреть как гость
+                    </Link>
+                    <button
+                      onClick={copyProfileLink}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors"
+                    >
+                      {copied
+                        ? <><Check size={15} className="text-green-500" /> Скопировано</>
+                        : <><Link2 size={15} className="text-[#71717A]" /> Скопировать ссылку</>}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Left: identity */}
-            <div className="flex items-start gap-5 lg:w-[42%] lg:shrink-0">
+            <div className="flex items-start gap-5 lg:w-[45%] lg:shrink-0">
             <div className="relative shrink-0 group">
               <div
                 className={`w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center text-xl font-bold text-white${avatarUrl ? " cursor-pointer" : ""}`}
@@ -336,36 +425,43 @@ export default function ProfilePage() {
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <div>
-                <div className="min-w-0">
-                  <h1 className="text-xl font-bold text-[#1C1C1E] truncate">{profile?.name || "Участник"}</h1>
-                  {profile?.username && <p className="text-sm font-medium mt-0.5" style={{ color: "#F4632A" }}>@{profile.username}</p>}
-                  {profile?.bio && <p className="text-sm text-[#71717A] mt-1">{profile.bio}</p>}
-                  {(profile?.website || profile?.strava_url) && (
-                    <div className="flex items-center gap-3 mt-2 flex-wrap">
-                      {profile.website && (
-                        <a href={profile.website} target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-xs text-[#7C5CFC] hover:underline">
-                          <Globe size={12} />
-                          {(() => { try { return new URL(profile.website!).hostname.replace("www.", ""); } catch { return profile.website; } })()}
-                          <ExternalLink size={10} />
-                        </a>
-                      )}
-                      {profile.strava_url && (
-                        <a href={profile.strava_url} target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-xs font-medium hover:underline"
-                          style={{ color: "#FC4C02" }}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
-                          </svg>
-                          Strava
-                          <ExternalLink size={10} />
-                        </a>
-                      )}
-                    </div>
+              <h1 className="text-xl font-bold text-[#1C1C1E] truncate">{profile?.name || "Участник"}</h1>
+              {profile?.username && <p className="text-sm font-medium mt-0.5" style={{ color: "#F4632A" }}>@{profile.username}</p>}
+              {profile?.bio && <p className="text-sm text-[#71717A] mt-1">{profile.bio}</p>}
+              {(profile?.website || profile?.strava_url) && (
+                <div className="flex items-center gap-3 mt-2 flex-wrap">
+                  {profile.website && (
+                    <a href={profile.website} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-[#7C5CFC] hover:underline">
+                      <Globe size={12} />
+                      {(() => { try { return new URL(profile.website!).hostname.replace("www.", ""); } catch { return profile.website; } })()}
+                      <ExternalLink size={10} />
+                    </a>
+                  )}
+                  {profile.strava_url && (
+                    <a href={profile.strava_url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs font-medium hover:underline"
+                      style={{ color: "#FC4C02" }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
+                      </svg>
+                      Strava
+                      <ExternalLink size={10} />
+                    </a>
                   )}
                 </div>
-              </div>
+              )}
+              {/* Showcase: compact badges inside the identity block, not a separate card */}
+              {achievementsLoaded && (
+                <div className="mt-3">
+                  <ProfileShowcase
+                    showcaseIds={showcaseIds}
+                    achievements={achievements}
+                    earnedLevels={earnedLevels}
+                    onEdit={() => setShowShowcasePicker(true)}
+                  />
+                </div>
+              )}
               {/* Social row */}
               <div className="flex items-center gap-2 mt-2.5 text-xs text-[#A1A1AA] flex-wrap">
                 <Link href={`/users/${user.id}/followers`} className="hover:text-[#71717A] hover:underline transition-colors">
@@ -376,7 +472,7 @@ export default function ProfilePage() {
                   {followingCount} {followingCount === 1 ? "подписка" : followingCount < 5 ? "подписки" : "подписок"}
                 </Link>
                 <span>·</span>
-                <Link href="/clubs" className="hover:text-[#71717A] hover:underline transition-colors">
+                <Link href="/clubs?tab=mine" className="hover:text-[#71717A] hover:underline transition-colors">
                   {clubsCount} {clubsCount === 1 ? "клуб" : clubsCount < 5 ? "клуба" : "клубов"}
                 </Link>
               </div>
@@ -388,10 +484,11 @@ export default function ProfilePage() {
 
             {/* Right: stats dashboard */}
             <div className="flex-1 min-w-0">
-              <div className="grid grid-cols-3 gap-2.5 mb-5">
+              <div className="grid grid-cols-3 gap-2.5">
                 {[
                   { value: totalKm == null ? "…" : totalKm.toLocaleString("ru-RU"), label: "км всего", accent: true },
-                  { value: totalRides == null ? "…" : totalRides, label: "поездок", accent: false },
+                  // Same source as the "Заезды" tab badge and feed — the numbers must match.
+                  { value: loadingFeed ? "…" : feed.length, label: feed.length === 1 ? "заезд" : feed.length > 1 && feed.length < 5 ? "заезда" : "заездов", accent: false },
                   { value: myRoutes.length, label: "маршрутов", accent: false },
                 ].map(({ value, label, accent }) => (
                   <div key={label} className="bg-[#F5F4F1] rounded-xl px-3 py-2.5">
@@ -400,25 +497,54 @@ export default function ProfilePage() {
                   </div>
                 ))}
               </div>
-              <YearlyStats stats={yearlyStats} />
+
+              {/* Season goal */}
+              <div className="mt-4">
+                {seasonGoal ? (
+                  <div className="bg-[#F5F4F1] rounded-xl px-4 py-3">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-xs font-semibold text-[#1C1C1E] flex items-center gap-1.5">
+                        <Target size={13} style={{ color: "#F4632A" }} /> Цель сезона {currentYear}
+                      </span>
+                      <span className="text-xs text-[#71717A]">
+                        <span className="font-semibold" style={{ color: "#F4632A" }}>{seasonKm.toLocaleString("ru-RU")}</span>
+                        {" из "}{seasonGoal.toLocaleString("ru-RU")} км · {goalPct}%
+                      </span>
+                    </div>
+                    <div className="h-2 rounded-full bg-[#E7E5E0] overflow-hidden mt-2">
+                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${goalPct}%`, backgroundColor: "#F4632A" }} />
+                    </div>
+                  </div>
+                ) : (
+                  <Link
+                    href="/profile/settings"
+                    className="flex items-center gap-1.5 text-xs text-[#A1A1AA] hover:text-[#F4632A] transition-colors"
+                  >
+                    <Target size={13} /> Задать цель сезона →
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* Activity heatmap: full card width, current year at a glance */}
+          {activityLoaded && allActivity.length > 0 && (
+            <div className="mt-5 pt-4 border-t border-[#F0EFEC]">
+              <h3 className="font-bold text-xs uppercase tracking-wide text-[#71717A] mb-3">
+                Активность · {currentYear}
+              </h3>
+              <ActivityHeatmap entries={allActivity} year={currentYear} />
+              <div className="flex items-center gap-x-5 gap-y-1 flex-wrap mt-2 text-xs text-[#71717A]">
+                <span><span className="text-sm font-semibold text-[#1C1C1E]">{yearEntries.length}</span> {yearEntries.length === 1 ? "заезд" : yearEntries.length < 5 ? "заезда" : "заездов"} в этом году</span>
+                {longestKm > 0 && <span><span className="text-sm font-semibold text-[#1C1C1E]">{longestKm} км</span> самый длинный</span>}
+                {activeWeeks > 0 && <span><span className="text-sm font-semibold text-[#1C1C1E]">{activeWeeks}</span> {activeWeeks === 1 ? "активная неделя" : activeWeeks < 5 ? "активные недели" : "активных недель"}</span>}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Showcase */}
-        {achievementsLoaded && (
-          <div className="mb-6">
-            <ProfileShowcase
-              showcaseIds={showcaseIds}
-              achievements={achievements}
-              earnedLevels={earnedLevels}
-              onEdit={() => setShowShowcasePicker(true)}
-            />
-          </div>
-        )}
-
-        {/* Setup checklist — replaces separate "fill profile" and Telegram banners */}
-        {profile && (
+        {/* Setup checklist — new users only, first two weeks */}
+        {profile && isNewUser && (
           <SetupChecklist
             hasBio={!!profile.bio}
             hasAvatar={!!avatarUrl}
@@ -462,131 +588,123 @@ export default function ProfilePage() {
 
         {activeTab === "routes" && (
           <section>
-            {loadingRoutes ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {[1, 2].map((i) => <div key={i} className="h-64 bg-white rounded-2xl animate-pulse border border-[#E4E4E7]" />)}
-              </div>
-            ) : myRoutes.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {myRoutes.map((route) => <RouteCard key={route.id} route={route} />)}
-              </div>
-            ) : (
-              <EmptyState icon={<Map size={28} />} title="Пока нет маршрутов"
-                text="Поделись своим любимым маршрутом — покажи его другим велосипедистам"
-                action={<Link href="/routes/new" className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl text-white" style={{ backgroundColor: "#F4632A" }}>
-                  <Map size={16} /> Добавить маршрут
-                </Link>}
-              />
-            )}
-          </section>
-        )}
-
-        {activeTab === "favorites" && (
-          <section>
-            {loadingFavorites ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {[1, 2].map((i) => <div key={i} className="h-64 bg-white rounded-2xl animate-pulse border border-[#E4E4E7]" />)}
-              </div>
-            ) : favoriteRoutes.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {favoriteRoutes.map((route) => <RouteCard key={route.id} route={route} />)}
-              </div>
-            ) : (
-              <EmptyState icon={<Bookmark size={28} />} title="Нет избранных маршрутов"
-                text="Найди интересный маршрут и сохрани его, чтобы не потерять"
-                action={<Link href="/routes" className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl text-white" style={{ backgroundColor: "#F4632A" }}>
-                  <Map size={16} /> Найти маршрут
-                </Link>}
-              />
-            )}
-          </section>
-        )}
-
-        {activeTab === "events" && (
-          <section>
-            {/* Sub-tabs */}
-            <div className="flex gap-1 bg-white rounded-xl p-1 border border-[#E4E4E7] mb-5" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+            {/* Filter chips: my routes / saved */}
+            <div className="flex items-center gap-2 mb-5">
               {([
-                { id: "rides" as const,       label: "Катанул",     icon: <Bike size={14} />,     count: ridesData.length },
-                { id: "events_list" as const, label: "Мероприятия", icon: <Calendar size={14} />, count: myEvents.length },
-              ]).map((sub) => (
-                <button key={sub.id} onClick={() => setEventsSubTab(sub.id)}
-                  className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-all"
-                  style={eventsSubTab === sub.id ? { backgroundColor: "#1C1C1E", color: "white" } : { color: "#71717A" }}>
-                  {sub.icon}
-                  {sub.label}
-                  {sub.count > 0 && (
-                    <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full"
-                      style={eventsSubTab === sub.id
-                        ? { backgroundColor: "rgba(255,255,255,0.2)", color: "white" }
-                        : { backgroundColor: "#F5F4F1", color: "#71717A" }}>
-                      {sub.count}
-                    </span>
-                  )}
+                { id: "mine" as const,  label: "Мои",         count: myRoutes.length },
+                { id: "saved" as const, label: "Сохранённые", count: favoriteRoutes.length },
+              ]).map((chip) => (
+                <button key={chip.id} onClick={() => setRoutesFilter(chip.id)}
+                  className="flex items-center gap-1.5 text-xs font-medium px-3.5 py-2 rounded-full border transition-colors"
+                  style={routesFilter === chip.id
+                    ? { backgroundColor: "#1C1C1E", color: "white", borderColor: "#1C1C1E" }
+                    : { backgroundColor: "white", color: "#71717A", borderColor: "#E4E4E7" }}>
+                  {chip.id === "saved" && <Bookmark size={12} />}
+                  {chip.label} · {chip.count}
                 </button>
               ))}
             </div>
 
-            {eventsSubTab === "rides" && (
-              loadingRides ? (
+            {routesFilter === "mine" && (
+              loadingRoutes ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {[1, 2].map((i) => <div key={i} className="h-64 bg-white rounded-2xl animate-pulse border border-[#E4E4E7]" />)}
                 </div>
-              ) : ridesData.length > 0 ? (
+              ) : myRoutes.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {ridesData.map((route) => <RouteCard key={route.id} route={route} />)}
+                  {myRoutes.map((route) => <RouteCard key={route.id} route={route} />)}
                 </div>
               ) : (
-                <EmptyState icon={<Bike size={28} />} title="Нет прокатанных маршрутов"
-                  text='Открой любой маршрут и нажми "Отметить проезд", чтобы добавить его в свои поездки'
-                  action={<Link href="/routes" className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl text-white" style={{ backgroundColor: "#F4632A" }}>
-                    <Bike size={16} /> Найти маршрут
+                <EmptyState icon={<MapIcon size={28} />} title="Пока нет маршрутов"
+                  text="Поделись своим любимым маршрутом — покажи его другим велосипедистам"
+                  action={<Link href="/routes/new" className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl text-white" style={{ backgroundColor: "#F4632A" }}>
+                    <MapIcon size={16} /> Добавить маршрут
                   </Link>}
                 />
               )
             )}
 
-            {eventsSubTab === "events_list" && (
-              loadingEvents ? (
-                <div className="space-y-3">
-                  {[1, 2].map((i) => <div key={i} className="h-20 bg-white rounded-2xl animate-pulse border border-[#E4E4E7]" />)}
+            {routesFilter === "saved" && (
+              loadingFavorites ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {[1, 2].map((i) => <div key={i} className="h-64 bg-white rounded-2xl animate-pulse border border-[#E4E4E7]" />)}
                 </div>
-              ) : myEvents.length > 0 ? (
-                <div className="space-y-3">
-                  {myEvents.map((ev) => (
-                    <Link key={ev.id} href={`/events/${ev.id}`}
-                      className="flex items-center gap-4 bg-white rounded-2xl p-4 border border-[#E4E4E7] hover:border-[#F4632A] transition-colors"
-                      style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                        style={{ backgroundColor: "#FFF0EB" }}>
-                        <Calendar size={18} style={{ color: "#F4632A" }} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm text-[#1C1C1E] truncate">{ev.title}</div>
-                        <div className="text-xs text-[#A1A1AA] mt-0.5">
-                          {ev.start_date ? formatDate(ev.start_date) : "Дата не указана"}
-                          {ev.organizer?.name && ` · ${ev.organizer.name}`}
-                        </div>
-                      </div>
-                      <ChevronRight size={16} className="text-[#A1A1AA] shrink-0" />
-                    </Link>
-                  ))}
+              ) : favoriteRoutes.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {favoriteRoutes.map((route) => <RouteCard key={route.id} route={route} />)}
                 </div>
               ) : (
-                <EmptyState icon={<Calendar size={28} />} title="Нет мероприятий"
-                  text="Запишись на групповую поездку или организуй свою"
-                  action={
-                    <div className="flex items-center gap-2 justify-center flex-wrap">
-                      <Link href="/routes?tab=events" className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl border border-[#E4E4E7] text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors">
-                        Найти поездку
-                      </Link>
-                      <Link href="/events/new" className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl text-white" style={{ backgroundColor: "#F4632A" }}>
-                        <Calendar size={16} /> Создать
-                      </Link>
-                    </div>
-                  }
+                <EmptyState icon={<Bookmark size={28} />} title="Нет сохранённых маршрутов"
+                  text="Найди интересный маршрут и сохрани его, чтобы не потерять"
+                  action={<Link href="/routes" className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl text-white" style={{ backgroundColor: "#F4632A" }}>
+                    <MapIcon size={16} /> Найти маршрут
+                  </Link>}
                 />
               )
+            )}
+          </section>
+        )}
+
+        {activeTab === "rides" && (
+          <section>
+            {loadingFeed ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => <div key={i} className="h-16 bg-white rounded-2xl animate-pulse border border-[#E4E4E7]" />)}
+              </div>
+            ) : feed.length > 0 ? (
+              <div className="bg-white rounded-2xl border border-[#E4E4E7] overflow-hidden" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
+                {feed.map((item, i) => {
+                  const isLast = i === feed.length - 1;
+                  if (item.type === "event") {
+                    return (
+                      <Link key={`ev-${item.event.id}`} href={`/events/${item.event.id}`}
+                        className={`flex items-center gap-3.5 px-4 py-3.5 hover:bg-[#FAFAF8] transition-colors${isLast ? "" : " border-b border-[#F4F4F5]"}`}>
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "#EEEDFE" }}>
+                          <Calendar size={17} style={{ color: "#7C5CFC" }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm text-[#1C1C1E] truncate">{item.event.title}</div>
+                          <div className="text-xs text-[#A1A1AA] mt-0.5">
+                            {item.date ? formatDate(item.date) : "Дата не указана"}
+                            {" · мероприятие"}
+                            {item.event.organizer?.name && ` · ${item.event.organizer.name}`}
+                          </div>
+                        </div>
+                        <ChevronRight size={16} className="text-[#A1A1AA] shrink-0" />
+                      </Link>
+                    );
+                  }
+                  const inner = (
+                    <>
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "#FFF0EB" }}>
+                        <Bike size={17} style={{ color: "#F4632A" }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm text-[#1C1C1E] truncate">{item.route?.title ?? "Маршрут удалён"}</div>
+                        <div className="text-xs text-[#A1A1AA] mt-0.5">
+                          {formatDate(item.date)}
+                          {item.km > 0 && ` · ${item.km} км`}
+                          {item.nth > 1 && ` · ${item.nth}-й заезд по маршруту`}
+                        </div>
+                      </div>
+                      {item.route && <ChevronRight size={16} className="text-[#A1A1AA] shrink-0" />}
+                    </>
+                  );
+                  const cls = `flex items-center gap-3.5 px-4 py-3.5 transition-colors${isLast ? "" : " border-b border-[#F4F4F5]"}`;
+                  return item.route ? (
+                    <Link key={`ride-${i}`} href={`/routes/${item.route.id}`} className={`${cls} hover:bg-[#FAFAF8]`}>{inner}</Link>
+                  ) : (
+                    <div key={`ride-${i}`} className={cls}>{inner}</div>
+                  );
+                })}
+              </div>
+            ) : (
+              <EmptyState icon={<Bike size={28} />} title="Пока нет заездов"
+                text='Открой любой маршрут и нажми "Отметить проезд" — заезд появится здесь'
+                action={<Link href="/routes" className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl text-white" style={{ backgroundColor: "#F4632A" }}>
+                  <Bike size={16} /> Найти маршрут
+                </Link>}
+              />
             )}
           </section>
         )}
@@ -657,22 +775,6 @@ export default function ProfilePage() {
       )}
     </div>
   );
-}
-
-function stravaErrorMessage(code: string): string {
-  // Mirrors the error codes emitted by /api/strava/callback/route.ts.
-  switch (code) {
-    case "denied":             return "Ты отменил подключение Strava";
-    case "missing_params":     return "Strava вернула неполный ответ — попробуй ещё раз";
-    case "not_signed_in":      return "Войди в аккаунт перед подключением Strava";
-    case "state_mismatch":
-    case "state_user_mismatch":return "Ссылка устарела — попробуй подключить ещё раз";
-    case "token_exchange":     return "Strava отказала в обмене токенов — попробуй позже";
-    case "no_athlete":         return "Strava не вернула профиль — попробуй ещё раз";
-    case "storage":            return "Не удалось сохранить подключение — попробуй позже";
-    case "profile_update":     return "Не удалось обновить профиль";
-    default:                   return "Не получилось подключить Strava — попробуй ещё раз";
-  }
 }
 
 function EmptyState({ icon, title, text, action }: { icon: React.ReactNode; title: string; text: string; action?: React.ReactNode }) {

@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { CommunityTabs } from "@/components/layout/CommunityTabs";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -81,16 +81,18 @@ function sortClubs(list: Club[], sort: Sort): Club[] {
   return arr;
 }
 
-export default function ClubsPage() {
+function ClubsPageInner() {
   const { user, loading: authLoading } = useAuth();
   const { requireAuth } = useAuthModal();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabFromQuery = searchParams.get("tab") === "mine";
 
   const [myClubs, setMyClubs] = useState<Club[]>([]);
   const [allClubs, setAllClubs] = useState<Club[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [tab, setTab] = useState<Tab>("all");
+  const [tab, setTab] = useState<Tab>(tabFromQuery ? "mine" : "all");
   const [sort, setSort] = useState<Sort>("activity");
   const [vis, setVis] = useState<VisFilter>("any");
   const [city, setCity] = useState<string>("");
@@ -102,7 +104,7 @@ export default function ClubsPage() {
   }, [authLoading, user]);
 
   useEffect(() => {
-    if (!loading && myClubs.length > 0 && tab === "all") setTab("mine");
+    if (!loading && myClubs.length > 0 && tab === "all" && !tabFromQuery) setTab("mine");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 
@@ -461,6 +463,14 @@ export default function ClubsPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function ClubsPage() {
+  return (
+    <Suspense>
+      <ClubsPageInner />
+    </Suspense>
   );
 }
 

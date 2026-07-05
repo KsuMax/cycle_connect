@@ -86,6 +86,8 @@ export interface DbProfile {
   email_notify_routes?: boolean;
   email_notify_clubs?: boolean;
   email_notify_digest?: boolean;
+  // Season km goal (migration 063). NULL until the user sets one.
+  season_goal_km?: number | null;
 }
 
 /**

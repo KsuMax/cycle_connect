@@ -9,6 +9,23 @@ export interface YearStat {
   km: number;
 }
 
+/** One dated ride event (a single "проезд" of a route or event participation ride). */
+export interface RideEntry {
+  /** ISO date/timestamp of the ride, best source available (see useRideActivity). */
+  date: string;
+  km: number;
+  routeId: string | null;
+  eventId: string | null;
+}
+
+export interface RideActivity {
+  /** Per-year aggregates, newest first. Null while loading. */
+  yearly: YearStat[] | null;
+  /** All dated rides, newest first. Empty while loading. */
+  entries: RideEntry[];
+  loaded: boolean;
+}
+
 /** Year string from an ISO date/timestamp ("YYYY-..."), avoiding timezone drift. */
 function yearOf(dateStr: string | null | undefined): number | null {
   if (!dateStr) return null;
@@ -17,20 +34,22 @@ function yearOf(dateStr: string | null | undefined): number | null {
 }
 
 /**
- * Aggregates a user's ridden routes by year, fully client-side.
+ * Loads a user's ride history from `route_rides`, fully client-side.
  *
- * Each ride in `route_rides` is dated by the most precise source available:
+ * Each ride is dated by the most precise source available:
  *   1. ride_reports.ridden_at linked via ride_id (actual ride date)
  *   2. events.end_date for rides created from an event
  *   3. route_rides.created_at (when the ride was marked in the app)
  *
- * Returns years sorted newest-first, or null while loading.
+ * Single source of truth for the profile page: headline totals, the
+ * activity heatmap, the season goal and the rides feed all derive from
+ * `entries`, so the numbers can never disagree.
  */
-export function useYearlyRideStats(userId: string | null | undefined): YearStat[] | null {
-  const [stats, setStats] = useState<YearStat[] | null>(null);
+export function useRideActivity(userId: string | null | undefined): RideActivity {
+  const [activity, setActivity] = useState<RideActivity>({ yearly: null, entries: [], loaded: false });
 
   useEffect(() => {
-    if (!userId) { setStats(null); return; }
+    if (!userId) { setActivity({ yearly: null, entries: [], loaded: false }); return; }
     let cancelled = false;
 
     (async () => {
@@ -40,7 +59,10 @@ export function useYearlyRideStats(userId: string | null | undefined): YearStat[
         .eq("user_id", userId);
 
       if (cancelled) return;
-      if (!rides || rides.length === 0) { setStats([]); return; }
+      if (!rides || rides.length === 0) {
+        setActivity({ yearly: [], entries: [], loaded: true });
+        return;
+      }
 
       type Ride = { id: string | null; route_id: string | null; event_id: string | null; created_at: string };
       const list = rides as Ride[];
@@ -72,29 +94,47 @@ export function useYearlyRideStats(userId: string | null | undefined): YearStat[
         if (rep.ride_id) riddenByRideId.set(rep.ride_id, rep.ridden_at);
       }
 
-      const byYear = new Map<number, { rides: number; km: number }>();
+      const entries: RideEntry[] = [];
       for (const r of list) {
         const dateStr =
           (r.id ? riddenByRideId.get(r.id) : null) ??
           (r.event_id ? endByEvent.get(r.event_id) : null) ??
           r.created_at;
-        const year = yearOf(dateStr);
-        if (year == null) continue;
+        if (yearOf(dateStr) == null) continue;
+        entries.push({
+          date: dateStr!,
+          km: r.route_id ? kmByRoute.get(r.route_id) ?? 0 : 0,
+          routeId: r.route_id,
+          eventId: r.event_id,
+        });
+      }
+      entries.sort((a, b) => b.date.localeCompare(a.date));
+
+      const byYear = new Map<number, { rides: number; km: number }>();
+      for (const e of entries) {
+        const year = yearOf(e.date)!;
         const cur = byYear.get(year) ?? { rides: 0, km: 0 };
         cur.rides += 1;
-        cur.km += r.route_id ? kmByRoute.get(r.route_id) ?? 0 : 0;
+        cur.km += e.km;
         byYear.set(year, cur);
       }
-
-      const out: YearStat[] = [...byYear.entries()]
+      const yearly: YearStat[] = [...byYear.entries()]
         .map(([year, v]) => ({ year, rides: v.rides, km: Math.round(v.km) }))
         .sort((a, b) => b.year - a.year);
 
-      setStats(out);
+      setActivity({ yearly, entries, loaded: true });
     })();
 
     return () => { cancelled = true; };
   }, [userId]);
 
-  return stats;
+  return activity;
+}
+
+/**
+ * Backward-compatible wrapper: per-year aggregates only.
+ * Used by the public profile page (/users/[id]).
+ */
+export function useYearlyRideStats(userId: string | null | undefined): YearStat[] | null {
+  return useRideActivity(userId).yearly;
 }

@@ -39,6 +39,7 @@ export default function SettingsPage() {
 
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
+  const [seasonGoalKm, setSeasonGoalKm] = useState("");
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [website, setWebsite] = useState("");
@@ -72,6 +73,7 @@ export default function SettingsPage() {
     if (profile) {
       setName(profile.name ?? "");
       setBio(profile.bio ?? "");
+      setSeasonGoalKm(profile.season_goal_km != null ? String(profile.season_goal_km) : "");
       setUsername(profile.username ?? "");
       setWebsite(profile.website ?? "");
       setStravaUrl(profile.strava_url ?? "");
@@ -166,7 +168,7 @@ export default function SettingsPage() {
       return;
     }
     // Update profile table
-    const profileUpdate: Record<string, string | boolean | null> = {
+    const profileUpdate: Record<string, string | boolean | number | null> = {
       name: name.trim(),
       bio: bio.trim() || null,
       username: username.trim() || null,
@@ -178,6 +180,7 @@ export default function SettingsPage() {
       email_notify_routes: emailNotifyRoutes,
       email_notify_clubs:  emailNotifyClubs,
       email_notify_digest: emailNotifyDigest,
+      season_goal_km: seasonGoalKm.trim() ? Number(seasonGoalKm) : null,
     };
     const { error: profileError } = await supabase
       .from("profiles")
@@ -281,6 +284,18 @@ export default function SettingsPage() {
                   className={`${INPUT_CLS} pl-7`}
                 />
               </div>
+            </Field>
+            <Field label="Цель на сезон, км" htmlFor="season-goal-km">
+              <input
+                id="season-goal-km"
+                type="number"
+                min={0}
+                value={seasonGoalKm}
+                onChange={(e) => setSeasonGoalKm(e.target.value)}
+                placeholder="2000"
+                className={INPUT_CLS}
+              />
+              <p className="text-[11px] text-[#A1A1AA] mt-1">Показывается прогресс к цели в личном кабинете</p>
             </Field>
           </Section>
 
