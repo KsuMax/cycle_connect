@@ -3,11 +3,15 @@ import { fetchTelegramChannel } from "./fetch-telegram";
 import { fetchForumSubforum } from "./fetch-forum";
 import { detectLinks, extractLinks } from "./link-detect";
 import { extractCandidate } from "./extract";
-import { telegramFetch } from "./proxied-fetch";
 import type { GrabberSource, RunSummary } from "./types";
 
 const MIN_CONFIDENCE = 0.3;
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://cycleconnect.cc";
+// api.telegram.org's Bot API is already reachable via the same reverse proxy
+// tg-notify/tg-webhook use (TELEGRAM_API_BASE) — no need for the SOCKS
+// tunnel here, that's only required for scraping t.me directly (see
+// fetch-telegram.ts), which the proxy doesn't serve.
+const TG_API_BASE = (process.env.TELEGRAM_API_BASE ?? "https://api.telegram.org").replace(/\/$/, "");
 
 export type GrabberMode = "telegram" | "forum";
 
@@ -125,11 +129,11 @@ async function sendDigest(admin: ReturnType<typeof createAdminSupabase>, count: 
     const chatId = row.telegram_chat_id as number | null;
     if (!chatId) continue;
     try {
-      await telegramFetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      await fetch(`${TG_API_BASE}/bot${token}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
-        timeoutMs: 5000,
+        signal: AbortSignal.timeout(5000),
       });
     } catch (err) {
       console.error("[grabber] telegram digest failed:", err instanceof Error ? err.message : err);
