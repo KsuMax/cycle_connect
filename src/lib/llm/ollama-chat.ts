@@ -29,11 +29,17 @@ export interface ChatMessage {
 /**
  * Send messages and receive a JSON-parsed response object.
  * Chain: OpenRouter (if key set) → Ollama local → DeepSeek (last resort).
+ *
+ * `maxTokens` counts REASONING tokens too on reasoning models (Nemotron):
+ * with a long prompt and the old fixed 256, the whole budget went to
+ * thinking and `content` came back empty. Callers with non-trivial prompts
+ * should pass 1024+.
  */
 export async function chatJSON(
   messages: ChatMessage[],
   timeoutMs = 5_000,
   numCtx = 1024,
+  maxTokens = 256,
 ): Promise<Record<string, unknown>> {
   // ── Primary: OpenRouter (rotate models on 429) ───────────────────────────
   if (OPENROUTER_API_KEY) {
@@ -53,7 +59,7 @@ export async function chatJSON(
           body: JSON.stringify({
             model,
             messages,
-            max_tokens: 256,
+            max_tokens: maxTokens,
             temperature: 0,
             response_format: { type: "json_object" },
           }),
@@ -69,9 +75,12 @@ export async function chatJSON(
           continue;
         }
         if (data.error) throw new Error(`openrouter: ${data.error.message}`);
-        const raw = data.choices?.[0]?.message?.content ?? "{}";
+        const raw = data.choices?.[0]?.message?.content ?? "";
         const match = raw.match(/\{[\s\S]*\}/);
-        if (!match) return {};
+        // Empty content is a real failure mode (reasoning models burning the
+        // whole token budget before emitting JSON) — try the next model
+        // rather than silently handing the caller an empty object.
+        if (!match) throw new Error("empty or non-JSON content");
         return JSON.parse(match[0]) as Record<string, unknown>;
       } catch (err) {
         console.warn(
@@ -134,7 +143,7 @@ export async function chatJSON(
       body: JSON.stringify({
         model: "deepseek-chat",
         messages,
-        max_tokens: 256,
+        max_tokens: maxTokens,
         temperature: 0,
         response_format: { type: "json_object" },
       }),

@@ -47,7 +47,8 @@ export async function extractCandidate(
         { role: "user", content: userMessage },
       ],
       60_000,
-      4096
+      4096,
+      2048 // reasoning models think before answering; 256 left content empty
     );
     if (!("is_route" in result)) {
       // chatJSON's total-failure signature is {}, but a 200 with empty
