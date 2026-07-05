@@ -22,13 +22,15 @@ describe("toMapMagicEmbed", () => {
       .toBe("https://mapmagic.app/embed?routes=9R8OXG0&title=y");
   });
 
-  it("чужие сервисы не трогает, кроме прежнего embed=1", () => {
-    expect(toMapMagicEmbed("https://example.com/route/42"))
-      .toBe("https://example.com/route/42?embed=1");
+  it("чужие сервисы → null (их рисуем из GPX, не через iframe)", () => {
+    // Раньше дописывался embed=1, но их страницы отдают X-Frame-Options и в
+    // iframe рисуются пустым окном — теперь такие маршруты идут на карту из GPX.
+    expect(toMapMagicEmbed("https://example.com/route/42")).toBeNull();
+    expect(toMapMagicEmbed("https://esya.ru/route/foo-n17r3oqnf9")).toBeNull();
   });
 
-  it("mapmagic без routes ведёт себя как раньше", () => {
-    expect(toMapMagicEmbed("https://mapmagic.app/")).toBe("https://mapmagic.app/?embed=1");
+  it("mapmagic без routes → null (нечего встраивать)", () => {
+    expect(toMapMagicEmbed("https://mapmagic.app/")).toBeNull();
   });
 
   it("мусор и пустота → null", () => {

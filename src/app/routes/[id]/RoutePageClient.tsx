@@ -26,6 +26,8 @@ import { SendToNavigator } from "@/components/routes/SendToNavigator";
 import { PostRideSheet } from "@/components/routes/PostRideSheet";
 import { ymGoal } from "@/lib/ym";
 import { toMapMagicEmbed } from "@/lib/mapmagic";
+import { mapProviderName, isEmbeddableMapUrl } from "@/lib/map-provider";
+import { RouteMap } from "@/components/routes/RouteMap";
 import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users, Download, Train, Bus, CarTaxiFront, Route as RouteIcon, MoreVertical, Navigation, Star } from "lucide-react";
 import type { ExitPointKind } from "@/types";
 import { formatDate } from "@/lib/utils";
@@ -634,10 +636,14 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
             {/* Mobile: сводка первой — что за маршрут, до карты и фото */}
             <div className="lg:hidden">{renderSummaryCard(true)}</div>
 
-            {/* Map */}
+            {/* Map. Only MapMagic can be iframed (others send X-Frame-Options →
+                blank window); for every other planner we draw the track from
+                our own GPX. See lib/map-provider.ts. */}
             <div className="bg-white rounded-2xl overflow-hidden border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-              {route.mapmagic_embed ? (
+              {isEmbeddableMapUrl(route.mapmagic_url ?? route.mapmagic_embed) && route.mapmagic_embed ? (
                 <iframe src={toMapMagicEmbed(route.mapmagic_embed, route.title) ?? route.mapmagic_embed} className="w-full" style={{ height: 400, border: "none" }} allowFullScreen />
+              ) : route.gpx_url ? (
+                <RouteMap gpxUrl={route.gpx_url} height={400} />
               ) : (
                 <div className="relative bg-gradient-to-br from-[#E6FAF9] to-[#D1FAF7] flex items-center justify-center" style={{ height: 400 }}>
                   <div className="text-center text-[#71717A]">
@@ -652,7 +658,7 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
                     <a href={route.mapmagic_url} target="_blank" rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-opacity hover:opacity-80"
                       style={{ backgroundColor: "#FFF7ED", color: "#F4632A" }}>
-                      <ExternalLink size={13} /> Открыть в MapMagic
+                      <ExternalLink size={13} /> Открыть в {mapProviderName(route.mapmagic_url) ?? "источнике"}
                     </a>
                   )}
                   {route.gpx_url && (

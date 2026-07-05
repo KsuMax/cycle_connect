@@ -18,7 +18,15 @@ export interface GpxStats {
 
 /** Parse a GPX file and extract all trackpoints. */
 export async function parseGpxFile(file: File): Promise<GpxGeometry> {
-  const text = await file.text();
+  return parseGpxText(await file.text());
+}
+
+/**
+ * Parse a GPX document (as text) into trackpoints. Browser-only — relies on
+ * DOMParser. Shared by the upload flow (parseGpxFile) and the route-page map,
+ * which fetches the stored GPX and draws the track itself.
+ */
+export function parseGpxText(text: string): GpxGeometry {
   const doc = new DOMParser().parseFromString(text, "application/xml");
 
   // Prioritise one point type to avoid doubling distance when a GPX contains
