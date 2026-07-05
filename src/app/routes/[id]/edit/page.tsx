@@ -295,7 +295,7 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
         difficulty,
         surface: surfaces,
         route_types: routeTypes,
-        poi_tags: poiTags.length > 0 ? poiTags : null,
+        poi_tags: poiTags,
         season_months: seasonMonths.length > 0 ? seasonMonths : null,
         mapmagic_url: mapUrl || null,
         mapmagic_embed: toMapMagicEmbed(mapUrl, title.trim()),

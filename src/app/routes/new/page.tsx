@@ -328,8 +328,6 @@ export default function NewRoutePage() {
         surface: surfaces,
         route_types: routeTypes,
         tags: [],
-        poi_tags: null,
-        season_months: null,
         mapmagic_url: mapUrl || null,
         mapmagic_embed: toMapMagicEmbed(mapUrl, title.trim()),
         club_id: clubId || null,
@@ -341,7 +339,7 @@ export default function NewRoutePage() {
       .single();
 
     if (routeError || !routeData) {
-      setError("Не удалось сохранить маршрут. Попробуй ещё раз.");
+      setError(`Не удалось сохранить маршрут. ${routeError?.message ?? "Попробуй ещё раз."}`);
       setSubmitting(false);
       return;
     }
