@@ -50,7 +50,8 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
   const [seasonMonths, setSeasonMonths] = useState<number[]>([]);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [existingImages, setExistingImages] = useState<{ url: string; storage_path: string }[]>([]);
+  const [existingImages, setExistingImages] = useState<{ url: string; storage_path: string | null }[]>([]);
+  const [removedImages, setRemovedImages] = useState<{ url: string; storage_path: string | null }[]>([]);
   const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
   const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
   const [existingGpxPath, setExistingGpxPath] = useState<string | null>(null);
@@ -192,6 +193,11 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
     setNewImageFiles(files);
   };
 
+  const removeExistingImage = (img: { url: string; storage_path: string | null }) => {
+    setExistingImages((prev) => prev.filter((i) => i.url !== img.url));
+    setRemovedImages((prev) => [...prev, img]);
+  };
+
   const handleGpxChange = async (f: File | null) => {
     setGpxFile(f);
     if (f) {
@@ -322,6 +328,25 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
       }
     } else if (coverPreview === null) {
       await supabase.from("routes").update({ cover_url: null }).eq("id", id);
+    }
+
+    if (removedImages.length > 0) {
+      const { error: deleteError } = await supabase
+        .from("route_images")
+        .delete()
+        .eq("route_id", id)
+        .in("url", removedImages.map((img) => img.url));
+      if (deleteError) {
+        showToast("Не удалось удалить фотографии. Попробуй ещё раз.", "error");
+      } else {
+        const paths = removedImages
+          .map((img) => img.storage_path)
+          .filter((p): p is string => Boolean(p));
+        if (paths.length > 0) {
+          // Best-effort: an orphaned file in storage is harmless
+          await supabase.storage.from("route-images").remove(paths);
+        }
+      }
     }
 
     for (const file of newImageFiles) {
@@ -689,10 +714,21 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
           {/* Existing photos */}
           {existingImages.length > 0 && (
             <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-              <label className="block text-sm font-semibold text-[#1C1C1E] mb-3">Текущие фотографии</label>
+              <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">Текущие фотографии</label>
+              <p className="text-xs text-[#71717A] mb-3">Нажми ×, чтобы убрать фото — оно удалится при сохранении</p>
               <div className="flex flex-wrap gap-2">
                 {existingImages.map((img) => (
-                  <Image key={img.url} src={proxyImageUrl(img.url) ?? img.url} alt="" width={96} height={96} className="object-cover rounded-xl border border-[#E4E4E7]" />
+                  <div key={img.url} className="relative">
+                    <Image src={proxyImageUrl(img.url) ?? img.url} alt="" width={96} height={96} className="object-cover rounded-xl border border-[#E4E4E7]" />
+                    <button
+                      type="button"
+                      onClick={() => removeExistingImage(img)}
+                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white text-xs flex items-center justify-center hover:bg-black/80"
+                      title="Убрать"
+                    >
+                      ×
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
