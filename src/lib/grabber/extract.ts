@@ -36,12 +36,18 @@ export async function extractCandidate(
 
   let result: Record<string, unknown> | null;
   try {
+    // Generous timeout + context: this runs in a background job where
+    // latency is free, and the Ollama fallback is a small CPU model that
+    // needs ~30s cold. The default num_ctx=1024 silently truncates our
+    // ~1300-token prompt (system + 3000 chars of post), which is worse
+    // than slow — the model classifies a cut-off post.
     result = await chatJSON(
       [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userMessage },
       ],
-      15_000
+      60_000,
+      4096
     );
     if (!("is_route" in result)) result = null;
   } catch (err) {
