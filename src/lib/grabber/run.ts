@@ -20,6 +20,71 @@ const MODE_TO_SOURCE_TYPE = {
   forum: "ips-forum",
 } as const;
 
+type Admin = ReturnType<typeof createAdminSupabase>;
+
+/** Fetch → filter → LLM-extract → insert for one source. Never throws. */
+async function processSource(admin: Admin, source: GrabberSource): Promise<RunSummary> {
+  const summary: RunSummary = {
+    source: source.label ?? source.identifier,
+    fetched: 0,
+    filtered: 0,
+    llmCalls: 0,
+    inserted: 0,
+  };
+
+  try {
+    const { posts, nextCursor } =
+      source.type === "telegram-preview"
+        ? await fetchTelegramChannel(source.identifier, source.cursor)
+        : await fetchForumSubforum(source.identifier, source.cursor);
+
+    summary.fetched = posts.length;
+
+    for (const post of posts) {
+      // Hard pre-filter in code: no link, no candidate — enforced before
+      // spending an LLM call, per product decision (any link qualifies).
+      if (extractLinks(post.text).length === 0) continue;
+      summary.filtered++;
+
+      const links = await detectLinks(post.text);
+      summary.llmCalls++;
+      const draft = await extractCandidate(post, links);
+      if (!draft || draft.confidence < MIN_CONFIDENCE) continue;
+
+      const { error: insertErr } = await admin.from("grabber_candidates").upsert(
+        {
+          source_id: source.id,
+          permalink: draft.permalink,
+          title: draft.title,
+          region: draft.region,
+          summary: draft.summary,
+          links: draft.links,
+          confidence: draft.confidence,
+          raw_snippet: draft.rawSnippet,
+        },
+        { onConflict: "source_id,permalink", ignoreDuplicates: true }
+      );
+      if (!insertErr) summary.inserted++;
+    }
+
+    await admin
+      .from("grabber_sources")
+      .update({ cursor: nextCursor, last_run_at: new Date().toISOString(), last_error: null })
+      .eq("id", source.id);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    summary.error = message;
+    console.error(`[grabber] source ${source.identifier} failed:`, message);
+    await admin
+      .from("grabber_sources")
+      .update({ last_run_at: new Date().toISOString(), last_error: message })
+      .eq("id", source.id);
+  }
+
+  return summary;
+}
+
+/** Cron entry point: every enabled source of one type (telegram or forum). */
 export async function runGrabber(mode: GrabberMode): Promise<RunSummary[]> {
   const admin = createAdminSupabase();
   const sourceType = MODE_TO_SOURCE_TYPE[mode];
@@ -41,66 +106,8 @@ export async function runGrabber(mode: GrabberMode): Promise<RunSummary[]> {
   // Sequential on purpose: forum sources share a host and must respect its
   // crawl-delay across subforums, not just within one.
   for (const source of (sources ?? []) as GrabberSource[]) {
-    const summary: RunSummary = {
-      source: source.label ?? source.identifier,
-      fetched: 0,
-      filtered: 0,
-      llmCalls: 0,
-      inserted: 0,
-    };
-
-    try {
-      const { posts, nextCursor } =
-        mode === "telegram"
-          ? await fetchTelegramChannel(source.identifier, source.cursor)
-          : await fetchForumSubforum(source.identifier, source.cursor);
-
-      summary.fetched = posts.length;
-
-      for (const post of posts) {
-        // Hard pre-filter in code: no link, no candidate — enforced before
-        // spending an LLM call, per product decision (any link qualifies).
-        if (extractLinks(post.text).length === 0) continue;
-        summary.filtered++;
-
-        const links = await detectLinks(post.text);
-        summary.llmCalls++;
-        const draft = await extractCandidate(post, links);
-        if (!draft || draft.confidence < MIN_CONFIDENCE) continue;
-
-        const { error: insertErr } = await admin.from("grabber_candidates").upsert(
-          {
-            source_id: source.id,
-            permalink: draft.permalink,
-            title: draft.title,
-            region: draft.region,
-            summary: draft.summary,
-            links: draft.links,
-            confidence: draft.confidence,
-            raw_snippet: draft.rawSnippet,
-          },
-          { onConflict: "source_id,permalink", ignoreDuplicates: true }
-        );
-        if (!insertErr) {
-          summary.inserted++;
-          totalInserted++;
-        }
-      }
-
-      await admin
-        .from("grabber_sources")
-        .update({ cursor: nextCursor, last_run_at: new Date().toISOString(), last_error: null })
-        .eq("id", source.id);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      summary.error = message;
-      console.error(`[grabber] source ${source.identifier} failed:`, message);
-      await admin
-        .from("grabber_sources")
-        .update({ last_run_at: new Date().toISOString(), last_error: message })
-        .eq("id", source.id);
-    }
-
+    const summary = await processSource(admin, source);
+    totalInserted += summary.inserted;
     summaries.push(summary);
   }
 
@@ -111,7 +118,26 @@ export async function runGrabber(mode: GrabberMode): Promise<RunSummary[]> {
   return summaries;
 }
 
-async function sendDigest(admin: ReturnType<typeof createAdminSupabase>, count: number): Promise<void> {
+/** "Проверить" button in /admin/grabber: run just this one source, right now. */
+export async function runGrabberSource(sourceId: string): Promise<RunSummary> {
+  const admin = createAdminSupabase();
+
+  const { data: source, error } = await admin
+    .from("grabber_sources")
+    .select("id, type, identifier, label, enabled, cursor")
+    .eq("id", sourceId)
+    .single();
+
+  if (error || !source) {
+    return { source: sourceId, fetched: 0, filtered: 0, llmCalls: 0, inserted: 0, error: "source not found" };
+  }
+
+  const summary = await processSource(admin, source as GrabberSource);
+  if (summary.inserted > 0) await sendDigest(admin, summary.inserted);
+  return summary;
+}
+
+async function sendDigest(admin: Admin, count: number): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) return;
 
