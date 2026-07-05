@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import * as https from "node:https";
+import { SocksProxyAgent } from "socks-proxy-agent";
 import { createAdminSupabase } from "@/lib/supabase-admin";
 
 interface OpenMeteoResponse {
@@ -31,6 +33,43 @@ function json(data: unknown, status = 200) {
   return NextResponse.json(data, { status });
 }
 
+// api.open-meteo.com is unreachable via direct TCP from the prod VPS (and
+// from RU generally — Hetzner ranges are blocked, DNS resolves fine but the
+// connection just hangs). Reuses the same backup-tunnel SOCKS5 proxy set up
+// for Telegram egress (see src/lib/grabber/proxied-fetch.ts). Unset locally,
+// so dev machines outside the block fall back to a direct fetch.
+const SOCKS_PROXY_URL = process.env.TELEGRAM_SOCKS_PROXY;
+let socksAgent: SocksProxyAgent | undefined;
+function getSocksAgent(): SocksProxyAgent | undefined {
+  if (!SOCKS_PROXY_URL) return undefined;
+  if (!socksAgent) socksAgent = new SocksProxyAgent(SOCKS_PROXY_URL);
+  return socksAgent;
+}
+
+function fetchViaSocks(url: string, agent: SocksProxyAgent, timeoutMs: number): Promise<OpenMeteoResponse> {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { agent, timeout: timeoutMs }, (res) => {
+      const status = res.statusCode ?? 0;
+      if (status < 200 || status >= 300) {
+        res.resume();
+        reject(new Error(`open-meteo ${status}`));
+        return;
+      }
+      const chunks: Buffer[] = [];
+      res.on("data", (c) => chunks.push(c));
+      res.on("end", () => {
+        try {
+          resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")) as OpenMeteoResponse);
+        } catch (e) {
+          reject(e instanceof Error ? e : new Error(String(e)));
+        }
+      });
+    });
+    req.on("timeout", () => req.destroy(new Error("open-meteo timeout")));
+    req.on("error", reject);
+  });
+}
+
 async function fetchOpenMeteo(lat: number, lng: number): Promise<{
   hours: string[];
   dirs: number[];
@@ -44,18 +83,21 @@ async function fetchOpenMeteo(lat: number, lng: number): Promise<{
   url.searchParams.set("timezone", "UTC");
   url.searchParams.set("wind_speed_unit", "ms");
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), OPEN_METEO_TIMEOUT_MS);
-
-  let res: Response;
-  try {
-    res = await fetch(url.toString(), { signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
+  const agent = getSocksAgent();
+  let body: OpenMeteoResponse;
+  if (agent) {
+    body = await fetchViaSocks(url.toString(), agent, OPEN_METEO_TIMEOUT_MS);
+  } else {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), OPEN_METEO_TIMEOUT_MS);
+    try {
+      const res = await fetch(url.toString(), { signal: controller.signal });
+      if (!res.ok) throw new Error(`open-meteo ${res.status}`);
+      body = (await res.json()) as OpenMeteoResponse;
+    } finally {
+      clearTimeout(timer);
+    }
   }
-
-  if (!res.ok) throw new Error(`open-meteo ${res.status}`);
-  const body = (await res.json()) as OpenMeteoResponse;
 
   const time = body.hourly?.time ?? [];
   const speeds = body.hourly?.wind_speed_10m ?? [];
