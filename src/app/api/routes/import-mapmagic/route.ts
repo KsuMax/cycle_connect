@@ -38,9 +38,16 @@ function buildGpx(
   description: string,
   points: [number, number][],
   pois: MmPoi[] = [],
+  elevations: number[] | null = null,
 ): string {
+  // Высоты пишем только если профиль сопоставим с точками по длине
+  // (полилинии сегментов и профиль у MapMagic расходятся на стыках на единицы точек).
+  const useEle = elevations !== null && Math.abs(elevations.length - points.length) / points.length <= 0.1;
   const trkpts = points
-    .map(([lat, lon]) => `<trkpt lat="${lat}" lon="${lon}"/>`)
+    .map(([lat, lon], i) =>
+      useEle && i < elevations.length
+        ? `<trkpt lat="${lat}" lon="${lon}"><ele>${elevations[i]}</ele></trkpt>`
+        : `<trkpt lat="${lat}" lon="${lon}"/>`)
     .join("");
 
   const wpts = pois
@@ -131,7 +138,9 @@ export async function POST(req: NextRequest) {
 
   if (cached) {
     const age = Date.now() - new Date(cached.fetched_at).getTime();
-    if (age < CACHE_TTL_MS) {
+    // Записи без высот (до фикса «Набор из ссылки») считаем устаревшими и перезабираем.
+    const hasElevation = cached.elevation_m != null || String(cached.gpx_xml).includes("<ele>");
+    if (age < CACHE_TTL_MS && hasElevation) {
       return json({
         ok: true,
         gpx: cached.gpx_xml,
@@ -214,10 +223,26 @@ export async function POST(req: NextRequest) {
   const distanceKm = t.constant_meta?.distance
     ? Math.round(t.constant_meta.distance / 100) / 10
     : null;
-  const elevationM = t.constant_meta?.elevation_gain ?? null;
+
+  // Профиль высот: pieces.elevations — массив метров по точкам трека.
+  const rawElevations = pieces?.elevations;
+  const elevations = Array.isArray(rawElevations) && rawElevations.length > 1 && rawElevations.every((v) => typeof v === "number" && Number.isFinite(v))
+    ? (rawElevations as number[])
+    : null;
+
+  // Суммарный набор: из constant_meta, а если его нет (частый случай) — считаем по профилю.
+  let elevationM: number | null = t.constant_meta?.elevation_gain ?? null;
+  if (elevationM == null && elevations) {
+    let gain = 0;
+    for (let i = 1; i < elevations.length; i++) {
+      const diff = elevations[i] - elevations[i - 1];
+      if (diff > 0) gain += diff;
+    }
+    elevationM = Math.round(gain);
+  }
   const pois = t.poi ?? [];
 
-  const gpxXml = buildGpx(name, description, points, pois);
+  const gpxXml = buildGpx(name, description, points, pois, elevations);
 
   // Upsert cache.
   await admin.from("mapmagic_route_cache").upsert({

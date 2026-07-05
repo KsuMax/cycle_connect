@@ -262,6 +262,10 @@ export default function NewRoutePage() {
       const blob = new Blob([data.gpx], { type: "application/gpx+xml" });
       const file = new File([blob], `mapmagic-${Date.now()}.gpx`, { type: "application/gpx+xml" });
       await handleGpxChange(file);
+      // Страховка: если из GPX статистика не извлеклась (нет <ele> и т.п.) —
+      // берём готовые значения из ответа API.
+      if (data.distanceKm != null) setDistance((prev) => prev || String(data.distanceKm));
+      if (data.elevationM != null) setElevation((prev) => prev || String(Math.round(data.elevationM)));
       if (!title.trim() && data.name) setTitle(data.name);
       if (!description.trim() && data.description) setDescription(data.description);
       setImportStatus("success");
