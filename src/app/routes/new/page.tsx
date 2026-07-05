@@ -447,6 +447,7 @@ export default function NewRoutePage() {
               importError={importError}
               onImport={handleImport}
               gpxFileName={gpxFile?.name ?? null}
+              gpxFile={gpxFile}
               onGpxChange={handleGpxChange}
               hasTrack={hasTrack}
               region={region}

@@ -18,9 +18,13 @@ import "leaflet/dist/leaflet.css";
  */
 export function RouteMap({
   gpxUrl,
+  gpxFile,
   height = 400,
 }: {
-  gpxUrl: string;
+  /** Stored GPX to fetch (route page). */
+  gpxUrl?: string;
+  /** Not-yet-uploaded GPX to read locally (create/edit preview). */
+  gpxFile?: File | Blob | null;
   height?: number;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -33,14 +37,20 @@ export function RouteMap({
 
     async function init() {
       try {
-        const [{ default: L }, res] = await Promise.all([
+        // Local file takes precedence over a URL (preview shows the freshly
+        // picked track before it's uploaded).
+        const [{ default: L }, gpxTextRaw] = await Promise.all([
           import("leaflet"),
-          fetch(gpxUrl),
+          gpxFile
+            ? gpxFile.text()
+            : fetch(gpxUrl!).then((res) => {
+                if (!res.ok) throw new Error(`gpx fetch ${res.status}`);
+                return res.text();
+              }),
         ]);
         if (cancelled) return;
-        if (!res.ok) throw new Error(`gpx fetch ${res.status}`);
 
-        const { trackpoints } = parseGpxText(await res.text());
+        const { trackpoints } = parseGpxText(gpxTextRaw);
         if (cancelled) return;
         if (trackpoints.length < 2 || !containerRef.current) {
           setStatus("error");
@@ -85,7 +95,7 @@ export function RouteMap({
       cancelled = true;
       if (map) map.remove();
     };
-  }, [gpxUrl]);
+  }, [gpxUrl, gpxFile]);
 
   if (status === "error") {
     return (

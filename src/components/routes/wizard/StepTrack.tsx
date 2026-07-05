@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { GpxUpload } from "@/components/routes/GpxUpload";
 import { RegionPicker, type RegionOption } from "@/components/routes/RegionPicker";
+import { RouteMap } from "@/components/routes/RouteMap";
 import { toMapMagicEmbed } from "@/lib/mapmagic";
 
 export type DurationMode = "single" | "multi";
@@ -27,6 +28,7 @@ interface StepTrackProps {
   onImport: () => void;
 
   gpxFileName: string | null;
+  gpxFile: File | null;
   onGpxChange: (file: File | null) => void;
   hasTrack: boolean;
 
@@ -60,6 +62,7 @@ export function StepTrack({
   importError,
   onImport,
   gpxFileName,
+  gpxFile,
   onGpxChange,
   hasTrack,
   region,
@@ -167,11 +170,18 @@ export function StepTrack({
             <RegionPicker value={region} onChange={onRegionChange} options={regions} />
           </div>
 
-          {embedSrc && (
+          {/* Preview: MapMagic keeps its embeddable iframe; every other source
+              (manual GPX, non-MapMagic planner) is drawn from the picked GPX
+              on our own map — same as the final route page. */}
+          {embedSrc ? (
             <div className="mt-4 rounded-xl overflow-hidden border border-[#E4E4E7]" style={{ height: 220 }}>
               <iframe src={embedSrc} className="w-full h-full" style={{ border: 0 }} title="Предпросмотр маршрута" />
             </div>
-          )}
+          ) : gpxFile ? (
+            <div className="mt-4 rounded-xl overflow-hidden border border-[#E4E4E7]">
+              <RouteMap gpxFile={gpxFile} height={220} />
+            </div>
+          ) : null}
 
           {/* Manual correction disclosure */}
           <div className="mt-4 border-t border-[#E4E4E7] pt-3">
