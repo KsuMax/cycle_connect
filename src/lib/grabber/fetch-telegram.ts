@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import { telegramFetch } from "./proxied-fetch";
 import type { RawPost } from "./types";
 
 const USER_AGENT = "CycleConnectRouteGrabber/1.0 (+https://cycleconnect.cc)";
@@ -15,9 +16,9 @@ export async function fetchTelegramChannel(
   const handle = identifier.replace(/^@/, "");
   const lastMessageId = typeof cursor.lastMessageId === "number" ? cursor.lastMessageId : 0;
 
-  const res = await fetch(`https://t.me/s/${handle}`, {
+  const res = await telegramFetch(`https://t.me/s/${handle}`, {
     headers: { "User-Agent": USER_AGENT },
-    signal: AbortSignal.timeout(10_000),
+    timeoutMs: 10_000,
   });
   if (!res.ok) {
     throw new Error(`t.me/s/${handle} responded ${res.status}`);
