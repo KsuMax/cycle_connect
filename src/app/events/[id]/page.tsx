@@ -367,7 +367,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const totalKm = event.days.reduce((sum, d) => sum + (d.distance_km ?? 0), 0);
   const isMultiDay = event.days.length > 1;
   const isOrganizer = user?.id === event.organizer_id;
-  const isPastEvent = event.start_date ? new Date(event.start_date) < new Date() : false;
+  // "Past" for the repeat-event CTA: use the event's end date, or the last day's
+  // date for multi-day trips without an explicit end_date, or start_date for
+  // single-day events.
+  const lastDayDate = event.days.length > 0 ? event.days[event.days.length - 1].date : null;
+  const effectiveEndDate = event.end_date ?? lastDayDate ?? event.start_date;
+  const isPastEvent = effectiveEndDate ? new Date(effectiveEndDate) < new Date() : false;
 
   return (
     <div className="min-h-screen bg-[#F5F4F1]">
@@ -383,7 +388,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 <Link href={`/events/new?copy=${event.id}`}
                   className="inline-flex items-center gap-1.5 text-sm font-semibold text-white px-3 py-1.5 rounded-lg transition-colors"
                   style={{ backgroundColor: "#0BBFB5" }}>
-                  <RefreshCw size={13} /> Повторить поездку
+                  <RefreshCw size={13} /> Повторить заезд
                 </Link>
               )}
               <Link href={`/events/${event.id}/edit`}

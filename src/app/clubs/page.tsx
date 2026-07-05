@@ -214,6 +214,13 @@ export default function ClubsPage() {
 
   const hasActiveFilters = vis !== "any" || !!city || !!search;
 
+  const showOrganizerHero = !loading && myClubs.length === 0;
+
+  const registerClub = () => {
+    if (!requireAuth("зарегистрировать клуб")) return;
+    router.push("/clubs/new");
+  };
+
   return (
     <div className="min-h-screen bg-[#F5F4F1]">
       <Header />
@@ -227,18 +234,59 @@ export default function ClubsPage() {
               Сообщества велосипедистов вокруг общих маршрутов
             </p>
           </div>
-          <button
-            onClick={() => {
-              if (!requireAuth("зарегистрировать клуб")) return;
-              router.push("/clubs/new");
-            }}
-            className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl text-white shrink-0"
-            style={{ backgroundColor: "#0BBFB5" }}
-          >
-            <Plus size={16} />
-            Зарегистрировать клуб
-          </button>
+          {!showOrganizerHero && (
+            <button
+              onClick={registerClub}
+              className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl text-white shrink-0"
+              style={{ backgroundColor: "#0BBFB5" }}
+            >
+              <Plus size={16} />
+              Зарегистрировать клуб
+            </button>
+          )}
         </div>
+
+        {/* Organizer showcase hero: shown to guests and users without a club */}
+        {showOrganizerHero && (
+          <div
+            className="rounded-2xl p-5 sm:p-6 mb-6"
+            style={{ backgroundColor: "#FFF0EB" }}
+          >
+            <h2 className="text-lg sm:text-xl font-bold text-[#1C1C1E] leading-snug">
+              Ваш клуб уже катается в Telegram?
+            </h2>
+            <p className="text-sm text-[#71717A] mt-2 max-w-2xl">
+              Дайте ему витрину: страница клуба, библиотека маршрутов, календарь заездов и заявки на вступление — в одном месте.
+            </p>
+
+            <div className="flex flex-wrap gap-2 mt-4">
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-white/60 text-[#7A3A22]">
+                <MapIcon size={12} />
+                маршруты клуба
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-white/60 text-[#7A3A22]">
+                <Calendar size={12} />
+                заезды
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-white/60 text-[#7A3A22]">
+                <Users size={12} />
+                заявки
+              </span>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mt-4">
+              <button
+                onClick={registerClub}
+                className="inline-flex items-center justify-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl text-white shrink-0"
+                style={{ backgroundColor: "#F4632A" }}
+              >
+                <Plus size={16} />
+                Зарегистрировать клуб
+              </button>
+              <span className="text-xs text-[#71717A]">Две минуты, бесплатно</span>
+            </div>
+          </div>
+        )}
 
         {/* Tabs + search */}
         <div className="flex items-center gap-3 mb-6 flex-wrap">

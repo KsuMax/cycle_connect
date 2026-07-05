@@ -7,8 +7,11 @@ import { notFound } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { EventCard } from "@/components/events/EventCard";
+import { NextRideCard } from "@/components/clubs/NextRideCard";
+import { ClubChecklist } from "@/components/clubs/ClubChecklist";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useAuthModal } from "@/components/ui/AuthModal";
+import { useToast } from "@/lib/context/ToastContext";
 import { supabase, proxyImageUrl } from "@/lib/supabase";
 import { CLUB_LIST_SELECT, CLUB_MEMBERS_SELECT, ROUTE_LIST_SELECT, EVENT_LIST_SELECT } from "@/lib/queries";
 import { dbToClub, dbToClubMember, dbToRoute, dbToEvent } from "@/lib/transforms";
@@ -16,15 +19,26 @@ import type { Club, ClubMember, Route, CycleEvent, ClubPoll, ClubPollOption } fr
 import {
   ArrowLeft, Users, MapPin, Lock, Globe, UserPlus, UserMinus,
   Clock, Map, Calendar, CheckCircle, Settings, Check, X, Trophy, Pin, PinOff,
-  Vote, Plus, Trash2, Archive, ChevronDown,
+  Vote, Plus, Trash2, Archive, ChevronDown, Link2,
 } from "lucide-react";
 
 type Tab = "feed" | "routes" | "members" | "leaderboard" | "requests";
+
+async function handleCopyInviteLink(club: Club, showToast: (message: string, type?: "success" | "error" | "info") => void) {
+  const text = `Наш велоклуб «${club.name}» теперь на CycleConnect — маршруты, заезды и отчёты в одном месте. Вступай: ${window.location.origin}/clubs/${club.slug}`;
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast("Приглашение скопировано", "success");
+  } catch {
+    showToast("Не удалось скопировать", "error");
+  }
+}
 
 export default function ClubPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
   const { user } = useAuth();
   const { requireAuth } = useAuthModal();
+  const { showToast } = useToast();
 
   const [club, setClub] = useState<Club | null>(null);
   const [myMembership, setMyMembership] = useState<ClubMember | null>(null);
@@ -234,6 +248,17 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
     setPendingMembers((prev) => prev.filter((m) => m.user_id !== userId));
   }
 
+  function handleNextRideParticipationChange(eventId: string, delta: number) {
+    if (!user) return;
+    setEvents((prev) => prev.map((e) => {
+      if (e.id !== eventId) return e;
+      const participants = delta > 0
+        ? [...e.participants, { id: user.id, name: "Ты", initials: "Т", color: "#0BBFB5", avatar_url: null, km_total: 0, routes_count: 0, events_count: 0 }]
+        : e.participants.filter((p) => p.id !== user.id);
+      return { ...e, participants };
+    }));
+  }
+
   async function handleToggleFeatured(routeId: string, current: boolean) {
     // Optimistic update
     setRoutes((prev) => prev.map((r) => r.id === routeId ? { ...r, is_club_featured: !current } : r));
@@ -308,6 +333,8 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
   const nextEvent = [...upcomingEvents].sort(
     (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime(),
   )[0];
+
+  const lastPastEventId = pastEvents[0]?.id ?? null;
 
   // Feed = upcoming events + routes sorted by created_at desc; past events live in the archive below
   const feedItems: ({ type: "event"; data: CycleEvent } | { type: "route"; data: Route })[] = [
@@ -496,11 +523,43 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
                   </Link>
                 </div>
               )}
+
+              {/* Invite link — any active member, incl. owner/admin */}
+              {myMembership?.status === "active" && (
+                <button
+                  onClick={() => handleCopyInviteLink(club, showToast)}
+                  className="w-full flex items-center gap-1.5 text-xs font-medium text-[#71717A] hover:text-[#0BBFB5] transition-colors mt-4 pt-4 border-t border-[#F0F0EE]"
+                >
+                  <Link2 size={13} />
+                  Ссылка-приглашение для чата клуба
+                </button>
+              )}
             </div>
           </aside>
 
           {/* Main content */}
           <div className="min-w-0">
+
+        {/* Pinned next ride — visible to everyone */}
+        <NextRideCard
+          event={nextEvent ?? null}
+          isAdmin={isAdmin}
+          lastPastEventId={lastPastEventId}
+          clubId={club.id}
+          onParticipationChange={handleNextRideParticipationChange}
+        />
+
+        {/* Organizer checklist — owner/admin only, hidden once complete */}
+        {isAdmin && (
+          <ClubChecklist
+            clubId={club.id}
+            clubName={club.name}
+            clubSlug={club.slug}
+            routesCount={routes.length}
+            eventsCount={events.length}
+            membersCount={club.members_count}
+          />
+        )}
 
         {/* Tabs */}
         <div className="flex gap-1 bg-white rounded-2xl p-1.5 border border-[#E4E4E7] mb-6 overflow-x-auto" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
