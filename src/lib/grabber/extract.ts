@@ -49,7 +49,15 @@ export async function extractCandidate(
       60_000,
       4096
     );
-    if (!("is_route" in result)) result = null;
+    if (!("is_route" in result)) {
+      // chatJSON's total-failure signature is {}, but a 200 with empty
+      // choices also lands here silently — log what actually came back.
+      console.error(
+        "[grabber/extract] LLM returned no is_route:",
+        JSON.stringify(result).slice(0, 300)
+      );
+      result = null;
+    }
   } catch (err) {
     console.error("[grabber/extract] chatJSON failed:", err instanceof Error ? err.message : err);
     result = null;
