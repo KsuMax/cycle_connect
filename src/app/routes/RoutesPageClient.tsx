@@ -317,7 +317,8 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
     if (selectedSurfaces.length > 0 && !selectedSurfaces.some((s) => route.surface.includes(s))) return false;
     if (minKm !== null && !Number.isNaN(minKm) && route.distance_km < minKm) return false;
     if (maxKm !== null && !Number.isNaN(maxKm) && route.distance_km > maxKm) return false;
-    if (region && route.region !== region) return false;
+    // A route can be tagged with several regions (comma-separated); match if any of them is the picked one.
+    if (region && !(route.region ?? "").split(",").map((r) => r.trim()).includes(region)) return false;
     if (clubId && route.club?.id !== clubId) return false;
     return true;
   }).sort((a, b) =>

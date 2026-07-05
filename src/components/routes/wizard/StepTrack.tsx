@@ -30,9 +30,9 @@ interface StepTrackProps {
   onGpxChange: (file: File | null) => void;
   hasTrack: boolean;
 
-  region: string;
+  region: string[];
   regions: RegionOption[];
-  onRegionChange: (value: string) => void;
+  onRegionChange: (value: string[]) => void;
 
   distance: string;
   onDistanceChange: (value: string) => void;
@@ -163,7 +163,7 @@ export function StepTrack({
           </div>
 
           <div className="mb-1">
-            <label className="text-xs text-[#71717A] mb-1 block flex items-center gap-1"><MapPin size={11} /> Регион</label>
+            <label className="text-xs text-[#71717A] mb-1 block flex items-center gap-1"><MapPin size={11} /> Регионы</label>
             <RegionPicker value={region} onChange={onRegionChange} options={regions} />
           </div>
 

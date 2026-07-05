@@ -35,7 +35,7 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [mapUrl, setMapUrl] = useState("");
-  const [region, setRegion] = useState("");
+  const [region, setRegion] = useState<string[]>([]);
   const [regions, setRegions] = useState<RegionOption[]>([]);
   const [distance, setDistance] = useState("");
   const [elevation, setElevation] = useState("");
@@ -101,7 +101,7 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
       setTitle(data.title ?? "");
       setDescription(data.description ?? "");
       setMapUrl(data.mapmagic_url ?? "");
-      setRegion(data.region ?? "");
+      setRegion((data.region ?? "").split(",").map((r: string) => r.trim()).filter(Boolean));
       setDistance(data.distance_km ? String(data.distance_km) : "");
       setElevation(data.elevation_m ? String(data.elevation_m) : "");
       if (data.duration_days) {
@@ -289,7 +289,7 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
       .update({
         title: title.trim(),
         description: description.trim(),
-        region: region || null,
+        region: region.join(", ") || null,
         distance_km: parseFloat(distance) || 0,
         elevation_m: parseInt(elevation) || 0,
         duration_min: durationMode === "single"

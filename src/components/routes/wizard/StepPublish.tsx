@@ -19,7 +19,7 @@ interface StepPublishProps {
 
   distance: string;
   elevation: string;
-  region: string;
+  region: string[];
 
   canSubmit: boolean;
   submitting: boolean;
@@ -50,11 +50,11 @@ export function StepPublish({
   return (
     <div className="space-y-5">
       {/* Stats recap */}
-      {(distance || elevation || region) && (
+      {(distance || elevation || region.length > 0) && (
         <div className="bg-white rounded-2xl p-4 border border-[#E4E4E7] flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#71717A]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
           {distance && <span>{distance} км</span>}
           {elevation && <span>{elevation} м набора</span>}
-          {region && <span>{region}</span>}
+          {region.length > 0 && <span>{region.join(", ")}</span>}
         </div>
       )}
 

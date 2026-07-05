@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, X, Check } from "lucide-react";
 
 export interface RegionOption {
   name: string;
@@ -9,8 +9,8 @@ export interface RegionOption {
 }
 
 interface Props {
-  value: string;
-  onChange: (value: string) => void;
+  value: string[];
+  onChange: (value: string[]) => void;
   options: RegionOption[];
   placeholder?: string;
 }
@@ -47,10 +47,19 @@ export function RegionPicker({ value, onChange, options, placeholder = "Не у�
     setHighlighted(0);
   }, [query, open]);
 
-  function commit(name: string) {
-    onChange(name);
-    setOpen(false);
+  function toggle(name: string) {
+    if (value.includes(name)) {
+      onChange(value.filter((v) => v !== name));
+    } else {
+      onChange([...value, name]);
+    }
+    // Keep the dropdown open so multiple regions can be picked in a row.
     setQuery("");
+    inputRef.current?.focus();
+  }
+
+  function remove(name: string) {
+    onChange(value.filter((v) => v !== name));
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -63,7 +72,10 @@ export function RegionPicker({ value, onChange, options, placeholder = "Не у�
     } else if (e.key === "Enter") {
       e.preventDefault();
       const pick = filtered[highlighted];
-      if (pick) commit(pick.name);
+      if (pick) toggle(pick.name);
+    } else if (e.key === "Backspace" && !query && value.length > 0) {
+      // Quick-remove the last chip when the search box is empty.
+      remove(value[value.length - 1]);
     } else if (e.key === "Escape") {
       setOpen(false);
       setQuery("");
@@ -79,37 +91,59 @@ export function RegionPicker({ value, onChange, options, placeholder = "Не у�
   return (
     <div ref={rootRef} className="relative">
       {open ? (
-        <input
-          ref={inputRef}
-          autoFocus
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="Введите название…"
-          className="w-full px-3 py-2 rounded-xl border border-[#F4632A] bg-white text-sm outline-none transition-colors"
-        />
+        <div className="w-full px-2 py-1.5 rounded-xl border border-[#F4632A] bg-white flex flex-wrap items-center gap-1.5">
+          {value.map((name) => (
+            <span
+              key={name}
+              className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-lg bg-[#F5F4F1] text-xs text-[#1C1C1E]"
+            >
+              {name}
+              <X
+                size={12}
+                onClick={() => remove(name)}
+                className="hover:text-[#F4632A] cursor-pointer"
+              />
+            </span>
+          ))}
+          <input
+            ref={inputRef}
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder={value.length ? "Добавить ещё…" : "Введите название…"}
+            className="flex-1 min-w-[8rem] px-1 py-0.5 bg-transparent text-sm outline-none"
+          />
+        </div>
       ) : (
         <button
           type="button"
           onClick={() => setOpen(true)}
           className="w-full px-3 py-2 rounded-xl border border-[#E4E4E7] bg-white text-sm text-left flex items-center justify-between gap-2 hover:border-[#F4632A] focus:border-[#F4632A] focus:outline-none transition-colors"
         >
-          <span className={value ? "text-[#1C1C1E]" : "text-[#A1A1AA]"}>
-            {value || placeholder}
-          </span>
-          <span className="flex items-center gap-1 text-[#A1A1AA]">
-            {value && (
-              <X
-                size={14}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onChange("");
-                }}
-                className="hover:text-[#1C1C1E] cursor-pointer"
-              />
-            )}
-            <ChevronDown size={16} />
-          </span>
+          {value.length > 0 ? (
+            <span className="flex flex-wrap items-center gap-1.5">
+              {value.map((name) => (
+                <span
+                  key={name}
+                  className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-lg bg-[#F5F4F1] text-xs text-[#1C1C1E]"
+                >
+                  {name}
+                  <X
+                    size={12}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      remove(name);
+                    }}
+                    className="hover:text-[#F4632A] cursor-pointer"
+                  />
+                </span>
+              ))}
+            </span>
+          ) : (
+            <span className="text-[#A1A1AA]">{placeholder}</span>
+          )}
+          <ChevronDown size={16} className="text-[#A1A1AA] shrink-0" />
         </button>
       )}
       {open && (
@@ -120,21 +154,25 @@ export function RegionPicker({ value, onChange, options, placeholder = "Не у�
           {filtered.length === 0 && (
             <li className="px-3 py-2 text-sm text-[#A1A1AA]">Ничего не найдено</li>
           )}
-          {filtered.map((o, i) => (
-            <li
-              key={o.name}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                commit(o.name);
-              }}
-              onMouseEnter={() => setHighlighted(i)}
-              className={`px-3 py-2 text-sm cursor-pointer ${
-                i === highlighted ? "bg-[#F5F4F1] text-[#1C1C1E]" : "text-[#1C1C1E] hover:bg-[#F5F4F1]"
-              } ${value === o.name ? "font-medium" : ""}`}
-            >
-              {o.name}
-            </li>
-          ))}
+          {filtered.map((o, i) => {
+            const selected = value.includes(o.name);
+            return (
+              <li
+                key={o.name}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  toggle(o.name);
+                }}
+                onMouseEnter={() => setHighlighted(i)}
+                className={`px-3 py-2 text-sm cursor-pointer flex items-center justify-between gap-2 ${
+                  i === highlighted ? "bg-[#F5F4F1] text-[#1C1C1E]" : "text-[#1C1C1E] hover:bg-[#F5F4F1]"
+                } ${selected ? "font-medium" : ""}`}
+              >
+                <span>{o.name}</span>
+                {selected && <Check size={14} className="text-[#F4632A] shrink-0" />}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

@@ -40,7 +40,10 @@ export default function NewRoutePage() {
   const [title, setTitle] = useState(() => searchParams.get("title") ?? "");
   const [description, setDescription] = useState(() => searchParams.get("description") ?? "");
   const [mapUrl, setMapUrl] = useState(() => searchParams.get("mapUrl") ?? "");
-  const [region, setRegion] = useState(() => searchParams.get("region") ?? "");
+  const [region, setRegion] = useState<string[]>(() => {
+    const raw = searchParams.get("region") ?? "";
+    return raw.split(",").map((r) => r.trim()).filter(Boolean);
+  });
   const [regions, setRegions] = useState<RegionOption[]>([]);
   const [distance, setDistance] = useState("");
   const [elevation, setElevation] = useState("");
@@ -204,14 +207,14 @@ export default function NewRoutePage() {
         setDurationMinutes(String(stats.durationMin % 60));
       }
 
-      // Auto-detect region from the track midpoint when user hasn't picked one.
-      if (!region && trackpoints.length > 0) {
+      // Auto-detect region from the track midpoint when user hasn't picked any.
+      if (region.length === 0 && trackpoints.length > 0) {
         const mid = trackpoints[Math.floor(trackpoints.length / 2)];
         const { data } = await supabase.rpc("find_region_for_point", {
           lat: mid.lat,
           lng: mid.lng,
         });
-        if (typeof data === "string" && data) setRegion(data);
+        if (typeof data === "string" && data) setRegion([data]);
       }
     } catch {
       // Non-critical — fields stay empty
@@ -315,7 +318,7 @@ export default function NewRoutePage() {
         author_id: user.id,
         title: title.trim(),
         description: description.trim(),
-        region: region || null,
+        region: region.join(", ") || null,
         distance_km: parseFloat(distance) || 0,
         elevation_m: parseInt(elevation) || 0,
         duration_min: durationMode === "single"
