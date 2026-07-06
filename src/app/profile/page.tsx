@@ -364,9 +364,8 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Left: identity */}
-            <div className="flex items-start gap-5 lg:w-[45%] lg:shrink-0">
+          {/* Identity: single flow, avatar + name/badges/bio/links/social */}
+          <div className="flex items-start gap-5">
             <div className="relative shrink-0 group">
               <div
                 className={`w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center text-xl font-bold text-white${avatarUrl ? " cursor-pointer" : ""}`}
@@ -425,45 +424,23 @@ export default function ProfilePage() {
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <h1 className="text-xl font-bold text-[#1C1C1E] truncate">{profile?.name || "Участник"}</h1>
-              {profile?.username && <p className="text-sm font-medium mt-0.5" style={{ color: "#F4632A" }}>@{profile.username}</p>}
-              {profile?.bio && <p className="text-sm text-[#71717A] mt-1">{profile.bio}</p>}
-              {(profile?.website || profile?.strava_url) && (
-                <div className="flex items-center gap-3 mt-2 flex-wrap">
-                  {profile.website && (
-                    <a href={profile.website} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-xs text-[#7C5CFC] hover:underline">
-                      <Globe size={12} />
-                      {(() => { try { return new URL(profile.website!).hostname.replace("www.", ""); } catch { return profile.website; } })()}
-                      <ExternalLink size={10} />
-                    </a>
-                  )}
-                  {profile.strava_url && (
-                    <a href={profile.strava_url} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-xs font-medium hover:underline"
-                      style={{ color: "#FC4C02" }}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
-                      </svg>
-                      Strava
-                      <ExternalLink size={10} />
-                    </a>
-                  )}
-                </div>
-              )}
-              {/* Showcase: compact badges inside the identity block, not a separate card */}
-              {achievementsLoaded && (
-                <div className="mt-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl font-bold text-[#1C1C1E]">{profile?.name || "Участник"}</h1>
+                {/* Showcase: compact badges inline with the name, not a separate row */}
+                {achievementsLoaded && (
                   <ProfileShowcase
                     showcaseIds={showcaseIds}
                     achievements={achievements}
                     earnedLevels={earnedLevels}
                     onEdit={() => setShowShowcasePicker(true)}
                   />
-                </div>
-              )}
-              {/* Social row */}
-              <div className="flex items-center gap-2 mt-2.5 text-xs text-[#A1A1AA] flex-wrap">
+                )}
+              </div>
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap text-sm">
+                {profile?.username && <span className="font-medium" style={{ color: "#F4632A" }}>@{profile.username}</span>}
+                {profile?.bio && <span className="text-[#71717A]">{profile.bio}</span>}
+              </div>
+              <div className="flex items-center gap-x-3 gap-y-1 mt-2 flex-wrap text-xs text-[#A1A1AA]">
                 <Link href={`/users/${user.id}/followers`} className="hover:text-[#71717A] hover:underline transition-colors">
                   {followersCount} {followersCount === 1 ? "подписчик" : followersCount < 5 ? "подписчика" : "подписчиков"}
                 </Link>
@@ -475,56 +452,68 @@ export default function ProfilePage() {
                 <Link href="/clubs?tab=mine" className="hover:text-[#71717A] hover:underline transition-colors">
                   {clubsCount} {clubsCount === 1 ? "клуб" : clubsCount < 5 ? "клуба" : "клубов"}
                 </Link>
-              </div>
-            </div>
-            </div>
-
-            {/* Divider */}
-            <div className="hidden lg:block w-px self-stretch bg-[#F0EFEC]" />
-
-            {/* Right: stats dashboard */}
-            <div className="flex-1 min-w-0">
-              <div className="grid grid-cols-3 gap-2.5">
-                {[
-                  { value: totalKm == null ? "…" : totalKm.toLocaleString("ru-RU"), label: "км всего", accent: true },
-                  // Same source as the "Заезды" tab badge and feed — the numbers must match.
-                  { value: loadingFeed ? "…" : feed.length, label: feed.length === 1 ? "заезд" : feed.length > 1 && feed.length < 5 ? "заезда" : "заездов", accent: false },
-                  { value: myRoutes.length, label: "маршрутов", accent: false },
-                ].map(({ value, label, accent }) => (
-                  <div key={label} className="bg-[#F5F4F1] rounded-xl px-3 py-2.5">
-                    <div className="text-2xl font-bold leading-none" style={{ color: accent ? "#F4632A" : "#1C1C1E" }}>{value}</div>
-                    <div className="text-[11px] text-[#71717A] mt-1">{label}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Season goal */}
-              <div className="mt-4">
-                {seasonGoal ? (
-                  <div className="bg-[#F5F4F1] rounded-xl px-4 py-3">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-xs font-semibold text-[#1C1C1E] flex items-center gap-1.5">
-                        <Target size={13} style={{ color: "#F4632A" }} /> Цель сезона {currentYear}
-                      </span>
-                      <span className="text-xs text-[#71717A]">
-                        <span className="font-semibold" style={{ color: "#F4632A" }}>{seasonKm.toLocaleString("ru-RU")}</span>
-                        {" из "}{seasonGoal.toLocaleString("ru-RU")} км · {goalPct}%
-                      </span>
-                    </div>
-                    <div className="h-2 rounded-full bg-[#E7E5E0] overflow-hidden mt-2">
-                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${goalPct}%`, backgroundColor: "#F4632A" }} />
-                    </div>
-                  </div>
-                ) : (
-                  <Link
-                    href="/profile/settings"
-                    className="flex items-center gap-1.5 text-xs text-[#A1A1AA] hover:text-[#F4632A] transition-colors"
-                  >
-                    <Target size={13} /> Задать цель сезона →
-                  </Link>
+                {profile?.website && (
+                  <>
+                    <span>·</span>
+                    <a href={profile.website} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1 hover:text-[#7C5CFC] transition-colors">
+                      <Globe size={11} />
+                      {(() => { try { return new URL(profile.website!).hostname.replace("www.", ""); } catch { return profile.website; } })()}
+                      <ExternalLink size={9} />
+                    </a>
+                  </>
+                )}
+                {profile?.strava_url && (
+                  <>
+                    <span>·</span>
+                    <a href={profile.strava_url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1 font-medium hover:underline"
+                      style={{ color: "#FC4C02" }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
+                      </svg>
+                      Strava
+                      <ExternalLink size={9} />
+                    </a>
+                  </>
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Stats row: km / rides / routes / season goal, all in one line */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-4">
+            {[
+              { value: totalKm == null ? "…" : totalKm.toLocaleString("ru-RU"), label: "км всего", accent: true },
+              // Same source as the "Заезды" tab badge and feed — the numbers must match.
+              { value: loadingFeed ? "…" : feed.length, label: feed.length === 1 ? "заезд" : feed.length > 1 && feed.length < 5 ? "заезда" : "заездов", accent: false },
+              { value: myRoutes.length, label: "маршрутов", accent: false },
+            ].map(({ value, label, accent }) => (
+              <div key={label} className="bg-[#F5F4F1] rounded-xl px-3 py-2.5">
+                <div className="text-2xl font-bold leading-none" style={{ color: accent ? "#F4632A" : "#1C1C1E" }}>{value}</div>
+                <div className="text-[11px] text-[#71717A] mt-1">{label}</div>
+              </div>
+            ))}
+
+            {seasonGoal ? (
+              <div className="rounded-xl px-3 py-2.5" style={{ backgroundColor: "#FFF0EB" }}>
+                <div className="flex items-baseline justify-between gap-1">
+                  <span className="text-2xl font-bold leading-none" style={{ color: "#D85A30" }}>{goalPct}%</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-[#F5C4B3] overflow-hidden mt-1.5">
+                  <div className="h-full rounded-full transition-all duration-500" style={{ width: `${goalPct}%`, backgroundColor: "#F4632A" }} />
+                </div>
+                <div className="text-[11px] mt-1" style={{ color: "#993C1D" }}>цель сезона · {seasonKm.toLocaleString("ru-RU")}/{seasonGoal.toLocaleString("ru-RU")} км</div>
+              </div>
+            ) : (
+              <Link
+                href="/profile/settings"
+                className="flex flex-col justify-center items-start rounded-xl px-3 py-2.5 border border-dashed border-[#E4E4E7] text-[#A1A1AA] hover:border-[#F4632A] hover:text-[#F4632A] transition-colors"
+              >
+                <Target size={16} />
+                <span className="text-[11px] mt-1.5">Задать цель сезона →</span>
+              </Link>
+            )}
           </div>
 
           {/* Activity heatmap: full card width, current year at a glance */}

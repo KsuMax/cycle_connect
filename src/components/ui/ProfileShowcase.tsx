@@ -21,9 +21,9 @@ export function ProfileShowcase({ showcaseIds, achievements, earnedLevels, onEdi
     return (
       <button
         onClick={onEdit}
-        className="w-full text-center py-3 px-4 rounded-xl border border-dashed border-[#E4E4E7] text-xs text-[#A1A1AA] hover:border-[#F4632A] hover:text-[#F4632A] transition-colors"
+        className="text-left py-1.5 px-3 rounded-lg border border-dashed border-[#E4E4E7] text-xs text-[#A1A1AA] hover:border-[#F4632A] hover:text-[#F4632A] transition-colors whitespace-nowrap"
       >
-        + Выбери до 3 достижений для витрины
+        + Витрина достижений
       </button>
     );
   }
