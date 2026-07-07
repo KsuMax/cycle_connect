@@ -25,6 +25,28 @@ const LOCATION_SCOPES: { value: LocationScope; label: string }[] = [
 
 const OUT_TYPES: RouteType[] = ["road", "gravel", "mtb"];
 
+/** Russian plural: plural(22, "маршрут", "маршрута", "маршрутов") → "маршрута" */
+function plural(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+}
+
+/** Trailing-edge debounce for text inputs so each keystroke doesn't hit the DB. */
+function useDebounced<T>(value: T, ms: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return debounced;
+}
+
+const escapeLike = (s: string) => s.replace(/[\\%_]/g, "\\$&");
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const DIFFICULTIES: { value: Difficulty | "all"; label: string }[] = [
   { value: "all", label: "Все" },
   ...BASE_DIFFICULTIES,
@@ -32,10 +54,12 @@ const DIFFICULTIES: { value: Difficulty | "all"; label: string }[] = [
 
 interface Props {
   initialRoutes: Route[];
+  /** Exact total from SSR (`count: "exact"`); null when the routes tab wasn't SSR-loaded. */
+  initialRoutesTotal: number | null;
   initialEvents: CycleEvent[];
 }
 
-function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
+function RoutesPageInner({ initialRoutes, initialRoutesTotal, initialEvents }: Props) {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -70,8 +94,8 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
   const [sortBy, setSortBy] = useState<"newest" | "oldest">("newest");
   const [routes, setRoutes] = useState<Route[]>(initialRoutes);
   const [routesLoading, setRoutesLoading] = useState(initialRoutes.length === 0);
-  const [routesOffset, setRoutesOffset] = useState(initialRoutes.length);
-  const [hasMoreRoutes, setHasMoreRoutes] = useState(initialRoutes.length >= PAGE_SIZE);
+  // Exact catalog total for the current filter set (from `count: "exact"`)
+  const [totalRoutes, setTotalRoutes] = useState<number | null>(initialRoutesTotal);
   const [loadingMoreRoutes, setLoadingMoreRoutes] = useState(false);
 
   // ── Personal shelves (Сохранённые / Проехано / Мои) ───────────────────────
@@ -140,25 +164,6 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
       .select("id, name")
       .order("name")
       .then(({ data }) => { if (data) setClubs(data as { id: string; name: string }[]); });
-  }, []);
-
-  // ── Load routes (skipped when SSR already provided data) ──────────────────
-  useEffect(() => {
-    if (initialRoutes.length > 0) return;
-    supabase
-      .from("routes")
-      .select(ROUTE_LIST_SELECT)
-      .order("created_at", { ascending: false })
-      .limit(PAGE_SIZE)
-      .then(({ data, error }) => {
-        if (!error && data) {
-          const mapped = (data as unknown as DbRoute[]).map(dbToRoute);
-          setRoutes(mapped);
-          setRoutesOffset(mapped.length);
-          setHasMoreRoutes(mapped.length >= PAGE_SIZE);
-        }
-        setRoutesLoading(false);
-      });
   }, []);
 
   // ── Load events (lazy — only when tab first opened) ───────────────────────
@@ -257,22 +262,68 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
     if (nearMeActive) activateNearMe(radius);
   }, [nearMeActive, activateNearMe]);
 
-  // ── Load more routes ──────────────────────────────────────────────────────
-  const loadMoreRoutes = useCallback(async () => {
-    setLoadingMoreRoutes(true);
-    const { data, error } = await supabase
-      .from("routes")
-      .select(ROUTE_LIST_SELECT)
-      .order("created_at", { ascending: false })
-      .range(routesOffset, routesOffset + PAGE_SIZE - 1);
+  // ── Catalog fetch: filters live in the DB query, count is exact ───────────
+  const debouncedSearch = useDebounced(search, 350);
+  const debouncedMinDistance = useDebounced(minDistance, 350);
+  const debouncedMaxDistance = useDebounced(maxDistance, 350);
+  const catalogReqId = useRef(0);
+
+  /**
+   * Fetches one catalog page with ALL filters applied server-side plus
+   * `count: "exact"`, so both the list and the total stay truthful under
+   * pagination. offset 0 replaces the list, otherwise the page is appended.
+   */
+  const fetchCatalogPage = useCallback(async (offset: number) => {
+    const reqId = ++catalogReqId.current;
+    if (offset === 0) setRoutesLoading(true);
+    else setLoadingMoreRoutes(true);
+
+    let q = supabase.from("routes").select(ROUTE_LIST_SELECT, { count: "exact" });
+    // Near-me: RPC gives ids within the radius; catalog is small enough for `in`
+    if (nearMeActive && nearMeIds !== null) q = q.in("id", Array.from(nearMeIds));
+    const term = debouncedSearch.trim();
+    if (term) q = q.ilike("title", `%${escapeLike(term)}%`);
+    if (difficulty !== "all") q = q.eq("difficulty", difficulty);
+    if (selectedTypes.length > 0) q = q.overlaps("route_types", selectedTypes);
+    if (locationScope === "city") q = q.contains("route_types", ["urban"]);
+    if (locationScope === "out") q = q.overlaps("route_types", OUT_TYPES);
+    if (selectedSurfaces.length > 0) q = q.overlaps("surface", selectedSurfaces);
+    const min = debouncedMinDistance === "" ? null : Number(debouncedMinDistance);
+    const max = debouncedMaxDistance === "" ? null : Number(debouncedMaxDistance);
+    if (min !== null && !Number.isNaN(min)) q = q.gte("distance_km", min);
+    if (max !== null && !Number.isNaN(max)) q = q.lte("distance_km", max);
+    // region holds a comma-separated list — match the picked one as a whole item
+    if (region) q = q.filter("region", "imatch", `(^|,)\\s*${escapeRegex(region)}\\s*(,|$)`);
+    if (clubId) q = q.eq("club_id", clubId);
+
+    const { data, error, count } = await q
+      .order("created_at", { ascending: sortBy === "oldest" })
+      .order("id", { ascending: false }) // tiebreaker: stable pages when created_at collides
+      .range(offset, offset + PAGE_SIZE - 1);
+
+    if (reqId !== catalogReqId.current) return; // superseded by a newer request
     if (!error && data) {
       const mapped = (data as unknown as DbRoute[]).map(dbToRoute);
-      setRoutes((prev) => [...prev, ...mapped]);
-      setRoutesOffset((prev) => prev + mapped.length);
-      setHasMoreRoutes(mapped.length >= PAGE_SIZE);
+      setRoutes((prev) => (offset === 0 ? mapped : [...prev, ...mapped]));
+      if (count !== null) setTotalRoutes(count);
     }
+    setRoutesLoading(false);
     setLoadingMoreRoutes(false);
-  }, [routesOffset]);
+  }, [nearMeActive, nearMeIds, debouncedSearch, difficulty, selectedTypes, selectedSurfaces,
+      locationScope, debouncedMinDistance, debouncedMaxDistance, region, clubId, sortBy]);
+
+  // Refetch page 0 on any filter/sort change; on first mount reuse SSR data
+  const catalogMounted = useRef(false);
+  useEffect(() => {
+    if (!catalogMounted.current) {
+      catalogMounted.current = true;
+      if (initialRoutes.length > 0 && initialRoutesTotal !== null) return;
+    }
+    fetchCatalogPage(0);
+  }, [fetchCatalogPage, initialRoutes.length, initialRoutesTotal]);
+
+  const loadMoreRoutes = useCallback(() => fetchCatalogPage(routes.length), [fetchCatalogPage, routes.length]);
+  const hasMoreRoutes = totalRoutes !== null && routes.length < totalRoutes;
 
   // ── Load more events ──────────────────────────────────────────────────────
   const loadMoreEvents = useCallback(async () => {
@@ -303,11 +354,12 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
   const minKm = minDistance === "" ? null : Number(minDistance);
   const maxKm = maxDistance === "" ? null : Number(maxDistance);
 
-  // When a personal shelf is active, filter/sort operate on that shelf's
-  // (fully-fetched) route set instead of the paginated catalog list.
-  const routesSource = activeShelf ? (shelfRoutes[activeShelf] ?? []) : routes;
+  // The catalog arrives from the server already filtered, sorted and counted.
+  // Client-side filtering below only serves the personal shelves — those are
+  // fetched in full, so filtering them locally stays truthful.
+  const shelfSource = activeShelf ? (shelfRoutes[activeShelf] ?? []) : [];
 
-  const filtered = routesSource.filter((route) => {
+  const shelfFiltered = shelfSource.filter((route) => {
     if (nearMeActive && nearMeIds !== null && !nearMeIds.has(route.id)) return false;
     if (search && !route.title.toLowerCase().includes(search.toLowerCase())) return false;
     if (difficulty !== "all" && route.difficulty !== difficulty) return false;
@@ -326,6 +378,8 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
       ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       : new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
+
+  const filtered = activeShelf ? shelfFiltered : routes;
 
   const hasActiveRouteFilters =
     nearMeActive
@@ -994,7 +1048,7 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
 
             {/* ── Routes grid ───────────────────────────────────────────── */}
             {activeTab === "routes" && (
-              routesLoading || (activeShelf && shelfLoading && shelfRoutes[activeShelf] === null) ? (
+              (!activeShelf && routesLoading && routes.length === 0) || (activeShelf && shelfLoading && shelfRoutes[activeShelf] === null) ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {[1, 2, 3, 4].map((i) => (
                     <div key={i} className="bg-white rounded-2xl h-64 animate-pulse border border-[#E4E4E7]" />
@@ -1007,8 +1061,8 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
                       {filtered.length === 0
                         ? "Маршруты не найдены"
                         : activeShelf
-                          ? `${filtered.length} маршрутов`
-                          : `${filtered.length} маршрут${filtered.length === 1 ? "" : filtered.length < 5 ? "а" : "ов"}`}
+                          ? `${filtered.length} ${plural(filtered.length, "маршрут", "маршрута", "маршрутов")}`
+                          : `${totalRoutes ?? filtered.length} ${plural(totalRoutes ?? filtered.length, "маршрут", "маршрута", "маршрутов")}`}
                     </div>
                     <SortSelect
                       value={sortBy}
@@ -1022,10 +1076,10 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
                   </div>
                   {filtered.length > 0 ? (
                     <>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 transition-opacity ${!activeShelf && routesLoading ? "opacity-50 pointer-events-none" : ""}`}>
                         {filtered.map((route) => <RouteCard key={route.id} route={route} />)}
                       </div>
-                      {hasMoreRoutes && !hasActiveRouteFilters && !activeShelf && (
+                      {hasMoreRoutes && !activeShelf && (
                         <div className="mt-6 flex justify-center">
                           <button
                             onClick={loadMoreRoutes}
@@ -1091,7 +1145,7 @@ function RoutesPageInner({ initialRoutes, initialEvents }: Props) {
                 <>
                   <div className="flex items-center justify-between mb-4">
                     <div className="text-sm text-[#71717A]">
-                      {filteredEvents.length === 0 ? "Ничего не найдено" : `${filteredEvents.length} заезд${filteredEvents.length === 1 ? "" : filteredEvents.length < 5 ? "а" : "ов"}`}
+                      {filteredEvents.length === 0 ? "Ничего не найдено" : `${filteredEvents.length} ${plural(filteredEvents.length, "заезд", "заезда", "заездов")}`}
                     </div>
                     <SortSelect
                       value={eventSortBy}

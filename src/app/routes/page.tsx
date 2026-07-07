@@ -24,15 +24,18 @@ export default async function RoutesPage({
   const supabase = await createServerSupabase();
 
   let initialRoutes: Route[] = [];
+  let initialRoutesTotal: number | null = null;
   let initialEvents: CycleEvent[] = [];
 
   if (tab === "routes") {
-    const { data } = await supabase
+    const { data, count } = await supabase
       .from("routes")
-      .select(ROUTE_LIST_SELECT)
+      .select(ROUTE_LIST_SELECT, { count: "exact" })
       .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
       .limit(PAGE_SIZE);
     if (data) initialRoutes = (data as unknown as DbRoute[]).map(dbToRoute);
+    initialRoutesTotal = count;
   } else {
     const today = new Date().toISOString().split("T")[0];
     const { data } = await supabase
@@ -44,5 +47,5 @@ export default async function RoutesPage({
     if (data) initialEvents = (data as unknown as DbEvent[]).map(dbToEvent);
   }
 
-  return <RoutesPageClient initialRoutes={initialRoutes} initialEvents={initialEvents} />;
+  return <RoutesPageClient initialRoutes={initialRoutes} initialRoutesTotal={initialRoutesTotal} initialEvents={initialEvents} />;
 }
