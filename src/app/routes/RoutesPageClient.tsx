@@ -57,9 +57,11 @@ interface Props {
   /** Exact total from SSR (`count: "exact"`); null when the routes tab wasn't SSR-loaded. */
   initialRoutesTotal: number | null;
   initialEvents: CycleEvent[];
+  /** Exact total from SSR (`count: "exact"`); null when the events tab wasn't SSR-loaded. */
+  initialEventsTotal: number | null;
 }
 
-function RoutesPageInner({ initialRoutes, initialRoutesTotal, initialEvents }: Props) {
+function RoutesPageInner({ initialRoutes, initialRoutesTotal, initialEvents, initialEventsTotal }: Props) {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -113,9 +115,8 @@ function RoutesPageInner({ initialRoutes, initialRoutesTotal, initialEvents }: P
   // ── Events state ──────────────────────────────────────────────────────────
   const [events, setEvents] = useState<CycleEvent[]>(initialEvents);
   const [eventsLoading, setEventsLoading] = useState(false);
-  const [eventsLoaded, setEventsLoaded] = useState(initialEvents.length > 0);
-  const [eventsOffset, setEventsOffset] = useState(initialEvents.length);
-  const [hasMoreEvents, setHasMoreEvents] = useState(initialEvents.length >= PAGE_SIZE);
+  // Exact upcoming-events total for the current server filter set (from `count: "exact"`)
+  const [totalEvents, setTotalEvents] = useState<number | null>(initialEventsTotal);
   const [loadingMoreEvents, setLoadingMoreEvents] = useState(false);
   const [eventSearch, setEventSearch] = useState("");
   const [eventSortBy, setEventSortBy] = useState<"date_asc" | "date_desc">("date_asc");
@@ -165,29 +166,6 @@ function RoutesPageInner({ initialRoutes, initialRoutesTotal, initialEvents }: P
       .order("name")
       .then(({ data }) => { if (data) setClubs(data as { id: string; name: string }[]); });
   }, []);
-
-  // ── Load events (lazy — only when tab first opened) ───────────────────────
-  useEffect(() => {
-    if (activeTab !== "events" || eventsLoaded) return;
-    setEventsLoading(true);
-    const today = new Date().toISOString().split("T")[0];
-    supabase
-      .from("events")
-      .select(EVENT_LIST_SELECT)
-      .or(`end_date.gte.${today},and(end_date.is.null,start_date.gte.${today})`)
-      .order("start_date", { ascending: true })
-      .limit(PAGE_SIZE)
-      .then(({ data, error }) => {
-        if (!error && data) {
-          const mapped = (data as unknown as DbEvent[]).map(dbToEvent);
-          setEvents(mapped);
-          setEventsOffset(mapped.length);
-          setHasMoreEvents(mapped.length >= PAGE_SIZE);
-        }
-        setEventsLoading(false);
-        setEventsLoaded(true);
-      });
-  }, [activeTab, eventsLoaded]);
 
   // ── Near-me: request location + call RPC ─────────────────────────────────
   /**
@@ -325,24 +303,60 @@ function RoutesPageInner({ initialRoutes, initialRoutesTotal, initialEvents }: P
   const loadMoreRoutes = useCallback(() => fetchCatalogPage(routes.length), [fetchCatalogPage, routes.length]);
   const hasMoreRoutes = totalRoutes !== null && routes.length < totalRoutes;
 
-  // ── Load more events ──────────────────────────────────────────────────────
-  const loadMoreEvents = useCallback(async () => {
-    setLoadingMoreEvents(true);
+  // ── Events fetch: server filters + exact count (mirrors fetchCatalogPage) ─
+  const debouncedEventSearch = useDebounced(eventSearch, 350);
+  const eventsReqId = useRef(0);
+
+  /**
+   * Search / date range / sort live in the DB query with `count: "exact"`.
+   * Days, total distance and free spots are computed from event_days and
+   * participants, so those stay client-side (see hasClientEventFilters).
+   */
+  const fetchEventsPage = useCallback(async (offset: number) => {
+    const reqId = ++eventsReqId.current;
+    if (offset === 0) setEventsLoading(true);
+    else setLoadingMoreEvents(true);
+
     const today = new Date().toISOString().split("T")[0];
-    const { data, error } = await supabase
+    let q = supabase
       .from("events")
-      .select(EVENT_LIST_SELECT)
-      .or(`end_date.gte.${today},and(end_date.is.null,start_date.gte.${today})`)
-      .order("start_date", { ascending: true })
-      .range(eventsOffset, eventsOffset + PAGE_SIZE - 1);
+      .select(EVENT_LIST_SELECT, { count: "exact" })
+      .or(`end_date.gte.${today},and(end_date.is.null,start_date.gte.${today})`);
+    const term = debouncedEventSearch.trim();
+    if (term) q = q.ilike("title", `%${escapeLike(term)}%`);
+    if (eventStartFrom) q = q.gte("start_date", eventStartFrom);
+    if (eventStartTo) q = q.lte("start_date", eventStartTo);
+
+    const { data, error, count } = await q
+      .order("start_date", { ascending: eventSortBy === "date_asc" })
+      .order("id", { ascending: false }) // tiebreaker: stable pages when start_date collides
+      .range(offset, offset + PAGE_SIZE - 1);
+
+    if (reqId !== eventsReqId.current) return; // superseded by a newer request
     if (!error && data) {
       const mapped = (data as unknown as DbEvent[]).map(dbToEvent);
-      setEvents((prev) => [...prev, ...mapped]);
-      setEventsOffset((prev) => prev + mapped.length);
-      setHasMoreEvents(mapped.length >= PAGE_SIZE);
+      setEvents((prev) => (offset === 0 ? mapped : [...prev, ...mapped]));
+      if (count !== null) setTotalEvents(count);
     }
+    setEventsLoading(false);
     setLoadingMoreEvents(false);
-  }, [eventsOffset]);
+  }, [debouncedEventSearch, eventStartFrom, eventStartTo, eventSortBy]);
+
+  // Lazy first load + refetch page 0 on filter/sort change. Event filters are
+  // only reachable from the events tab, so changes while hidden are impossible;
+  // re-entering the tab refreshes page 0.
+  const eventsMounted = useRef(false);
+  useEffect(() => {
+    if (activeTab !== "events") return;
+    if (!eventsMounted.current) {
+      eventsMounted.current = true;
+      if (initialEvents.length > 0 && initialEventsTotal !== null) return;
+    }
+    fetchEventsPage(0);
+  }, [activeTab, fetchEventsPage, initialEvents.length, initialEventsTotal]);
+
+  const loadMoreEvents = useCallback(() => fetchEventsPage(events.length), [fetchEventsPage, events.length]);
+  const hasMoreEvents = totalEvents !== null && events.length < totalEvents;
 
   // ── Routes filtering / sorting ────────────────────────────────────────────
   const toggleType = (type: RouteType) =>
@@ -404,23 +418,22 @@ function RoutesPageInner({ initialRoutes, initialRoutesTotal, initialEvents }: P
     setClubId("");
   };
 
-  // ── Events filtering / sorting ────────────────────────────────────────────
+  // ── Events filtering ──────────────────────────────────────────────────────
+  // Search, dates and sort are already applied by the server (fetchEventsPage).
+  // Days / total distance / free spots need event_days + participants, so they
+  // filter the loaded pages client-side; privacy too (no RLS on events). While
+  // any of them hides something, the counter falls back to the loaded count.
+  const hasClientEventFilters = eventMaxDays < 30 || eventMaxDistance < 500 || eventOnlyWithSpots;
+
   const filteredEvents = events.filter((ev) => {
     if (ev.is_private && !(user != null && ev.participants.some(p => p.id === user.id))) return false;
-    if (eventSearch && !ev.title.toLowerCase().includes(eventSearch.toLowerCase())) return false;
-    if (eventStartFrom && ev.start_date && ev.start_date < eventStartFrom) return false;
-    if (eventStartTo && ev.start_date && ev.start_date > eventStartTo) return false;
-    if (ev.days.length > eventMaxDays) return false;
-    const totalKm = ev.days.reduce((s, d) => s + d.distance_km, 0);
-    if (totalKm > eventMaxDistance) return false;
+    // sliders at max mean "30+" / "500+" — no upper bound
+    if (eventMaxDays < 30 && ev.days.length > eventMaxDays) return false;
+    if (eventMaxDistance < 500 && ev.days.reduce((s, d) => s + d.distance_km, 0) > eventMaxDistance) return false;
     if (eventOnlyWithSpots && ev.max_participants != null) {
       if (ev.participants.length >= ev.max_participants) return false;
     }
     return true;
-  }).sort((a, b) => {
-    const da = a.start_date ?? "";
-    const db = b.start_date ?? "";
-    return eventSortBy === "date_asc" ? da.localeCompare(db) : db.localeCompare(da);
   });
 
   const hasActiveEventFilters = eventStartFrom !== "" || eventStartTo !== "" || eventMaxDays < 30 || eventMaxDistance < 500 || eventOnlyWithSpots;
@@ -1135,7 +1148,7 @@ function RoutesPageInner({ initialRoutes, initialRoutesTotal, initialEvents }: P
 
             {/* ── Events grid ───────────────────────────────────────────── */}
             {activeTab === "events" && (
-              eventsLoading ? (
+              eventsLoading && events.length === 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {[1, 2, 3, 4].map((i) => (
                     <div key={i} className="bg-white rounded-2xl h-64 animate-pulse border border-[#E4E4E7]" />
@@ -1145,7 +1158,13 @@ function RoutesPageInner({ initialRoutes, initialRoutesTotal, initialEvents }: P
                 <>
                   <div className="flex items-center justify-between mb-4">
                     <div className="text-sm text-[#71717A]">
-                      {filteredEvents.length === 0 ? "Ничего не найдено" : `${filteredEvents.length} ${plural(filteredEvents.length, "заезд", "заезда", "заездов")}`}
+                      {filteredEvents.length === 0
+                        ? "Ничего не найдено"
+                        : hasClientEventFilters || filteredEvents.length !== events.length
+                          // client-side filters hide part of the list — the server total
+                          // would overcount, so show the loaded count ("+" = ещё есть на сервере)
+                          ? `${filteredEvents.length}${hasMoreEvents ? "+" : ""} ${plural(filteredEvents.length, "заезд", "заезда", "заездов")}`
+                          : `${totalEvents ?? filteredEvents.length} ${plural(totalEvents ?? filteredEvents.length, "заезд", "заезда", "заездов")}`}
                     </div>
                     <SortSelect
                       value={eventSortBy}
@@ -1159,10 +1178,10 @@ function RoutesPageInner({ initialRoutes, initialRoutesTotal, initialEvents }: P
                   </div>
                   {filteredEvents.length > 0 ? (
                     <>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
+                      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch transition-opacity ${eventsLoading ? "opacity-50 pointer-events-none" : ""}`}>
                         {filteredEvents.map((ev) => <EventCard key={ev.id} event={ev} />)}
                       </div>
-                      {hasMoreEvents && !hasActiveEventFilters && (
+                      {hasMoreEvents && (
                         <div className="mt-6 flex justify-center">
                           <button
                             onClick={loadMoreEvents}
