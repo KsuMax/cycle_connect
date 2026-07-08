@@ -22,6 +22,8 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
 const nextConfig: NextConfig = {
   compress: true,
+  // Don't advertise the framework/version in responses.
+  poweredByHeader: false,
   typescript: {
     ignoreBuildErrors: true,
   },

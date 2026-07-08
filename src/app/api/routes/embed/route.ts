@@ -15,6 +15,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { embedPassages, routeEmbeddingText, toPgVector } from "@/lib/embeddings/jina";
+import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -138,6 +139,12 @@ export async function POST(req: NextRequest) {
   // ── Single-route mode — caller must own the route ─────────────────────────
   const id = typeof body.id === "string" ? body.id : "";
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+
+  // Jina embedding call is paid — cap per-user (admin bulk modes above are
+  // admin-gated and cursor-driven, so they're intentionally not limited here).
+  if (!(await checkRateLimit(rateLimitKey("route-embed", req, user.id), 30, 3600))) {
+    return NextResponse.json({ error: "rate_limited" }, { status: 429 });
+  }
 
   const { data: route, error } = await sb
     .from("routes")

@@ -22,6 +22,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { extractRouteMetadata } from "@/lib/metadata/extract";
 import { warmUpOllama } from "@/lib/llm/ollama-chat";
+import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // backfill batches can take a while
@@ -162,6 +163,11 @@ export async function POST(req: NextRequest) {
   // ── Single-route mode — caller must own the route ───────────────────────────
   const id = typeof body.id === "string" ? body.id.trim() : "";
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+
+  // LLM extraction per call — cap per user (admin backfill above is admin-gated).
+  if (!(await checkRateLimit(rateLimitKey("route-metadata", req, user.id), 30, 3600))) {
+    return NextResponse.json({ error: "rate_limited" }, { status: 429 });
+  }
 
   const { data: route, error } = await sb
     .from("routes")

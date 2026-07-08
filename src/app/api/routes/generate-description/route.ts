@@ -35,6 +35,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { generateRouteDescription } from "@/lib/routes/generate-description";
 import type { OsmFeature } from "@/lib/routes/osm-context";
+import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 180; // free Nemotron sometimes drags to 2-3 min on congested free pool
@@ -68,6 +69,12 @@ async function getCaller() {
 export async function POST(req: NextRequest) {
   const user = await getCaller();
   if (!user) return json({ error: "unauthorized" }, 401);
+
+  // Expensive: OSM/SRTM enrichment + LLM (up to 180 s, paid OpenRouter).
+  // Cap per user so a single account can't drain the budget / pin the box.
+  if (!(await checkRateLimit(rateLimitKey("gen-desc", req, user.id), 20, 3600))) {
+    return json({ error: "rate_limited" }, 429);
+  }
 
   let body: { routeId?: string; gpx?: string; existingDraft?: string };
   try {
