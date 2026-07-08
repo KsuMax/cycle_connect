@@ -169,7 +169,7 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
     async function load() {
       const { data, error } = await supabase
         .from("routes")
-        .select("*, author:profiles!author_id(*), route_images(url), route_exit_points(*)")
+        .select("*, author:profiles!author_id(id, name, username, avatar_url, bio, website, strava_url, telegram_username, km_total, routes_count, events_count, showcase_achievements, is_admin, strava_connected, strava_synced_km, strava_synced_rides, strava_last_activity_at, strava_show_activities, strava_sport_types, season_goal_km, created_at), route_images(url), route_exit_points(*)")
         .eq("id", id)
         .single();
 

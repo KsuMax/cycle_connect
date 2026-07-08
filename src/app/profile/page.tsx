@@ -95,7 +95,7 @@ export default function ProfilePage() {
     if (!user) return;
     supabase
       .from("routes")
-      .select("*, author:profiles!author_id(*), route_images(url)")
+      .select("*, author:profiles!author_id(id, name, username, avatar_url, bio, website, strava_url, telegram_username, km_total, routes_count, events_count, showcase_achievements, is_admin, strava_connected, strava_synced_km, strava_synced_rides, strava_last_activity_at, strava_show_activities, strava_sport_types, season_goal_km, created_at), route_images(url)")
       .eq("author_id", user.id)
       .order("created_at", { ascending: false })
       .then(({ data }) => {
@@ -115,7 +115,7 @@ export default function ProfilePage() {
     }
     supabase
       .from("routes")
-      .select("*, author:profiles!author_id(*), route_images(url)")
+      .select("*, author:profiles!author_id(id, name, username, avatar_url, bio, website, strava_url, telegram_username, km_total, routes_count, events_count, showcase_achievements, is_admin, strava_connected, strava_synced_km, strava_synced_rides, strava_last_activity_at, strava_show_activities, strava_sport_types, season_goal_km, created_at), route_images(url)")
       .in("id", routeIds)
       .then(({ data }) => {
         if (data) setRiddenRoutes(data.map(dbToRoute));
@@ -134,7 +134,7 @@ export default function ProfilePage() {
     setLoadingFavorites(true);
     supabase
       .from("routes")
-      .select("*, author:profiles!author_id(*), route_images(url)")
+      .select("*, author:profiles!author_id(id, name, username, avatar_url, bio, website, strava_url, telegram_username, km_total, routes_count, events_count, showcase_achievements, is_admin, strava_connected, strava_synced_km, strava_synced_rides, strava_last_activity_at, strava_show_activities, strava_sport_types, season_goal_km, created_at), route_images(url)")
       .in("id", ids)
       .then(({ data }) => {
         if (data) setFavoriteRoutes(data.map(dbToRoute));

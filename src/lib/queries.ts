@@ -10,6 +10,22 @@
 const PROFILE_FIELDS =
   "id, name, avatar_url, km_total, routes_count, events_count, telegram_username";
 
+/**
+ * Non-sensitive profile columns, safe to expose to any viewer (anon included).
+ *
+ * Use this in place of `profiles(*)` embeds and `profiles.select('*')` on pages
+ * that read OTHER users' profiles. As of migration 065 the sensitive columns
+ * (contact_email, email_public, telegram_chat_id, tg_link_code,
+ * tg_link_code_exp, notify_email_address) are NOT granted to anon/authenticated,
+ * so `*` would raise "permission denied". The owner reads their own full row via
+ * the get_my_profile() RPC (see AuthContext).
+ */
+export const PUBLIC_PROFILE_COLS =
+  "id, name, username, avatar_url, bio, website, strava_url, telegram_username, " +
+  "km_total, routes_count, events_count, showcase_achievements, is_admin, " +
+  "strava_connected, strava_synced_km, strava_synced_rides, strava_last_activity_at, " +
+  "strava_show_activities, strava_sport_types, season_goal_km, created_at";
+
 /** Use for route list pages (routes/page.tsx, RoutesPageClient load-more). */
 export const ROUTE_LIST_SELECT = [
   "id, author_id, title, description, region",

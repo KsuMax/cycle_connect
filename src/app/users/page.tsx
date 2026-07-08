@@ -34,7 +34,7 @@ export default function UsersPage() {
   useEffect(() => {
     supabase
       .from("profiles")
-      .select("*", { count: "exact" })
+      .select("id, name, username, avatar_url, bio, website, strava_url, telegram_username, km_total, routes_count, events_count, showcase_achievements, is_admin, strava_connected, strava_synced_km, strava_synced_rides, strava_last_activity_at, strava_show_activities, strava_sport_types, season_goal_km, created_at", { count: "exact" })
       .order("km_total", { ascending: false })
       .range(0, 9999)
       .then(({ data, error, count }) => {

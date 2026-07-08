@@ -34,7 +34,7 @@ export default function FollowersPage({ params }: { params: Promise<{ id: string
     // Load followers: people who follow this user
     supabase
       .from("user_follows")
-      .select("follower:profiles!follower_id(*)")
+      .select("follower:profiles!follower_id(id, name, username, avatar_url, bio, website, strava_url, telegram_username, km_total, routes_count, events_count, showcase_achievements, is_admin, strava_connected, strava_synced_km, strava_synced_rides, strava_last_activity_at, strava_show_activities, strava_sport_types, season_goal_km, created_at)")
       .eq("following_id", id)
       .then(({ data }) => {
         if (data) {

@@ -30,13 +30,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
-    if (data) setProfile(data);
+  const fetchProfile = async (_userId: string) => {
+    // Own row only — via SECURITY DEFINER RPC so we still get the private
+    // columns (telegram_chat_id, contact_email, notify prefs, …) that
+    // migration 065 revokes from column-level SELECT for anon/authenticated.
+    const { data } = await supabase.rpc("get_my_profile").maybeSingle();
+    if (data) setProfile(data as DbProfile);
   };
 
   useEffect(() => {
