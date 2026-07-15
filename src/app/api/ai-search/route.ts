@@ -172,7 +172,26 @@ function closestRegion(lat: number, lng: number): string {
     const d = Math.hypot(lat - rlat, lng - rlng);
     if (d < bestDist) { bestDist = d; best = name; }
   }
+  // Оба города окружены своей областью кольцом, поэтому для большей части
+  // области ближайшая точка списка — центр города. За пределами ~городской
+  // черты считаем, что пользователь в области.
+  if (best === "Санкт-Петербург" && bestDist > 0.30) return "Ленинградская область";
+  if (best === "Москва" && bestDist > 0.35) return "Подмосковье";
   return best;
+}
+
+/**
+ * Coordinates for Open-Meteo calls: exact user coords when the search is
+ * geo-anchored, otherwise the centroid of the filtered region.
+ */
+function forecastPoint(filters: RouteFilters): { lat: number; lng: number } {
+  if (filters.near_lat != null && filters.near_lng != null) {
+    return { lat: filters.near_lat, lng: filters.near_lng };
+  }
+  const entry =
+    REGION_CENTERS.find(([name]) => name === (filters.region ?? "Москва")) ??
+    REGION_CENTERS.find(([name]) => name === "Москва")!;
+  return { lat: entry[1], lng: entry[2] };
 }
 
 // ─── Distance helper ──────────────────────────────────────────────────────────
@@ -530,6 +549,10 @@ function mergeFilters(ai: RouteFilters, regex: RouteFilters): RouteFilters {
   if (regex.sort_by) merged.sort_by = regex.sort_by;
   else if (ai.sort_by) merged.sort_by = ai.sort_by;
 
+  // Geo radius: regex is reliable for "рядом со мной"; AI wins only when it
+  // parsed an explicit custom radius the regex can't ("в 30 км от меня").
+  if (merged.near_km == null && regex.near_km != null) merged.near_km = regex.near_km;
+
   // Either source can flag wind intent
   if (regex.wind_intent || ai.wind_intent) merged.wind_intent = true;
   // Either source can flag weather intent (wind_intent implies weather_intent)
@@ -576,7 +599,17 @@ function relaxFilters(f: RouteFilters): RelaxResult | null {
     return { filters: { ...f, near_km: 50 }, reason: "расширили радиус поиска до 50 км" };
   }
   if (f.near_km != null && f.near_km <= 50) {
-    return { filters: { ...f, near_km: undefined, near_lat: undefined, near_lng: undefined }, reason: "убрали ограничение по расстоянию от вас" };
+    // В 50 км ничего нет — переходим на домашний регион, а не на весь каталог,
+    // чтобы выдача оставалась хотя бы примерно локальной.
+    const region =
+      f.region ??
+      (f.near_lat != null && f.near_lng != null ? closestRegion(f.near_lat, f.near_lng) : undefined);
+    return {
+      filters: { ...f, near_km: undefined, near_lat: undefined, near_lng: undefined, region },
+      reason: region && !f.region
+        ? `в 50 км ничего нет — ищем по региону «${region}»`
+        : "убрали ограничение по расстоянию от вас",
+    };
   }
   if (f.elevation_min != null && f.elevation_min > 0) {
     return { filters: { ...f, elevation_min: undefined }, reason: "убрали минимальный набор высот" };
@@ -1037,12 +1070,8 @@ async function searchRoutesWind(
     ]),
   );
 
-  // 3. Determine region centroid for the forecast call
-  const regionName = filters.region ?? "Москва";
-  const regionEntry =
-    REGION_CENTERS.find(([name]) => name === regionName) ??
-    REGION_CENTERS.find(([name]) => name === "Москва")!;
-  const [, lat, lng] = regionEntry;
+  // 3. Forecast point: exact user coords when geo-anchored, else region centroid
+  const { lat, lng } = forecastPoint(filters);
 
   // 4. Fetch regional wind forecast (one Open-Meteo call)
   let forecast: WindPoint[] = [];
@@ -1084,11 +1113,7 @@ async function attachWeatherComfort(
 ): Promise<RouteResult[]> {
   if (routes.length === 0) return routes;
 
-  const regionName = filters.region ?? "Москва";
-  const regionEntry =
-    REGION_CENTERS.find(([name]) => name === regionName) ??
-    REGION_CENTERS.find(([name]) => name === "Москва")!;
-  const [, lat, lng] = regionEntry;
+  const { lat, lng } = forecastPoint(filters);
 
   try {
     const forecast = await fetchForecastCached(lat, lng);
@@ -1321,14 +1346,18 @@ export async function POST(req: NextRequest) {
           filters = mergeFilters(aiFilters, regexFilters);
 
           // If coordinates provided:
-          //  • near_km set by query → attach actual coords for PostGIS filter
-          //  • always set region for wind-forecast regional center (if not already set)
+          //  • near_km set by query → attach actual coords for PostGIS filter.
+          //    The radius is exact, so a coarse region guess must NOT also
+          //    constrain SQL — иначе пользователь в Ленобласти теряет маршруты
+          //    в 15 км из-за region="Санкт-Петербург". Регион оставляем только
+          //    если пользователь назвал его в запросе явно (нашёл regex).
+          //  • no radius → coords only pick the home region.
           if (lat !== undefined && lng !== undefined) {
             if (filters.near_km) {
               filters.near_lat = lat;
               filters.near_lng = lng;
-            }
-            if (!filters.region) {
+              if (!regexFilters.region) delete filters.region;
+            } else if (!filters.region) {
               filters.region = closestRegion(lat, lng);
             }
           }
