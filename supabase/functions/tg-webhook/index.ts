@@ -218,7 +218,9 @@ async function parseAI(query: string): Promise<RouteFilters> {
 
   // ── Primary: Ollama local ────────────────────────────────────────────────
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 5_000);
+  // 20s: on the 2-vCPU host llama3.2:1b generates ~6.5 tok/s, so a typical
+  // 50-token filter JSON takes 9-12s warm; cold model load adds another ~8s.
+  const timer = setTimeout(() => controller.abort(), 20_000);
   try {
     const res = await fetch(`${OLLAMA_URL}/api/chat`, {
       method: "POST",
@@ -230,7 +232,9 @@ async function parseAI(query: string): Promise<RouteFilters> {
         stream: false,
         format: "json",
         options: { temperature: 0, num_ctx: 1024 },
-        keep_alive: "10m",
+        // -1 = keep the model resident; a finite value here would override the
+        // server-wide OLLAMA_KEEP_ALIVE=-1 and re-arm unloading on every call.
+        keep_alive: -1,
       }),
     });
     if (!res.ok) throw new Error(`ollama HTTP ${res.status}`);
