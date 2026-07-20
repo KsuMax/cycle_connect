@@ -1,17 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { Pencil, Star } from "lucide-react";
+import { Pencil, Star, MapPin, Smile, BicepsFlexed, Flame, Skull, Compass, type LucideIcon } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { richTextToPlain } from "@/lib/richText";
 import type { DbRideReport, RideReportVibe } from "@/lib/supabase";
 
-const VIBE_CONFIG: Record<RideReportVibe, { emoji: string; label: string; color: string }> = {
-  chill:   { emoji: "😌", label: "Кайф",     color: "#0BBFB5" },
-  push:    { emoji: "💪", label: "Жарили",   color: "#F4632A" },
-  epic:    { emoji: "🔥", label: "Эпик",     color: "#FF6B00" },
-  suffer:  { emoji: "😵", label: "Страдали", color: "#7C5CFC" },
-  explore: { emoji: "🧭", label: "Открытие", color: "#22A75B" },
+const VIBE_CONFIG: Record<RideReportVibe, { icon: LucideIcon; label: string; color: string }> = {
+  chill:   { icon: Smile,        label: "Кайф",     color: "#0BBFB5" },
+  push:    { icon: BicepsFlexed, label: "Жарили",   color: "#F4632A" },
+  epic:    { icon: Flame,        label: "Эпик",     color: "#FF6B00" },
+  suffer:  { icon: Skull,        label: "Страдали", color: "#7C5CFC" },
+  explore: { icon: Compass,      label: "Открытие", color: "#22A75B" },
 };
 
 interface Props {
@@ -91,7 +91,7 @@ export function ReportCard({ report, showRoute = false, currentUserId, coverOnly
                   className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
                   style={{ backgroundColor: vibe.color + "1A", color: vibe.color }}
                 >
-                  {vibe.emoji} {vibe.label}
+                  <vibe.icon size={12} aria-hidden /> {vibe.label}
                 </span>
               )}
             </div>
@@ -129,7 +129,7 @@ export function ReportCard({ report, showRoute = false, currentUserId, coverOnly
             className="inline-flex items-center gap-1 text-xs font-medium mb-2 hover:underline"
             style={{ color: "#F4632A" }}
           >
-            📍 {report.route.title}
+            <MapPin size={12} aria-hidden /> {report.route.title}
           </Link>
         )}
 

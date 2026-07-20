@@ -164,7 +164,7 @@ function ReportForm({ routeId }: { routeId: string }) {
                       : { backgroundColor: "white", color: "#3F3F46", borderColor: "#E4E4E7" }
                   }
                 >
-                  {v.emoji} {v.label}
+                  <v.icon size={15} aria-hidden /> {v.label}
                 </button>
               ))}
             </div>

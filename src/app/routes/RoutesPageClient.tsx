@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { EventCard } from "@/components/events/EventCard";
-import { Search, SlidersHorizontal, X, Plus, Map, Calendar, LocateFixed, Loader2, ArrowUpDown, ChevronDown } from "lucide-react";
+import { Search, SlidersHorizontal, X, Plus, Map, Calendar, LocateFixed, Loader2, ArrowUpDown, ChevronDown, Bike } from "lucide-react";
 import Link from "next/link";
 import type { Difficulty, RouteType, Route, CycleEvent, Surface } from "@/types";
 import { supabase } from "@/lib/supabase";
@@ -1109,19 +1109,19 @@ function RoutesPageInner({ initialRoutes, initialRoutesTotal, initialEvents, ini
                     </>
                   ) : activeShelf === "saved" ? (
                     <div className="text-center py-16 text-[#71717A]">
-                      <div className="text-4xl mb-3">🗺️</div>
+                      <Map size={36} className="mx-auto mb-3" aria-hidden />
                       <div className="font-medium mb-1">Пока ничего не сохранено</div>
                       <div className="text-sm">жми «Сохранить» на маршруте</div>
                     </div>
                   ) : activeShelf === "ridden" ? (
                     <div className="text-center py-16 text-[#71717A]">
-                      <div className="text-4xl mb-3">🗺️</div>
+                      <Map size={36} className="mx-auto mb-3" aria-hidden />
                       <div className="font-medium mb-1">Отмечай проезды кнопкой «Я проехал(а)»</div>
                       <div className="text-sm">они появятся здесь</div>
                     </div>
                   ) : activeShelf === "mine" ? (
                     <div className="text-center py-16 text-[#71717A]">
-                      <div className="text-4xl mb-3">🗺️</div>
+                      <Map size={36} className="mx-auto mb-3" aria-hidden />
                       <div className="font-medium mb-1">Ты ещё не создал ни одного маршрута</div>
                       <Link href={user ? "/routes/new" : "/auth/login"}
                         className="inline-flex items-center gap-2 mt-4 px-4 min-h-[44px] rounded-xl text-sm font-semibold text-white transition-colors hover:opacity-90"
@@ -1132,7 +1132,7 @@ function RoutesPageInner({ initialRoutes, initialRoutesTotal, initialEvents, ini
                     </div>
                   ) : (
                     <div className="text-center py-16 text-[#71717A]">
-                      <div className="text-4xl mb-3">🗺️</div>
+                      <Map size={36} className="mx-auto mb-3" aria-hidden />
                       <div className="font-medium mb-1">Маршруты не найдены</div>
                       <div className="text-sm">Попробуй изменить фильтры</div>
                       {hasActiveRouteFilters && (
@@ -1198,7 +1198,7 @@ function RoutesPageInner({ initialRoutes, initialRoutesTotal, initialEvents, ini
                     </>
                   ) : events.length === 0 ? (
                     <div className="text-center py-16 text-[#71717A]">
-                      <div className="text-4xl mb-3">🚴</div>
+                      <Bike size={36} className="mx-auto mb-3" aria-hidden />
                       <div className="font-medium mb-1">Пока никто не запланировал заезд</div>
                       <div className="text-sm">Создай первый — собери компанию на выходные.</div>
                       <Link href={user ? "/events/new" : "/auth/login"}
@@ -1210,7 +1210,7 @@ function RoutesPageInner({ initialRoutes, initialRoutesTotal, initialEvents, ini
                     </div>
                   ) : (
                     <div className="text-center py-16 text-[#71717A]">
-                      <div className="text-4xl mb-3">🚴</div>
+                      <Bike size={36} className="mx-auto mb-3" aria-hidden />
                       <div className="font-medium mb-1">Ничего не нашлось</div>
                       <div className="text-sm">Попробуй изменить фильтры</div>
                       {hasActiveEventFilters && (

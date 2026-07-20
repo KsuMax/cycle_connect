@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, Pencil, Star } from "lucide-react";
+import { ChevronLeft, Pencil, Star, Smile, BicepsFlexed, Flame, Skull, Compass, type LucideIcon } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { sanitizeHtml } from "@/lib/sanitize";
@@ -13,12 +13,12 @@ const BASE_URL = "https://cycleconnect.cc";
 
 type DbRideReportWithRating = DbRideReport & { rating?: number | null };
 
-const VIBE_CONFIG: Record<RideReportVibe, { emoji: string; label: string; color: string }> = {
-  chill:   { emoji: "😌", label: "Кайф",     color: "#0BBFB5" },
-  push:    { emoji: "💪", label: "Жарили",   color: "#F4632A" },
-  epic:    { emoji: "🔥", label: "Эпик",     color: "#FF6B00" },
-  suffer:  { emoji: "😵", label: "Страдали", color: "#7C5CFC" },
-  explore: { emoji: "🧭", label: "Открытие", color: "#22A75B" },
+const VIBE_CONFIG: Record<RideReportVibe, { icon: LucideIcon; label: string; color: string }> = {
+  chill:   { icon: Smile,        label: "Кайф",     color: "#0BBFB5" },
+  push:    { icon: BicepsFlexed, label: "Жарили",   color: "#F4632A" },
+  epic:    { icon: Flame,        label: "Эпик",     color: "#FF6B00" },
+  suffer:  { icon: Skull,        label: "Страдали", color: "#7C5CFC" },
+  explore: { icon: Compass,      label: "Открытие", color: "#22A75B" },
 };
 
 const REPORT_SELECT =
@@ -159,7 +159,7 @@ export default async function ReportDetailPage({ params }: Props) {
                       className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
                       style={{ backgroundColor: vibe.color + "1A", color: vibe.color }}
                     >
-                      {vibe.emoji} {vibe.label}
+                      <vibe.icon size={12} aria-hidden /> {vibe.label}
                     </span>
                   )}
                 </div>

@@ -28,7 +28,7 @@ import { ymGoal } from "@/lib/ym";
 import { toMapMagicEmbed } from "@/lib/mapmagic";
 import { mapProviderName, isEmbeddableMapUrl } from "@/lib/map-provider";
 import { RouteMap } from "@/components/routes/RouteMap";
-import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users, Download, Train, Bus, CarTaxiFront, Route as RouteIcon, MoreVertical, Navigation, Star } from "lucide-react";
+import { Bike, Mountain, Clock, Heart, ChevronLeft, Calendar, ExternalLink, MapPin, Bookmark, Pencil, Trash2, Lock, Users, Download, Train, Bus, CarTaxiFront, Route as RouteIcon, MoreVertical, Navigation, Star, NotebookPen } from "lucide-react";
 import type { ExitPointKind } from "@/types";
 import { formatDate } from "@/lib/utils";
 import { sanitizeHtml } from "@/lib/sanitize";
@@ -436,7 +436,7 @@ export default function RoutePageClient({ params }: { params: Promise<{ id: stri
                     onClick={() => setShowRideMenu(false)}
                     className="w-full px-4 py-2.5 text-left text-sm font-medium text-[#1C1C1E] hover:bg-[#F5F4F1] transition-colors first:rounded-t-lg last:rounded-b-lg flex items-center gap-2"
                   >
-                    📝 Написать отчёт
+                    <NotebookPen size={15} aria-hidden /> Написать отчёт
                   </Link>
                   <button
                     onClick={async () => {

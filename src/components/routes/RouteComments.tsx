@@ -157,7 +157,7 @@ export function RouteComments({ routeId }: RouteCommentsProps) {
         )}
         {!loading && comments.length === 0 && (
           <div className="px-6 py-8 text-center text-[#A1A1AA] text-sm">
-            Будь первым, кто оставит комментарий 💬
+            Будь первым, кто оставит комментарий
           </div>
         )}
         {comments.map((comment) => (

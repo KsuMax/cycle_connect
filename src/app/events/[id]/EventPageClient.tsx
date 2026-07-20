@@ -15,6 +15,7 @@ import { useEventLikes } from "@/lib/context/EventLikesContext";
 import {
   ChevronLeft, Calendar, Bike, Heart,
   Share2, Users, MapPin, ExternalLink, Flag, ChevronRight, Pencil, Lock, Trash2, UserPlus, Search, X, Download, RefreshCw, Info,
+  Tent, NotebookPen, Map,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { useAuthModal } from "@/components/ui/AuthModal";
@@ -315,7 +316,7 @@ export default function EventPageClient({ params }: { params: Promise<{ id: stri
       <div className="min-h-screen bg-[#F5F4F1]">
         <Header />
         <main className="max-w-6xl mx-auto px-4 py-8 text-center">
-          <div className="text-4xl mb-3">🗺️</div>
+          <Map size={36} className="mx-auto mb-3 text-[#A1A1AA]" aria-hidden />
           <h2 className="text-xl font-bold text-[#1C1C1E] mb-2">Мероприятие не найдено</h2>
           {fetchError && <p className="text-sm text-[#71717A] mb-2 font-mono">{fetchError}</p>}
           <Link href="/" className="text-sm text-[#F4632A] hover:underline">← На главную</Link>
@@ -379,8 +380,8 @@ export default function EventPageClient({ params }: { params: Promise<{ id: stri
               )}
               <div className="relative p-8">
                 <div className="flex flex-wrap items-center gap-2 mb-3">
-                  {isMultiDay && <Badge className="bg-white/20 text-white border-0">🏕️ {event.days.length}-дневный велопоход</Badge>}
-                  {event.route?.region && <Badge className="bg-white/20 text-white border-0">📍 {event.route.region}</Badge>}
+                  {isMultiDay && <Badge className="bg-white/20 text-white border-0 flex items-center gap-1"><Tent size={12} aria-hidden /> {event.days.length}-дневный велопоход</Badge>}
+                  {event.route?.region && <Badge className="bg-white/20 text-white border-0 flex items-center gap-1"><MapPin size={12} aria-hidden /> {event.route.region}</Badge>}
                   {event.is_private && (
                     <Badge className="bg-white/20 text-white border-0 flex items-center gap-1">
                       <Lock size={10} /> Закрытое
@@ -464,7 +465,7 @@ export default function EventPageClient({ params }: { params: Promise<{ id: stri
                 return (
                   <div className="bg-white rounded-2xl p-6 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
                     <h2 className="font-semibold text-[#1C1C1E] mb-3 flex items-center gap-2">
-                      📝 Отчёт о поездке
+                      <NotebookPen size={16} aria-hidden /> Отчёт о поездке
                     </h2>
                     <textarea
                       value={reportDraft}
@@ -497,7 +498,7 @@ export default function EventPageClient({ params }: { params: Promise<{ id: stri
                   <div className="bg-white rounded-2xl p-6 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
                     <div className="flex items-center justify-between mb-3">
                       <h2 className="font-semibold text-[#1C1C1E] flex items-center gap-2">
-                        📝 Отчёт о поездке
+                        <NotebookPen size={16} aria-hidden /> Отчёт о поездке
                       </h2>
                       {isOrganizer && (
                         <button
@@ -521,7 +522,7 @@ export default function EventPageClient({ params }: { params: Promise<{ id: stri
               if (isOrganizer) {
                 return (
                   <div className="bg-white rounded-2xl p-6 border border-[#E4E4E7] border-dashed text-center" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
-                    <div className="text-2xl mb-2">📝</div>
+                    <NotebookPen size={24} className="mx-auto mb-2 text-[#A1A1AA]" aria-hidden />
                     <div className="text-sm font-medium text-[#1C1C1E] mb-1">Напишите отчёт о поездке</div>
                     <div className="text-xs text-[#A1A1AA] mb-4">Расскажите участникам, как всё прошло</div>
                     <button

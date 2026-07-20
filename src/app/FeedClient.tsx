@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { EventCard } from "@/components/events/EventCard";
-import { Sparkles, Search, ArrowUp, TrendingUp, Calendar, Users, ArrowRight, BookOpen } from "lucide-react";
+import { Sparkles, Search, ArrowUp, TrendingUp, Calendar, Users, ArrowRight, BookOpen, Bike } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -144,7 +144,7 @@ export function FeedClient({ initialRoutes, initialEvents, initialReports }: Pro
 
             {initialRoutes.length === 0 && initialEvents.length === 0 && (
               <div className="text-center py-16 text-[#71717A]">
-                <div className="text-4xl mb-3">🚴</div>
+                <Bike size={36} className="mx-auto mb-3" aria-hidden />
                 <div className="font-medium mb-1">Маршрутов пока нет</div>
                 <div className="text-sm mb-4">Будь первым — добавь маршрут!</div>
                 <Link href="/routes/new"

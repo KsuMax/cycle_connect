@@ -12,7 +12,7 @@ import { supabase } from "@/lib/supabase";
 import { MOCK_ROUTES } from "@/lib/data/mock";
 import { CoverUpload } from "@/components/routes/CoverUpload";
 import { GpxUpload } from "@/components/routes/GpxUpload";
-import { Plus, Trash2, ChevronLeft, Calendar, Bike, AlertCircle, Shield } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, Calendar, Bike, AlertCircle, Shield, RefreshCw } from "lucide-react";
 import Link from "next/link";
 
 interface CaptainClub { id: string; name: string }
@@ -310,7 +310,7 @@ function CreateEventForm() {
 
         {copySourceTitle && (
           <div className="flex items-center gap-2 text-sm px-4 py-3 rounded-xl mb-2" style={{ backgroundColor: "#E8FAF9", color: "#0BBFB5" }}>
-            🔄 Все поля скопированы из оригинала. Даты сдвинуты на +7 дней.
+            <RefreshCw size={15} className="shrink-0" aria-hidden /> Все поля скопированы из оригинала. Даты сдвинуты на +7 дней.
           </div>
         )}
 

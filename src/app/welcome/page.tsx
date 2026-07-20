@@ -1,4 +1,8 @@
 import Link from "next/link";
+import {
+  Calendar, Bike, Map, Link2, Bot, BarChart3, Sprout, Wrench, Handshake,
+  Mountain, Flag, Compass, Building2, type LucideIcon,
+} from "lucide-react";
 
 export const metadata = {
   title: "CycleConnect — Сообщество велосипедистов",
@@ -6,44 +10,44 @@ export const metadata = {
     "Социальный слой для велосипедистов: события, клубы, точки на карте и любимые маршруты. Присоединяйся на этапе раннего доступа.",
 };
 
-const features = [
+const features: { icon: LucideIcon; color: string; title: string; description: string }[] = [
   {
-    icon: "📅",
+    icon: Calendar,
     color: "bg-teal-light text-teal",
     title: "Совместные выезды",
     description:
       "От покатушек выходного дня до многодневных туров. Регистрируйся в один клик и получай апдейты в Telegram.",
   },
   {
-    icon: "🚴",
+    icon: Bike,
     color: "bg-purple-light text-purple",
     title: "Клубы по интересам",
     description:
       "Гревел, шоссе, MTB или городские покатушки — вступай в клуб или собирай свой и зови единомышленников.",
   },
   {
-    icon: "🗺️",
+    icon: Map,
     color: "bg-orange-light text-orange",
     title: "Маршруты и точки",
     description:
       "Делись треками и важными местами: родники, точки сбора, опасные участки, кафе с велопарковкой. Карта оживает находками райдеров.",
   },
   {
-    icon: "🔗",
+    icon: Link2,
     color: "bg-teal-light text-teal",
     title: "Дружит с твоими инструментами",
     description:
       "Не заставляем переучиваться. Подгружай треки из Komoot, Strava, MapMagic или GPX — мы добавляем социальный слой поверх.",
   },
   {
-    icon: "🤖",
+    icon: Bot,
     color: "bg-purple-light text-purple",
     title: "ИИ-поиск маршрутов",
     description:
       'Опиши идеальную поездку словами — «грунт на 50 км под Питером» — и нейросеть подберёт подходящие треки.',
   },
   {
-    icon: "📊",
+    icon: BarChart3,
     color: "bg-orange-light text-orange",
     title: "Синхронизация со Strava",
     description:
@@ -178,7 +182,7 @@ export default function LandingPage() {
       <section className="border-y border-border bg-surface">
         <div className="mx-auto grid max-w-6xl gap-6 px-6 py-10 md:grid-cols-3">
           <div className="flex items-start gap-3">
-            <span className="text-2xl">🌱</span>
+            <Sprout size={24} className="shrink-0 text-teal" aria-hidden />
             <div>
               <div className="font-semibold text-text">Запускаемся</div>
               <p className="text-sm text-muted">
@@ -188,7 +192,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="flex items-start gap-3">
-            <span className="text-2xl">🛠</span>
+            <Wrench size={24} className="shrink-0 text-orange" aria-hidden />
             <div>
               <div className="font-semibold text-text">Делаем открыто</div>
               <p className="text-sm text-muted">
@@ -198,7 +202,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="flex items-start gap-3">
-            <span className="text-2xl">🤝</span>
+            <Handshake size={24} className="shrink-0 text-purple" aria-hidden />
             <div>
               <div className="font-semibold text-text">Не дублируем — дополняем</div>
               <p className="text-sm text-muted">
@@ -224,15 +228,15 @@ export default function LandingPage() {
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {features.map(({ icon, color, title, description }) => (
+            {features.map(({ icon: Icon, color, title, description }) => (
               <div
                 key={title}
                 className="rounded-2xl border border-border bg-surface p-6 shadow-card transition-shadow hover:shadow-card-hover"
               >
                 <div
-                  className={`mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl text-2xl ${color}`}
+                  className={`mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl ${color}`}
                 >
-                  {icon}
+                  <Icon size={24} aria-hidden />
                 </div>
                 <h3 className="mb-2 text-lg font-bold text-text">{title}</h3>
                 <p className="text-sm leading-relaxed text-muted">
@@ -340,16 +344,16 @@ export default function LandingPage() {
               <div className="relative flex items-center justify-center p-10 md:p-14">
                 <div className="grid gap-3 sm:grid-cols-2">
                   {[
-                    { emoji: "🚵", title: "MTB", body: "Грязь, корни, лес" },
-                    { emoji: "🏁", title: "Шоссе", body: "Скорость и пелотоны" },
-                    { emoji: "🪨", title: "Гревел", body: "Грунт без границ" },
-                    { emoji: "🏙", title: "Город", body: "Покатушки по району" },
-                  ].map(({ emoji, title, body }) => (
+                    { icon: Mountain, title: "MTB", body: "Грязь, корни, лес" },
+                    { icon: Flag, title: "Шоссе", body: "Скорость и пелотоны" },
+                    { icon: Compass, title: "Гревел", body: "Грунт без границ" },
+                    { icon: Building2, title: "Город", body: "Покатушки по району" },
+                  ].map(({ icon: Icon, title, body }) => (
                     <div
                       key={title}
                       className="rounded-2xl bg-surface/10 p-4 ring-1 ring-white/10"
                     >
-                      <div className="text-2xl">{emoji}</div>
+                      <Icon size={24} className="text-surface" aria-hidden />
                       <div className="mt-2 font-semibold text-surface">{title}</div>
                       <div className="text-xs opacity-60">{body}</div>
                     </div>
@@ -364,8 +368,8 @@ export default function LandingPage() {
       {/* AI search callout */}
       <section className="bg-bg py-20">
         <div className="mx-auto max-w-4xl px-6 text-center">
-          <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-light text-3xl">
-            🤖
+          <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-light text-purple">
+            <Bot size={28} aria-hidden />
           </div>
           <h2 className="mb-4 text-4xl font-extrabold text-text">
             Ищешь маршрут? Просто попроси

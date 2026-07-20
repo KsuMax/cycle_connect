@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bike, Mountain, Clock, Heart, ChevronRight, Shield } from "lucide-react";
+import { Bike, Mountain, Clock, Heart, ChevronRight, Shield, MapPin, Map } from "lucide-react";
 import { DifficultyBadge, Badge } from "@/components/ui/Badge";
 import { AvatarGroup } from "@/components/ui/Avatar";
 import { cn } from "@/lib/utils";
@@ -96,8 +96,8 @@ export function RouteCard({ route, compact = false, priority = false }: RouteCar
 
           {/* Region label */}
           <div className="absolute top-3 left-3">
-            <span className="text-xs font-medium px-2 py-1 rounded-lg bg-white/80 backdrop-blur-sm text-[#71717A]">
-              📍 {route.region}
+            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg bg-white/80 backdrop-blur-sm text-[#71717A]">
+              <MapPin size={11} aria-hidden /> {route.region}
             </span>
           </div>
 
@@ -110,8 +110,8 @@ export function RouteCard({ route, compact = false, priority = false }: RouteCar
         {/* Content */}
         <div className="p-4 flex flex-col flex-1">
           <div className="flex items-center gap-1.5 mb-2 flex-wrap">
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-md" style={{ backgroundColor: "#FFF0EB", color: "#F4632A" }}>
-              🗺 Маршрут
+            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-md" style={{ backgroundColor: "#FFF0EB", color: "#F4632A" }}>
+              <Map size={11} aria-hidden /> Маршрут
             </span>
             {route.club && (
               <span

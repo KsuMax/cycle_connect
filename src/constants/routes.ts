@@ -1,5 +1,10 @@
 import type { Difficulty, Surface, RouteType } from "@/types";
-import { Leaf, Flame, Mountain, type LucideIcon } from "lucide-react";
+import {
+  Leaf, Flame, Mountain, Fish, Waves, Sailboat, TreePalm, Trees, Binoculars,
+  Droplets, Coffee, GlassWater, Church, TrainFront, Castle, Landmark, MapPinned,
+  Flower, Sun, Snowflake,
+  type LucideIcon,
+} from "lucide-react";
 
 export const SURFACES: { value: Surface; label: string }[] = [
   { value: "asphalt", label: "Асфальт" },
@@ -20,27 +25,27 @@ export const DIFFICULTIES: { value: Difficulty; label: string; icon: LucideIcon 
   { value: "hard",   label: "Сложный", icon: Mountain },
 ];
 
-export const POI_TAGS: { value: string; label: string; emoji: string }[] = [
-  { value: "lake",        label: "Озеро",                    emoji: "🏞" },
-  { value: "river",       label: "Река",                     emoji: "🌊" },
-  { value: "sea",         label: "Море",                     emoji: "🏖" },
-  { value: "forest",      label: "Лес",                      emoji: "🌲" },
-  { value: "mountain",    label: "Горы",                     emoji: "🏔" },
-  { value: "viewpoint",   label: "Видовое место",            emoji: "👁" },
-  { value: "waterfall",   label: "Водопад",                  emoji: "💧" },
-  { value: "beach",       label: "Пляж",                     emoji: "🏝" },
-  { value: "cafe",        label: "Кафе / еда",               emoji: "☕" },
-  { value: "water_source",label: "Родник",                   emoji: "🚰" },
-  { value: "monastery",   label: "Храм / монастырь",         emoji: "⛪" },
-  { value: "station",     label: "Электричка рядом",         emoji: "🚂" },
-  { value: "castle",      label: "Замок / крепость",         emoji: "🏰" },
-  { value: "historical",  label: "Исторический",             emoji: "🏛" },
-  { value: "landmarks",   label: "Много достопримечательностей", emoji: "🗺" },
+export const POI_TAGS: { value: string; label: string; icon: LucideIcon }[] = [
+  { value: "lake",        label: "Озеро",                    icon: Fish },
+  { value: "river",       label: "Река",                     icon: Waves },
+  { value: "sea",         label: "Море",                     icon: Sailboat },
+  { value: "forest",      label: "Лес",                      icon: Trees },
+  { value: "mountain",    label: "Горы",                     icon: Mountain },
+  { value: "viewpoint",   label: "Видовое место",            icon: Binoculars },
+  { value: "waterfall",   label: "Водопад",                  icon: Droplets },
+  { value: "beach",       label: "Пляж",                     icon: TreePalm },
+  { value: "cafe",        label: "Кафе / еда",               icon: Coffee },
+  { value: "water_source",label: "Родник",                   icon: GlassWater },
+  { value: "monastery",   label: "Храм / монастырь",         icon: Church },
+  { value: "station",     label: "Электричка рядом",         icon: TrainFront },
+  { value: "castle",      label: "Замок / крепость",         icon: Castle },
+  { value: "historical",  label: "Исторический",             icon: Landmark },
+  { value: "landmarks",   label: "Много достопримечательностей", icon: MapPinned },
 ];
 
-export const SEASONS: { months: number[]; label: string; emoji: string }[] = [
-  { months: [3, 4, 5],    label: "Весна",  emoji: "🌸" },
-  { months: [6, 7, 8],    label: "Лето",   emoji: "☀️" },
-  { months: [9, 10, 11],  label: "Осень",  emoji: "🍂" },
-  { months: [12, 1, 2],   label: "Зима",   emoji: "❄️" },
+export const SEASONS: { months: number[]; label: string; icon: LucideIcon }[] = [
+  { months: [3, 4, 5],    label: "Весна",  icon: Flower },
+  { months: [6, 7, 8],    label: "Лето",   icon: Sun },
+  { months: [9, 10, 11],  label: "Осень",  icon: Leaf },
+  { months: [12, 1, 2],   label: "Зима",   icon: Snowflake },
 ];

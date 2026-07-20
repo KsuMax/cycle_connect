@@ -4,7 +4,7 @@ import { useState, use, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
-import { MapPin, Link as LinkIcon, ChevronRight, AlertCircle, ChevronLeft, Shield, X, Download, Loader2, CheckCircle2 } from "lucide-react";
+import { MapPin, Link as LinkIcon, ChevronRight, AlertCircle, ChevronLeft, Shield, X, Download, Loader2, CheckCircle2, Map } from "lucide-react";
 import { ImageUpload } from "@/components/routes/ImageUpload";
 import { CoverUpload } from "@/components/routes/CoverUpload";
 import { GpxUpload } from "@/components/routes/GpxUpload";
@@ -443,7 +443,7 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
       <div className="min-h-screen bg-[#F5F4F1]">
         <Header />
         <main className="max-w-2xl mx-auto px-4 py-20 text-center">
-          <div className="text-4xl mb-3">🗺️</div>
+          <Map size={36} className="mx-auto mb-3 text-[#A1A1AA]" aria-hidden />
           <h2 className="text-xl font-bold text-[#1C1C1E] mb-2">Маршрут не найден</h2>
           <Link href="/routes" className="text-sm text-[#F4632A] hover:underline">← Все маршруты</Link>
         </main>
@@ -548,13 +548,13 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
             <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">Места и природа</label>
             <p className="text-xs text-[#71717A] mb-3">Что встречается на маршруте? Помогает находить его в поиске</p>
             <div className="flex flex-wrap gap-2">
-              {POI_TAGS.map(({ value, label, emoji }) => (
+              {POI_TAGS.map(({ value, label, icon: Icon }) => (
                 <button type="button" key={value} onClick={() => togglePoi(value)}
-                  className="px-3 py-1.5 rounded-xl text-sm font-medium transition-colors border"
+                  className="px-3 py-1.5 rounded-xl text-sm font-medium transition-colors border inline-flex items-center gap-1.5"
                   style={poiTags.includes(value)
                     ? { backgroundColor: "#1C1C1E", color: "white", borderColor: "#1C1C1E" }
                     : { backgroundColor: "white", color: "#71717A", borderColor: "#E4E4E7" }}>
-                  {emoji} {label}
+                  <Icon size={14} aria-hidden /> {label}
                 </button>
               ))}
             </div>
@@ -565,15 +565,15 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
             <label className="block text-sm font-semibold text-[#1C1C1E] mb-1">Лучший сезон</label>
             <p className="text-xs text-[#71717A] mb-3">Когда маршрут особенно хорош? Можно выбрать несколько</p>
             <div className="flex gap-2">
-              {SEASONS.map(({ months, label, emoji }) => {
+              {SEASONS.map(({ months, label, icon: Icon }) => {
                 const active = months.every((m) => seasonMonths.includes(m));
                 return (
                   <button type="button" key={label} onClick={() => toggleSeason(months)}
-                    className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors border text-center"
+                    className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors border flex items-center justify-center gap-1.5"
                     style={active
                       ? { backgroundColor: "#1C1C1E", color: "white", borderColor: "#1C1C1E" }
                       : { backgroundColor: "white", color: "#71717A", borderColor: "#E4E4E7" }}>
-                    {emoji} {label}
+                    <Icon size={15} aria-hidden /> {label}
                   </button>
                 );
               })}
