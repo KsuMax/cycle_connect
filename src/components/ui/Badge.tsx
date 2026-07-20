@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import type { Difficulty } from "@/types";
+import { Leaf, Flame, Mountain, type LucideIcon } from "lucide-react";
 
 interface BadgeProps {
   children?: React.ReactNode;
@@ -8,21 +9,22 @@ interface BadgeProps {
   className?: string;
 }
 
-const DIFFICULTY_CONFIG: Record<Difficulty, { label: string; bg: string; text: string; emoji: string }> = {
-  easy: { label: "Лёгкий", bg: "#DCFCE7", text: "#15803D", emoji: "⭐" },
-  medium: { label: "Средний", bg: "#FEF3C7", text: "#B45309", emoji: "🔥" },
-  hard: { label: "Сложный", bg: "#FEE2E2", text: "#DC2626", emoji: "💀" },
+const DIFFICULTY_CONFIG: Record<Difficulty, { label: string; bg: string; text: string; icon: LucideIcon }> = {
+  easy: { label: "Лёгкий", bg: "#DCFCE7", text: "#15803D", icon: Leaf },
+  medium: { label: "Средний", bg: "#FEF3C7", text: "#B45309", icon: Flame },
+  hard: { label: "Сложный", bg: "#FEE2E2", text: "#DC2626", icon: Mountain },
 };
 
 export function Badge({ children, variant = "default", difficulty, className }: BadgeProps) {
   if (variant === "difficulty" && difficulty) {
     const cfg = DIFFICULTY_CONFIG[difficulty];
+    const Icon = cfg.icon;
     return (
       <span
         className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold", className)}
         style={{ backgroundColor: cfg.bg, color: cfg.text }}
       >
-        <span>{cfg.emoji}</span>
+        <Icon size={13} strokeWidth={2.5} aria-hidden />
         <span>{cfg.label}</span>
       </span>
     );

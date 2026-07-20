@@ -112,13 +112,13 @@ export function StepDetails({
       <div className="bg-white rounded-2xl p-5 border border-[#E4E4E7]" style={{ boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.07)" }}>
         <label className="block text-sm font-semibold text-[#1C1C1E] mb-3">Сложность *</label>
         <div className="flex gap-3">
-          {DIFFICULTIES.map(({ value, label, emoji }) => (
+          {DIFFICULTIES.map(({ value, label, icon: Icon }) => (
             <button type="button" key={value} onClick={() => onDifficultyChange(value)}
-              className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors border text-center"
+              className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors border flex items-center justify-center gap-1.5"
               style={difficulty === value
                 ? { backgroundColor: "#F4632A", color: "white", borderColor: "#F4632A" }
                 : { backgroundColor: "white", color: "#71717A", borderColor: "#E4E4E7" }}>
-              {emoji} {label}
+              <Icon size={16} aria-hidden /> {label}
             </button>
           ))}
         </div>

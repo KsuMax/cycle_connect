@@ -1,4 +1,5 @@
 import type { Difficulty, Surface, RouteType } from "@/types";
+import { Leaf, Flame, Mountain, type LucideIcon } from "lucide-react";
 
 export const SURFACES: { value: Surface; label: string }[] = [
   { value: "asphalt", label: "Асфальт" },
@@ -13,10 +14,10 @@ export const ROUTE_TYPES: { value: RouteType; label: string }[] = [
   { value: "urban",  label: "Городской" },
 ];
 
-export const DIFFICULTIES: { value: Difficulty; label: string; emoji: string }[] = [
-  { value: "easy",   label: "Лёгкий",  emoji: "⭐" },
-  { value: "medium", label: "Средний", emoji: "🔥" },
-  { value: "hard",   label: "Сложный", emoji: "💪" },
+export const DIFFICULTIES: { value: Difficulty; label: string; icon: LucideIcon }[] = [
+  { value: "easy",   label: "Лёгкий",  icon: Leaf },
+  { value: "medium", label: "Средний", icon: Flame },
+  { value: "hard",   label: "Сложный", icon: Mountain },
 ];
 
 export const POI_TAGS: { value: string; label: string; emoji: string }[] = [
