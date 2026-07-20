@@ -3,7 +3,13 @@
 import { useState, useRef, useEffect, FormEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Sparkles, X, ArrowUp, MapPin, Mountain, LocateFixed, Wind, Calendar, Users } from "lucide-react";
+import {
+  Sparkles, X, ArrowUp, MapPin, Mountain, LocateFixed, Wind, Calendar, Users,
+  Ruler, Bike, Feather, Equal, TrendingUp, Map, Flower, Sun, Leaf, Snowflake,
+  CalendarX, Flame, MapPinOff, Route, TreePine, SearchX,
+  CloudRain, CloudDrizzle, CloudSun, Cloud, ThermometerSnowflake, ThermometerSun,
+  type LucideIcon,
+} from "lucide-react";
 import type { RouteResult, EventResult, ClubResult } from "@/app/api/ai-search/route";
 import { proxyImageUrl } from "@/lib/supabase";
 
@@ -41,7 +47,7 @@ interface RouteFilters {
 
 interface Chip {
   label: string;
-  emoji: string;
+  icon: LucideIcon;
   /** Returns null if chip is not applicable given current filters/results. */
   apply: (f: RouteFilters, routes: RouteResult[]) => RouteFilters | null;
 }
@@ -84,7 +90,7 @@ function matchReasons(route: RouteResult, filters: RouteFilters): string[] {
   const out: string[] = [];
 
   if (filters.region && route.region) {
-    out.push(`📍 ${route.region}`);
+    out.push(route.region);
   }
 
   const hasDist = filters.distance_target != null || filters.distance_min != null || filters.distance_max != null;
@@ -122,7 +128,7 @@ function matchReasons(route: RouteResult, filters: RouteFilters): string[] {
 const CHIPS: Chip[] = [
   {
     label: "Покороче",
-    emoji: "📏",
+    icon: Ruler,
     apply: (f) => {
       const max = f.distance_max ?? f.distance_target;
       if (!max) return null;
@@ -133,7 +139,7 @@ const CHIPS: Chip[] = [
   },
   {
     label: "Подлиннее",
-    emoji: "🚴",
+    icon: Bike,
     apply: (f) => {
       const base = f.distance_max ?? f.distance_target ?? f.distance_min;
       if (!base) return null;
@@ -143,7 +149,7 @@ const CHIPS: Chip[] = [
   },
   {
     label: "Проще",
-    emoji: "😌",
+    icon: Feather,
     apply: (f) => {
       if (f.difficulty === "easy") return null;
       const down: Record<string, string> = { hard: "medium", medium: "easy" };
@@ -153,7 +159,7 @@ const CHIPS: Chip[] = [
   },
   {
     label: "Сложнее",
-    emoji: "💪",
+    icon: Mountain,
     apply: (f) => {
       if (f.difficulty === "hard") return null;
       const up: Record<string, string> = { easy: "medium", medium: "hard" };
@@ -163,7 +169,7 @@ const CHIPS: Chip[] = [
   },
   {
     label: "Ровнее",
-    emoji: "🏞",
+    icon: Equal,
     apply: (f) => {
       if (f.elevation_max != null && f.elevation_max <= 150) return null;
       return { ...f, elevation_max: 150, elevation_min: undefined };
@@ -171,7 +177,7 @@ const CHIPS: Chip[] = [
   },
   {
     label: "Больше подъёмов",
-    emoji: "⛰️",
+    icon: TrendingUp,
     apply: (f) => {
       if (f.elevation_min != null && f.elevation_min >= 600) return null;
       return { ...f, elevation_min: 600, elevation_max: undefined };
@@ -179,7 +185,7 @@ const CHIPS: Chip[] = [
   },
   {
     label: "Другой регион",
-    emoji: "🗺️",
+    icon: Map,
     apply: (f) => {
       if (!f.region) return null;
       return { ...f, region: undefined };
@@ -187,7 +193,7 @@ const CHIPS: Chip[] = [
   },
   {
     label: "Весенний",
-    emoji: "🌸",
+    icon: Flower,
     apply: (f) => {
       if (f.season_month === 5) return null;
       return { ...f, season_month: 5 };
@@ -195,7 +201,7 @@ const CHIPS: Chip[] = [
   },
   {
     label: "Летний",
-    emoji: "☀️",
+    icon: Sun,
     apply: (f) => {
       if (f.season_month === 7) return null;
       return { ...f, season_month: 7 };
@@ -203,7 +209,7 @@ const CHIPS: Chip[] = [
   },
   {
     label: "Осенний",
-    emoji: "🍂",
+    icon: Leaf,
     apply: (f) => {
       if (f.season_month === 9) return null;
       return { ...f, season_month: 9 };
@@ -211,7 +217,7 @@ const CHIPS: Chip[] = [
   },
   {
     label: "Зимний",
-    emoji: "❄️",
+    icon: Snowflake,
     apply: (f) => {
       if (f.season_month === 1) return null;
       return { ...f, season_month: 1 };
@@ -219,7 +225,7 @@ const CHIPS: Chip[] = [
   },
   {
     label: "Убрать сезон",
-    emoji: "📅",
+    icon: CalendarX,
     apply: (f) => {
       if (f.season_month == null) return null;
       return { ...f, season_month: undefined };
@@ -227,7 +233,7 @@ const CHIPS: Chip[] = [
   },
   {
     label: "Расширить радиус",
-    emoji: "📍",
+    icon: LocateFixed,
     apply: (f) => {
       if (!f.near_km) return null;
       // 15 km → 40 km → drop geo filter entirely
@@ -237,7 +243,7 @@ const CHIPS: Chip[] = [
   },
   {
     label: "С попутным ветром",
-    emoji: "🌬️",
+    icon: Wind,
     apply: (f) => {
       if (f.wind_intent) return null;
       return { ...f, wind_intent: true };
@@ -245,7 +251,7 @@ const CHIPS: Chip[] = [
   },
   {
     label: "По популярности",
-    emoji: "🔥",
+    icon: Flame,
     apply: (f) => {
       if (f.sort_by === "popular") return null;
       return { ...f, sort_by: "popular" };
@@ -253,7 +259,7 @@ const CHIPS: Chip[] = [
   },
   {
     label: "По совпадению",
-    emoji: "✨",
+    icon: Sparkles,
     apply: (f) => {
       if (f.sort_by !== "popular") return null;
       return { ...f, sort_by: "relevance" };
@@ -261,7 +267,7 @@ const CHIPS: Chip[] = [
   },
   {
     label: "Без фильтра мест",
-    emoji: "🗺️",
+    icon: MapPinOff,
     apply: (f) => {
       if (!f.poi_tags?.length) return null;
       return { ...f, poi_tags: undefined };
@@ -269,7 +275,7 @@ const CHIPS: Chip[] = [
   },
   {
     label: "Только асфальт",
-    emoji: "🛣️",
+    icon: Route,
     apply: (f) => {
       if (f.surface?.includes("asphalt") && f.surface.length === 1) return null;
       return { ...f, surface: ["asphalt"] };
@@ -277,7 +283,7 @@ const CHIPS: Chip[] = [
   },
   {
     label: "Грунт / гравий",
-    emoji: "🌲",
+    icon: TreePine,
     apply: (f) => {
       if (f.surface?.includes("gravel")) return null;
       return { ...f, surface: ["gravel", "dirt"] };
@@ -291,6 +297,17 @@ const FALLBACK_SUGGESTIONS = [
   "Горный MTB в Карелии",
   "Гравийный маршрут с видами",
 ];
+
+/** Maps the emoji prefix of the server-built comfort label to a lucide icon. */
+const COMFORT_ICONS: Record<string, LucideIcon> = {
+  "🌧": CloudRain, "🌦": CloudDrizzle, "🥶": ThermometerSnowflake, "🧤": ThermometerSnowflake,
+  "🥵": ThermometerSun, "🌤": CloudSun, "☁": Cloud,
+};
+
+function comfortIconFor(label: string): LucideIcon {
+  const token = label.split(" ")[0].replace(/\uFE0F/g, "");
+  return COMFORT_ICONS[token] ?? CloudSun;
+}
 
 const DIFFICULTY_STYLES: Record<string, string> = {
   easy: "bg-emerald-50 text-emerald-700",
@@ -372,33 +389,33 @@ function parseTraceLabel(phase: SearchPhase, filters: RouteFilters | null, isRef
     if (filters.region) parts.push(filters.region);
     if (filters.surface?.includes("asphalt")) parts.push("асфальт");
     else if (filters.surface?.includes("gravel")) parts.push("гравий");
-    if (filters.wind_intent) parts.push("🌬 попутный ветер");
-    if (filters.near_km) parts.push(`📍 в ${filters.near_km} км от тебя`);
+    if (filters.wind_intent) parts.push("попутный ветер");
+    if (filters.near_km) parts.push(`в ${filters.near_km} км от тебя`);
     if (filters.poi_tags?.length) {
-      const POI_EMOJI: Record<string, string> = {
-        lake: "🏞 озеро", river: "🌊 река", sea: "🌊 море", forest: "🌲 лес",
-        viewpoint: "🔭 виды", waterfall: "💧 водопад", cafe: "☕ кафе",
-        water_source: "💧 родник", monastery: "⛪ монастырь", station: "🚂 электричка",
-        park: "🌳 парк", beach: "🏖 пляж", mountain: "⛰️ горы",
-        bridge: "🌉 мост", field: "🌾 поля", castle: "🏰 замок",
+      const POI_LABEL: Record<string, string> = {
+        lake: "озеро", river: "река", sea: "море", forest: "лес",
+        viewpoint: "виды", waterfall: "водопад", cafe: "кафе",
+        water_source: "родник", monastery: "монастырь", station: "электричка",
+        park: "парк", beach: "пляж", mountain: "горы",
+        bridge: "мост", field: "поля", castle: "замок",
       };
-      parts.push(filters.poi_tags.map((t) => POI_EMOJI[t] ?? t).join(", "));
+      parts.push(filters.poi_tags.map((t) => POI_LABEL[t] ?? t).join(", "));
     }
     if (filters.duration_days_min != null || filters.duration_days_max != null) {
       const lo = filters.duration_days_min;
       const hi = filters.duration_days_max;
-      if (lo === hi && lo != null) parts.push(`🗓 на ${lo} дн.`);
-      else if (lo != null && hi != null) parts.push(`🗓 ${lo}–${hi} дн.`);
-      else if (lo != null) parts.push(`🗓 от ${lo} дн.`);
-      else if (hi != null) parts.push(`🗓 до ${hi} дн.`);
+      if (lo === hi && lo != null) parts.push(`на ${lo} дн.`);
+      else if (lo != null && hi != null) parts.push(`${lo}–${hi} дн.`);
+      else if (lo != null) parts.push(`от ${lo} дн.`);
+      else if (hi != null) parts.push(`до ${hi} дн.`);
     } else if (filters.multi_day_only === true) {
-      parts.push("🗓 многодневный");
+      parts.push("многодневный");
     } else if (filters.multi_day_only === false) {
-      parts.push("🗓 однодневный");
+      parts.push("однодневный");
     }
     if (filters.season_month != null) {
       const SEASON_LABEL: Record<number, string> = {
-        1: "❄️ зима", 5: "🌸 весна", 7: "☀️ лето", 9: "🍂 осень",
+        1: "зима", 5: "весна", 7: "лето", 9: "осень",
       };
       parts.push(SEASON_LABEL[filters.season_month] ?? `месяц ${filters.season_month}`);
     }
@@ -831,7 +848,7 @@ export function AiSearchWidget() {
             (entityType === "clubs" && clubs !== null && clubs.length === 0)
           ) && (
             <div className="text-center py-8">
-              <p className="text-2xl mb-2">🔍</p>
+              <SearchX size={28} className="mx-auto mb-2 text-[#A1A1AA]" aria-hidden />
               <p className="text-sm font-medium text-[#1C1C1E]">Ничего не нашлось</p>
               <p className="text-xs text-[#71717A] mt-1 max-w-xs mx-auto">
                 {entityType === "events"
@@ -846,8 +863,9 @@ export function AiSearchWidget() {
           {/* Event results */}
           {phase === "done" && entityType === "events" && events !== null && events.length > 0 && (
             <div className="space-y-2.5 pt-1">
-              <p className="text-xs text-[#71717A]">
-                📅 Найдено {events.length} {events.length === 1 ? "событие" : events.length < 5 ? "события" : "событий"}
+              <p className="text-xs text-[#71717A] flex items-center gap-1">
+                <Calendar size={12} aria-hidden />
+                Найдено {events.length} {events.length === 1 ? "событие" : events.length < 5 ? "события" : "событий"}
               </p>
               {events.map((e) => (
                 <Link
@@ -890,8 +908,9 @@ export function AiSearchWidget() {
           {/* Club results */}
           {phase === "done" && entityType === "clubs" && clubs !== null && clubs.length > 0 && (
             <div className="space-y-2.5 pt-1">
-              <p className="text-xs text-[#71717A]">
-                👥 Найдено {clubs.length} {clubs.length === 1 ? "клуб" : clubs.length < 5 ? "клуба" : "клубов"}
+              <p className="text-xs text-[#71717A] flex items-center gap-1">
+                <Users size={12} aria-hidden />
+                Найдено {clubs.length} {clubs.length === 1 ? "клуб" : clubs.length < 5 ? "клуба" : "клубов"}
               </p>
               {clubs.map((c) => (
                 <Link
@@ -957,21 +976,22 @@ export function AiSearchWidget() {
               {/* Popularity banner */}
               {activeFilters?.sort_by === "popular" && !relaxedReason && !activeFilters.wind_intent && (
                 <div className="flex items-center gap-1.5 text-xs text-orange-600 font-medium mb-1">
-                  <span>🔥</span> Сортировка по популярности
+                  <Flame size={12} aria-hidden /> Сортировка по популярности
                 </div>
               )}
               {relaxedReason ? (
                 <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-100 mb-1">
-                  <span className="text-base leading-none mt-0.5">🔎</span>
+                  <SearchX size={16} className="text-amber-600 flex-shrink-0 mt-0.5" aria-hidden />
                   <div>
                     <p className="text-xs font-medium text-amber-800">Точных совпадений нет — вот похожие</p>
                     <p className="text-xs text-amber-600 mt-0.5">{relaxedReason[0].toUpperCase() + relaxedReason.slice(1)}</p>
                   </div>
                 </div>
               ) : (
-                <p className="text-xs text-[#71717A]">
+                <p className="text-xs text-[#71717A] flex items-center gap-1">
+                  {detectedRegion && <MapPin size={11} className="flex-shrink-0" aria-hidden />}
                   {detectedRegion
-                    ? `📍 ${detectedRegion} · ${routes.length} маршрут${routes.length === 1 ? "" : routes.length < 5 ? "а" : "ов"}`
+                    ? `${detectedRegion} · ${routes.length} маршрут${routes.length === 1 ? "" : routes.length < 5 ? "а" : "ов"}`
                     : `Найдено ${routes.length} маршрут${routes.length === 1 ? "" : routes.length < 5 ? "а" : "ов"} по запросу «${query}»`
                   }
                 </p>
@@ -986,7 +1006,7 @@ export function AiSearchWidget() {
                       onClick={() => onChip(chip)}
                       className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-full border border-[#E4E4E7] text-[#3F3F46] bg-white hover:border-[#7C5CFC] hover:text-[#7C5CFC] hover:bg-[#FAFAFF] transition-colors active:scale-95"
                     >
-                      <span>{chip.emoji}</span>
+                      <chip.icon size={13} className="flex-shrink-0" aria-hidden />
                       <span>{chip.label}</span>
                     </button>
                   ))}
@@ -1046,7 +1066,7 @@ export function AiSearchWidget() {
                     {/* Comfort badge (weather_intent without wind) */}
                     {r.comfort != null && r.wind_score == null && (
                       <p className="text-xs font-medium mt-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-sky-50 text-sky-700">
-                        <span>{r.comfort.label.split(" ")[0]}</span>
+                        {(() => { const ComfortIcon = comfortIconFor(r.comfort.label); return <ComfortIcon size={11} aria-hidden />; })()}
                         <span>{r.comfort.temp_c}°C</span>
                         {r.comfort.precip_pct > 0 && (
                           <span className="text-sky-500">· {r.comfort.precip_pct}% дождь</span>
