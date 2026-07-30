@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, use, useEffect } from "react";
+import { useState, use, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
@@ -66,6 +66,8 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
   const [importing, setImporting] = useState(false);
   const [importStatus, setImportStatus] = useState<"idle" | "success" | "error">("idle");
   const [importError, setImportError] = useState<string | null>(null);
+  // Ссылка, уже сохранённая у маршрута: для неё GPX подтягивать не нужно.
+  const savedMapUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     supabase
@@ -100,6 +102,7 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
 
       setTitle(data.title ?? "");
       setDescription(data.description ?? "");
+      savedMapUrlRef.current = data.mapmagic_url ?? "";
       setMapUrl(data.mapmagic_url ?? "");
       setRegion((data.region ?? "").split(",").map((r: string) => r.trim()).filter(Boolean));
       setDistance(data.distance_km ? String(data.distance_km) : "");
@@ -226,7 +229,11 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
   };
 
   // Auto-import: trigger 800ms after user stops typing a MapMagic URL.
+  // Только для ссылки, которую поменяли руками: у уже сохранённой GPX загружен
+  // ранее, а фоновой импорт перетирал бы дистанцию/набор/длительность,
+  // отредактированные пользователем сразу после открытия страницы.
   useEffect(() => {
+    if (savedMapUrlRef.current === null || mapUrl === savedMapUrlRef.current) return;
     if (!isMapMagicUrl(mapUrl) || importStatus !== "idle" || importing) return;
     const timer = setTimeout(() => { handleImport(); }, 800);
     return () => clearTimeout(timer);
