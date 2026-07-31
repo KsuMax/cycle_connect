@@ -55,7 +55,9 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 Дополнительно (по используемым функциям):
 
 ```env
-# AI
+# AI — цепочка провайдеров: Gemini → OpenRouter → Ollama → DeepSeek
+GEMINI_API_KEY=              # ключ Google AI Studio (AIza…), основной провайдер
+GEMINI_MODELS=               # необязательно; по умолчанию gemini-3.5-flash,gemini-2.5-flash
 OLLAMA_URL=http://localhost:11434
 OLLAMA_CHAT_MODEL=llama3.2:3b
 OPENROUTER_API_KEY=
@@ -68,6 +70,12 @@ NEXT_PUBLIC_MAPTILER_KEY=
 NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_API_BASE=https://api.telegram.org
+
+# Egress через SOCKS5-туннель. На проде обязателен: российский IP VPS
+# блокируют и Google (400 FAILED_PRECONDITION), и OpenRouter (403), и Telegram.
+# Локально не задавать — соединения пойдут напрямую.
+SOCKS_PROXY=                 # напр. socks5h://host.docker.internal:1080
+TELEGRAM_SOCKS_PROXY=        # историческое имя того же туннеля, тоже работает
 
 # Strava / cron
 STRAVA_CLIENT_ID=
