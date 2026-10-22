@@ -1,0 +1,7 @@
+# The server checkout (/opt/cycleconnect) has its own node_modules from a host
+# npm install; without this, COPY . . overwrote the fresh deps from the deps
+# stage and prod kept running May's packages. .env.production must stay in the
+# context: next build reads it.
+node_modules
+.next
+.git
