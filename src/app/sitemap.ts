@@ -11,22 +11,25 @@ export const dynamic = "force-dynamic";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const supabase = createAdminSupabase();
 
+  // These tables have no updated_at: selecting it fails the whole query and
+  // the sitemap silently drops every route, so errors are logged below.
   const [routesRes, eventsRes, clubsRes, reportsRes] = await Promise.all([
     supabase
       .from("routes")
-      .select("id, updated_at")
-      .order("updated_at", { ascending: false })
+      .select("id, created_at, gpx_updated_at")
+      .order("created_at", { ascending: false })
       .limit(5000),
     supabase
       .from("events")
-      .select("id, updated_at")
-      .order("updated_at", { ascending: false })
+      .select("id, created_at")
+      .eq("is_private", false)
+      .order("created_at", { ascending: false })
       .limit(2000),
     supabase
       .from("clubs")
-      .select("slug, updated_at, visibility")
+      .select("slug, created_at, last_activity_at, visibility")
       .neq("visibility", "closed")
-      .order("updated_at", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(2000),
     supabase
       .from("ride_reports")
@@ -34,6 +37,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .order("created_at", { ascending: false })
       .limit(5000),
   ]);
+
+  for (const [name, res] of [
+    ["routes", routesRes],
+    ["events", eventsRes],
+    ["clubs", clubsRes],
+    ["ride_reports", reportsRes],
+  ] as const) {
+    if (res.error) console.error(`[sitemap] ${name} query failed:`, res.error.message);
+  }
 
   const routes = routesRes.data;
   const events = eventsRes.data;
@@ -54,21 +66,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const routePages: MetadataRoute.Sitemap = (routes ?? []).map((r) => ({
     url: `${BASE_URL}/routes/${r.id}`,
-    lastModified: r.updated_at ? new Date(r.updated_at) : now,
+    lastModified: new Date(r.gpx_updated_at ?? r.created_at ?? now),
     changeFrequency: "weekly",
     priority: 0.7,
   }));
 
   const eventPages: MetadataRoute.Sitemap = (events ?? []).map((e) => ({
     url: `${BASE_URL}/events/${e.id}`,
-    lastModified: e.updated_at ? new Date(e.updated_at) : now,
+    lastModified: e.created_at ? new Date(e.created_at) : now,
     changeFrequency: "daily",
     priority: 0.8,
   }));
 
   const clubPages: MetadataRoute.Sitemap = (clubs ?? []).map((c) => ({
     url: `${BASE_URL}/clubs/${c.slug}`,
-    lastModified: c.updated_at ? new Date(c.updated_at) : now,
+    lastModified: new Date(c.last_activity_at ?? c.created_at ?? now),
     changeFrequency: "weekly",
     priority: 0.6,
   }));
