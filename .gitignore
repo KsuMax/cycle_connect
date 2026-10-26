@@ -43,8 +43,15 @@ next-env.d.ts
 # eslint cache
 .eslintcache
 
-# claude code local settings
-.claude/
+# claude code: агенты, скиллы, хуки и settings.json — в репо (нужны облачным сессиям);
+# личное и временное — нет
+.claude/settings.local.json
+.claude/worktrees/
+.claude/memory/
+
+# codex (config.toml содержит токен)
+.codex/
+.agents/
 
 # mcp config (contains tokens)
 .mcp.json

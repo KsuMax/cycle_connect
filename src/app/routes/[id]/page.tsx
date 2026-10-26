@@ -18,10 +18,10 @@ export async function generateMetadata(
     .single();
 
   if (!data) {
-    return { title: "Маршрут | CycleConnect" };
+    return { title: "Маршрут" };
   }
 
-  const title = `${data.title} | CycleConnect`;
+  const title = data.title;
   const description = data.description
     ? metaDescription(data.description)
     : `Велосипедный маршрут${data.distance_km ? ` · ${Math.round(data.distance_km)} км` : ""} на CycleConnect`;

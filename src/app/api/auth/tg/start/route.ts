@@ -13,21 +13,14 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { createHash, randomBytes } from "crypto";
+import { randomBytes } from "crypto";
 import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
+import { clientFingerprint } from "@/lib/tg-fingerprint";
 
 const NONCE_TTL_MS = 5 * 60 * 1000;
 
 function makeNonce(): string {
   return randomBytes(16).toString("base64url");
-}
-
-/** Hash UA + first IP from x-forwarded-for. Stable per-browser, not user-identifying. */
-export function clientFingerprint(req: NextRequest): string {
-  const ua = req.headers.get("user-agent") ?? "";
-  const xff = req.headers.get("x-forwarded-for") ?? "";
-  const ip = xff.split(",")[0].trim() || req.headers.get("x-real-ip") || "";
-  return createHash("sha256").update(`${ua}|${ip}`).digest("base64url");
 }
 
 export async function POST(req: NextRequest) {

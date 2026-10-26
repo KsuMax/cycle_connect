@@ -38,7 +38,7 @@ export function DayEditor({ placeholder, content = "", value, onChange }: DayEdi
   useEffect(() => {
     if (!editor || value === undefined) return;
     if (editor.getHTML() === value) return;
-    editor.commands.setContent(value, { emitUpdate: true });
+    editor.commands.setContent(value, true);
   }, [editor, value]);
 
   if (!editor) return null;

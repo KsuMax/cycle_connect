@@ -1194,8 +1194,8 @@ async function buildUserProfile(userId: string): Promise<RouteFilters | null> {
     .order("created_at", { ascending: false })
     .limit(30);
 
-  const ridden = (rows ?? [])
-    .map((r: { routes: { distance_km: number | null; elevation_m: number | null; difficulty: string | null; region: string | null; surface: string[] | null } | null }) => r.routes)
+  const ridden = ((rows ?? []) as unknown as { routes: { distance_km: number | null; elevation_m: number | null; difficulty: string | null; region: string | null; surface: string[] | null } | null }[])
+    .map((r) => r.routes)
     .filter((r): r is NonNullable<typeof r> => r != null);
 
   if (ridden.length < 3) return null;
@@ -1243,10 +1243,12 @@ function logSearch(
       entity_type: entityType,
       relaxed,
     })
-    .then(() => {})
-    .catch((e: unknown) => {
-      console.warn("[ai-search] logSearch failed:", e instanceof Error ? e.message : String(e));
-    });
+    .then(
+      () => {},
+      (e: unknown) => {
+        console.warn("[ai-search] logSearch failed:", e instanceof Error ? e.message : String(e));
+      },
+    );
 }
 
 // ─── SSE helpers ──────────────────────────────────────────────────────────────

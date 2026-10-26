@@ -79,8 +79,8 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: false })
     .limit(30);
 
-  const ridden: RiddenRoute[] = (rows ?? [])
-    .map((r: { routes: RiddenRoute | null }) => r.routes)
+  const ridden: RiddenRoute[] = ((rows ?? []) as unknown as { routes: RiddenRoute | null }[])
+    .map((r) => r.routes)
     .filter((r): r is RiddenRoute => r != null);
 
   if (ridden.length < 2) {

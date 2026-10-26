@@ -16,7 +16,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { clientFingerprint } from "../start/route";
+import { clientFingerprint } from "@/lib/tg-fingerprint";
 
 export async function GET(req: NextRequest) {
   const nonce = req.nextUrl.searchParams.get("nonce");

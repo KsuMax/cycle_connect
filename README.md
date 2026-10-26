@@ -118,21 +118,24 @@ src/
   types/               # типы доменной модели
 
 supabase/
-  migrations/          # SQL-миграции
-  functions/           # Edge Functions (Telegram и пр.)
+  migrations/          # SQL-миграции (NNN_name.sql, применяются вручную)
+  functions/           # Edge Functions: tg-notify, tg-webhook, email-notify
+
+public/email-templates/ # письма авторизации — GoTrue на проде берёт их отсюда по URL
+scripts/               # разовые утилиты (few-shot, SRTM, эмбеддинги, dry-run LLM)
+data/few-shot/         # примеры для AI-описаний маршрутов
+docs/RUNBOOK.md        # прод: деплой, сервер, миграции, поломки
+.claude/               # агенты, скиллы и хуки Claude Code (общие для локальных и облачных сессий)
 ```
 
 ---
 
 ## Supabase и миграции
 
-В репозитории есть SQL-миграции в `supabase/migrations`.
-
-Типовой workflow:
-
-1. Поднять локальный Supabase.
-2. Применить миграции.
-3. Проверить переменные из `.env.local`.
+Прод работает на self-hosted Supabase на VPS (`api.cycleconnect.cc`), облачный
+проект на supabase.com устарел. Новая миграция — следующий номер в
+`supabase/migrations/`; деплой её **не применяет**, это делается вручную на
+сервере — см. [docs/RUNBOOK.md](docs/RUNBOOK.md#миграции).
 
 ---
 
@@ -146,24 +149,24 @@ supabase/
 
 ## Продакшн
 
-- В `next.config.ts` настроены security headers.
-- Есть rewrites для проксирования Supabase endpoint’ов через домен приложения.
-- Используется `output: "standalone"` для контейнеризации и деплоя.
+- Деплой — любой коммит в `main` (GitHub Action `deploy.yml` → VPS). Подробности,
+  откат и разбор поломок — в [docs/RUNBOOK.md](docs/RUNBOOK.md).
+- В `next.config.ts` настроены security headers и rewrites, проксирующие
+  Supabase через домен приложения; `output: "standalone"` для Docker.
 
 ---
 
-## Вклад в проект
+## Как вносить изменения
 
-1. Создайте feature-branch.
-2. Делайте небольшие атомарные коммиты.
-3. Перед PR запускайте:
+- PR и ветки проверяет CI (`ci.yml`): `tsc --noEmit` и `vitest`; eslint пока
+  только информирует.
+- Мерж в `main` сразу выкатывается на прод — перед мержем убедиться, что CI зелёный.
+- Облачные сессии Claude Code работают с этим репо без доп. настройки:
+  хук `.claude/hooks/session-start.sh` сам ставит зависимости. Доступа к серверу
+  и проду у них нет — миграции и всё на VPS делается локально.
 
 ```bash
-npm run lint
+npx tsc --noEmit
 npm run test
+npm run lint
 ```
-
-4. В описании PR указывайте проверенные сценарии.
-
----
-

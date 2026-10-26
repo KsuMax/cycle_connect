@@ -63,12 +63,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const report = await fetchReport(reportId);
 
   if (!report) {
-    return { title: "Отчёт | CycleConnect" };
+    return { title: "Отчёт" };
   }
 
   const author = report.author?.name ?? "Райдер";
   const routeTitle = report.route?.title ?? "маршруте";
-  const title = `Отчёт ${author} о ${routeTitle} | CycleConnect`;
+  const title = `Отчёт ${author} о ${routeTitle}`;
   const description =
     plainTextExcerpt(report.text) ||
     `Отчёт о велопоездке от ${formatDate(report.ridden_at)} на CycleConnect`;
