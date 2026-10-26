@@ -6,7 +6,7 @@ import { Bell, X, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useNotifications } from "@/lib/context/NotificationsContext";
 import { formatDate } from "@/lib/utils";
-import { proxyImageUrl, type DbNotification, type DbProfile } from "@/lib/supabase";
+import { type DbNotification, type DbProfile } from "@/lib/supabase";
 
 function formatNotification(n: DbNotification) {
   const actor = n.actor as DbProfile | undefined;
@@ -169,7 +169,7 @@ export function NotificationBell() {
                         style={{ backgroundColor: "#7C5CFC" }}
                       >
                         {actor?.avatar_url ? (
-                          <Image src={proxyImageUrl(actor.avatar_url) ?? actor.avatar_url} alt="" width={32} height={32} className="w-full h-full object-cover" />
+                          <Image src={actor.avatar_url} alt="" width={32} height={32} className="w-full h-full object-cover" />
                         ) : (
                           (actor?.name ?? "?")[0].toUpperCase()
                         )}

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
-import { proxyImageUrl } from "@/lib/supabase";
 import type { User } from "@/types";
 import type { UserSticker } from "@/lib/stickers";
 
@@ -41,7 +40,7 @@ export function Avatar({ user, size = "md", className, sticker }: AvatarProps) {
     >
       {user.avatar_url
         ? <Image
-            src={proxyImageUrl(user.avatar_url) ?? user.avatar_url}
+            src={user.avatar_url}
             alt={user.name}
             width={SIZE_PX[size]}
             height={SIZE_PX[size]}

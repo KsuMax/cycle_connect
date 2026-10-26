@@ -11,7 +11,6 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { useEventLikes } from "@/lib/context/EventLikesContext";
 import { useAuthModal } from "@/components/ui/AuthModal";
 import { useToast } from "@/lib/context/ToastContext";
-import { proxyImageUrl } from "@/lib/supabase";
 import type { CycleEvent } from "@/types";
 
 // Deterministic gradient palette — pick by hashing event id
@@ -113,7 +112,7 @@ export function EventCard({ event, priority = false }: EventCardProps) {
           {hasCover && (
             <>
               <Image
-                src={proxyImageUrl(event.cover_url) ?? event.cover_url!}
+                src={event.cover_url!}
                 alt={event.title}
                 fill
                 className="object-cover"

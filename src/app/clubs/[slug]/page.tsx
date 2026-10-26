@@ -12,7 +12,7 @@ import { ClubChecklist } from "@/components/clubs/ClubChecklist";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useAuthModal } from "@/components/ui/AuthModal";
 import { useToast } from "@/lib/context/ToastContext";
-import { supabase, proxyImageUrl } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { CLUB_LIST_SELECT, CLUB_MEMBERS_SELECT, ROUTE_LIST_SELECT, EVENT_LIST_SELECT } from "@/lib/queries";
 import { dbToClub, dbToClubMember, dbToRoute, dbToEvent } from "@/lib/transforms";
 import type { Club, ClubMember, Route, CycleEvent, ClubPoll, ClubPollOption } from "@/types";
@@ -383,7 +383,7 @@ export default function ClubPage({ params }: { params: Promise<{ slug: string }>
               >
                 {club.avatar_url ? (
                   <Image
-                    src={proxyImageUrl(club.avatar_url) ?? club.avatar_url}
+                    src={club.avatar_url}
                     alt={club.name}
                     width={56}
                     height={56}
@@ -931,7 +931,7 @@ function MemberRow({ member }: { member: ClubMember }) {
       >
         {p?.avatar_url ? (
           <Image
-            src={proxyImageUrl(p.avatar_url) ?? p.avatar_url}
+            src={p.avatar_url}
             alt={name}
             width={40}
             height={40}
@@ -987,7 +987,7 @@ function PendingMemberRow({
       >
         {p?.avatar_url ? (
           <Image
-            src={proxyImageUrl(p.avatar_url) ?? p.avatar_url}
+            src={p.avatar_url}
             alt={name}
             width={40}
             height={40}
@@ -1059,7 +1059,7 @@ function LeaderboardRow({ member, rank }: { member: ClubMember; rank: number }) 
       >
         {p?.avatar_url ? (
           <Image
-            src={proxyImageUrl(p.avatar_url) ?? p.avatar_url}
+            src={p.avatar_url}
             alt={name}
             width={40}
             height={40}

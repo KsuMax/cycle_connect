@@ -24,29 +24,6 @@ export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
-/**
- * Rewrite a Supabase storage URL to always go through our proxy.
- * DB stores absolute URLs like "https://xxx.supabase.co/storage/v1/object/public/..."
- * In Russia these are blocked. We always rewrite to "/api/supabase/storage/..."
- * so that server-rendered HTML and client HTML produce the same URL (no hydration mismatch),
- * and next/image can optimise them without needing remotePatterns for supabase.co.
- */
-export function proxyImageUrl(url: string | null | undefined): string | null | undefined {
-  if (!url) return url;
-  try {
-    const parsed = new URL(url);
-    if (parsed.hostname.endsWith(".supabase.co") || parsed.hostname.endsWith(".supabase.in")) {
-      // Strip query string (Supabase ?t= cache-buster) — our proxy sets
-      // Cache-Control: public, max-age=604800 so it is not needed, and
-      // next/image does not allow query strings in relative src paths.
-      return `/api/supabase${parsed.pathname}`;
-    }
-  } catch {
-    // not a valid URL (e.g. already a relative path), return as-is
-  }
-  return url;
-}
-
 // ─── Types matching DB schema ─────────────────────────────────────────────────
 
 export interface DbProfile {

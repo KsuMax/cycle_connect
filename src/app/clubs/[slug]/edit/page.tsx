@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { useAuth } from "@/lib/context/AuthContext";
-import { supabase, proxyImageUrl } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { CLUB_LIST_SELECT } from "@/lib/queries";
 import { dbToClub } from "@/lib/transforms";
 import type { Club } from "@/types";
@@ -213,7 +213,7 @@ export default function EditClubPage({ params }: { params: Promise<{ slug: strin
               >
                 {coverUrl ? (
                   <Image
-                    src={proxyImageUrl(coverUrl) ?? coverUrl}
+                    src={coverUrl}
                     alt="Обложка"
                     width={640}
                     height={112}
@@ -240,7 +240,7 @@ export default function EditClubPage({ params }: { params: Promise<{ slug: strin
                   >
                     {avatarUrl ? (
                       <Image
-                        src={proxyImageUrl(avatarUrl) ?? avatarUrl}
+                        src={avatarUrl}
                         alt="Аватар"
                         width={56}
                         height={56}

@@ -12,7 +12,6 @@ import { useLikes } from "@/lib/context/LikesContext";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useEventRides } from "@/lib/context/EventRidesContext";
 import { useInterests } from "@/lib/context/InterestsContext";
-import { proxyImageUrl } from "@/lib/supabase";
 import { formatRouteDuration } from "@/lib/duration";
 import type { Route, RouteType } from "@/types";
 
@@ -66,7 +65,7 @@ export function RouteCard({ route, compact = false, priority = false }: RouteCar
         <div className="relative overflow-hidden" style={{ height: compact ? 140 : 180 }}>
           {route.cover_url ? (
             <Image
-              src={proxyImageUrl(route.cover_url) ?? route.cover_url}
+              src={route.cover_url}
               alt={route.title}
               fill
               className="object-cover"

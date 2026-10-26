@@ -132,8 +132,7 @@ docs/RUNBOOK.md        # прод: деплой, сервер, миграции,
 
 ## Supabase и миграции
 
-Прод работает на self-hosted Supabase на VPS (`api.cycleconnect.cc`), облачный
-проект на supabase.com устарел. Новая миграция — следующий номер в
+Прод работает на self-hosted Supabase на VPS (`api.cycleconnect.cc`). Новая миграция — следующий номер в
 `supabase/migrations/`; деплой её **не применяет**, это делается вручную на
 сервере — см. [docs/RUNBOOK.md](docs/RUNBOOK.md#миграции).
 

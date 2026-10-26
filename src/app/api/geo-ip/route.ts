@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
  * Uses ip-api.com which is accessible from Russia.
  */
 export async function GET(req: NextRequest) {
-  // Prefer forwarded IP (behind Vercel/nginx proxy)
+  // Prefer forwarded IP (behind Caddy)
   const forwarded = req.headers.get("x-forwarded-for");
   const ip = forwarded ? forwarded.split(",")[0].trim() : (req as unknown as { ip?: string }).ip;
 

@@ -9,7 +9,7 @@ import { Avatar, AvatarGroup } from "@/components/ui/Avatar";
 import { ContactButton } from "@/components/ui/ContactButton";
 import { DifficultyBadge, Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { supabase, proxyImageUrl } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useEventLikes } from "@/lib/context/EventLikesContext";
 import {
@@ -413,7 +413,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               style={{ background: event.cover_url ? undefined : "linear-gradient(135deg, #0BBFB5 0%, #7C5CFC 100%)" }}>
               {event.cover_url ? (
                 <>
-                  <Image src={proxyImageUrl(event.cover_url) ?? event.cover_url} alt={event.title} fill className="object-cover" sizes="100vw" priority />
+                  <Image src={event.cover_url} alt={event.title} fill className="object-cover" sizes="100vw" priority />
                   <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.15) 60%, transparent 100%)" }} />
                 </>
               ) : (
@@ -992,7 +992,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                       className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center text-xs font-bold text-white shrink-0"
                       style={{ backgroundColor: "#7C5CFC" }}>
                       {r.avatar_url
-                        ? <Image src={proxyImageUrl(r.avatar_url) ?? r.avatar_url} alt={r.name} width={32} height={32} className="w-full h-full object-cover" />
+                        ? <Image src={r.avatar_url} alt={r.name} width={32} height={32} className="w-full h-full object-cover" />
                         : r.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
                       }
                     </div>

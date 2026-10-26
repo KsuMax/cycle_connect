@@ -36,7 +36,7 @@ const STATE_COOKIE = "strava_oauth_state";
 const BACKFILL_DAYS = 30;
 
 function errorRedirect(code: string): NextResponse {
-  // Log the error code so it appears in Vercel runtime logs.
+  // Log the error code so it appears in `docker logs cycleconnect-app`.
   // Never log tokens or personally-identifying data here.
   console.error(`[strava/callback] error: ${code}`);
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";

@@ -41,8 +41,7 @@ import { safeEqual } from "@/lib/secure-compare";
  *   6. After the batch, recompute_strava_stats once per touched user.
  *
  * Notes:
- * - Batch size is small (BATCH_SIZE=20) to stay well inside Vercel's
- *   request budget; pg_cron fires every minute, so 20/min = 1200/hour
+ * - Batch size is small (BATCH_SIZE=20) to keep each request short; pg_cron fires every minute, so 20/min = 1200/hour
  *   which is far more than a realistic fleet of athletes will produce.
  * - We never log raw tokens or raw activity payloads. Error strings
  *   are truncated before being written back to the queue row.

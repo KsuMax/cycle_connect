@@ -8,7 +8,7 @@ import { Header } from "@/components/layout/Header";
 import { CommunityTabs } from "@/components/layout/CommunityTabs";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useAuthModal } from "@/components/ui/AuthModal";
-import { supabase, proxyImageUrl } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { CLUB_LIST_SELECT } from "@/lib/queries";
 import { dbToClub } from "@/lib/transforms";
 import type { Club } from "@/types";
@@ -553,7 +553,7 @@ function ClubCard({
         >
           {club.avatar_url ? (
             <Image
-              src={proxyImageUrl(club.avatar_url) ?? club.avatar_url}
+              src={club.avatar_url}
               alt={club.name}
               width={44}
               height={44}

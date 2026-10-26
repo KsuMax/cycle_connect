@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 import { Map, Home, HelpCircle, Calendar, Shield, Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useNavigation } from "@/lib/context/NavigationContext";
-import { proxyImageUrl } from "@/lib/supabase";
 import { NotificationBell } from "@/components/ui/NotificationBell";
 
 const NAV_ITEMS = [
@@ -106,7 +105,7 @@ export function Header() {
                   style={{ backgroundColor: "#7C5CFC" }}
                 >
                   {profile?.avatar_url
-                    ? <Image src={proxyImageUrl(profile.avatar_url) ?? profile.avatar_url} alt="" width={28} height={28} className="w-full h-full object-cover" />
+                    ? <Image src={profile.avatar_url} alt="" width={28} height={28} className="w-full h-full object-cover" />
                     : initials}
                 </div>
               </a>
@@ -166,7 +165,7 @@ export function Header() {
                     style={{ backgroundColor: "#7C5CFC" }}
                   >
                     {profile?.avatar_url
-                      ? <Image src={proxyImageUrl(profile.avatar_url) ?? profile.avatar_url} alt="" width={28} height={28} className="w-full h-full object-cover" />
+                      ? <Image src={profile.avatar_url} alt="" width={28} height={28} className="w-full h-full object-cover" />
                       : initials}
                   </div>
                   <span>{profile?.name ?? "Профиль"}</span>

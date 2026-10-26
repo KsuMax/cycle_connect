@@ -11,7 +11,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { RouteResult, EventResult, ClubResult } from "@/app/api/ai-search/route";
-import { proxyImageUrl } from "@/lib/supabase";
 
 // ─── Filters type (mirrors server RouteFilters) ───────────────────────────────
 
@@ -875,7 +874,7 @@ export function AiSearchWidget() {
                   className="flex items-start gap-3 rounded-2xl border border-[#E4E4E7] p-4 hover:border-[#7C5CFC]/40 hover:bg-[#FAFAFF] transition-colors group"
                 >
                   {e.cover_url ? (
-                    <Image src={proxyImageUrl(e.cover_url) ?? e.cover_url} alt="" width={56} height={56} className="rounded-xl object-cover flex-shrink-0" />
+                    <Image src={e.cover_url} alt="" width={56} height={56} className="rounded-xl object-cover flex-shrink-0" />
                   ) : (
                     <div className="w-14 h-14 rounded-xl bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
                       <Calendar size={20} className="text-[#7C5CFC]" />
@@ -920,7 +919,7 @@ export function AiSearchWidget() {
                   className="flex items-center gap-3 rounded-2xl border border-[#E4E4E7] p-4 hover:border-[#7C5CFC]/40 hover:bg-[#FAFAFF] transition-colors group"
                 >
                   {c.avatar_url ? (
-                    <Image src={proxyImageUrl(c.avatar_url) ?? c.avatar_url} alt="" width={48} height={48} className="rounded-xl object-cover flex-shrink-0" />
+                    <Image src={c.avatar_url} alt="" width={48} height={48} className="rounded-xl object-cover flex-shrink-0" />
                   ) : (
                     <div className="w-12 h-12 rounded-xl bg-[#FFF0F6] flex items-center justify-center flex-shrink-0">
                       <Users size={18} className="text-[#E879A3]" />
@@ -1021,7 +1020,7 @@ export function AiSearchWidget() {
                   className="flex items-start gap-3 rounded-2xl border border-[#E4E4E7] p-4 hover:border-[#7C5CFC]/40 hover:bg-[#FAFAFF] transition-colors group"
                 >
                   {r.cover_url ? (
-                    <Image src={proxyImageUrl(r.cover_url) ?? r.cover_url} alt="" width={56} height={56} className="rounded-xl object-cover flex-shrink-0" />
+                    <Image src={r.cover_url} alt="" width={56} height={56} className="rounded-xl object-cover flex-shrink-0" />
                   ) : (
                     <div className="w-14 h-14 rounded-xl bg-[#F5F4F1] flex items-center justify-center flex-shrink-0">
                       <MapPin size={20} className="text-[#A1A1AA]" />

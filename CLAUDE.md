@@ -14,7 +14,7 @@ You (the main model) are the orchestrator: plan, decompose, delegate, synthesize
 ## Project facts (read before prod-related work)
 
 - Prod: Next.js + self-hosted Supabase on one VPS. Deploy, server layout, migrations and incident checklist: `docs/RUNBOOK.md`.
-- Cloud Supabase (supabase.com) and the Supabase MCP are obsolete for this project — never query or migrate through them.
+- Supabase is self-hosted at `api.cycleconnect.cc`; the only way to the DB is `docker exec supabase-db psql` on the VPS. There is no Supabase MCP for this project.
 - Every commit on `main` deploys to production via `.github/workflows/deploy.yml`.
 - Migrations: `supabase/migrations/NNN_name.sql`, next free number; the deploy does NOT apply them.
 - UI language is Russian; user-facing copy, commit messages and PR descriptions in Russian.

@@ -8,7 +8,7 @@ import { RouteCard } from "@/components/routes/RouteCard";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useFavorites } from "@/lib/context/FavoritesContext";
 import { useRides } from "@/lib/context/RidesContext";
-import { supabase, proxyImageUrl } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { Bike, Map as MapIcon, Calendar, Settings, Bookmark, ChevronRight, Camera, Globe, ExternalLink, Trophy, Eye, Link2, Check, MoreHorizontal, Target } from "lucide-react";
 import { getUserSticker } from "@/lib/stickers";
 import { useAchievements } from "@/lib/context/AchievementsContext";
@@ -372,7 +372,7 @@ export default function ProfilePage() {
                 style={{ backgroundColor: "#7C5CFC" }}
                 onClick={() => avatarUrl && setShowAvatarLightbox(true)}>
                 {avatarUrl
-                  ? <Image src={proxyImageUrl(avatarUrl) ?? avatarUrl} alt="Аватар" width={64} height={64} className="w-full h-full object-cover" />
+                  ? <Image src={avatarUrl} alt="Аватар" width={64} height={64} className="w-full h-full object-cover" />
                   : initials
                 }
               </div>
@@ -757,7 +757,7 @@ export default function ProfilePage() {
 
       {showAvatarLightbox && avatarUrl && (
         <AvatarLightbox
-          src={proxyImageUrl(avatarUrl) ?? avatarUrl}
+          src={avatarUrl}
           alt={profile?.name || "Аватар"}
           onClose={() => setShowAvatarLightbox(false)}
         />

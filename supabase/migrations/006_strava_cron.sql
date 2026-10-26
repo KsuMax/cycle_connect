@@ -1,14 +1,13 @@
 -- ============================================================================
 -- Strava Integration — pg_cron queue processor
 -- ============================================================================
--- Vercel Hobby restricts cron jobs to daily frequency, which is too slow to
--- drain the Strava webhook queue. Instead we schedule the work in the
+-- The Strava webhook queue is drained by a job scheduled in the
 -- database itself via pg_cron, which fires an HTTP POST to our Next.js
 -- route handler every minute through pg_net. The handler authenticates the
 -- call with a shared secret stored in Supabase Vault.
 --
 -- Prerequisite: the secret `cron_secret` must already exist in vault — see
--- the manual setup instructions (Supabase Dashboard → Vault). The secret's
+-- the manual setup instructions (Studio → Vault). The secret's
 -- value must match the CRON_SECRET environment variable used by the Next.js
 -- route handler at /api/strava/cron/process-events.
 -- ============================================================================

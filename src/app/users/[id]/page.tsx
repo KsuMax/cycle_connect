@@ -6,7 +6,7 @@ import { notFound } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { Avatar } from "@/components/ui/Avatar";
-import { supabase, proxyImageUrl } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useFollow } from "@/lib/context/FollowContext";
 import { Map, Calendar, Globe, ExternalLink, UserPlus, UserCheck, ChevronRight, Trophy } from "lucide-react";
@@ -430,7 +430,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
 
       {showAvatarLightbox && profile.avatar_url && (
         <AvatarLightbox
-          src={proxyImageUrl(profile.avatar_url) ?? profile.avatar_url}
+          src={profile.avatar_url}
           alt={profile.name}
           onClose={() => setShowAvatarLightbox(false)}
         />

@@ -13,7 +13,7 @@ import { RegionPicker, type RegionOption } from "@/components/routes/RegionPicke
 import { DayEditor } from "@/components/events/DayEditorLazy";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useToast } from "@/lib/context/ToastContext";
-import { supabase, proxyImageUrl } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { toMapMagicEmbed } from "@/lib/mapmagic";
 import { parseGpxFile, computeGpxStats, toWktPoint, toWktLinestring } from "@/lib/gpx";
 import { ROUTE_TYPES, DIFFICULTIES, SURFACES, POI_TAGS, SEASONS } from "@/constants/routes";
@@ -726,7 +726,7 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
               <div className="flex flex-wrap gap-2">
                 {existingImages.map((img) => (
                   <div key={img.url} className="relative">
-                    <Image src={proxyImageUrl(img.url) ?? img.url} alt="" width={96} height={96} className="object-cover rounded-xl border border-[#E4E4E7]" />
+                    <Image src={img.url} alt="" width={96} height={96} className="object-cover rounded-xl border border-[#E4E4E7]" />
                     <button
                       type="button"
                       onClick={() => removeExistingImage(img)}

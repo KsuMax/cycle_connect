@@ -15,8 +15,8 @@ GitHub main ──push──▶ GitHub Action deploy.yml ──ssh──▶ VPS 
                                                          └─ backup-tunnel.service — SOCKS/SSH-туннель на второй VPS
 ```
 
-- Облачный Supabase (supabase.com) **устарел**, его не трогаем. Supabase MCP
-  ходит только туда — для этого проекта не использовать.
+- Supabase — только self-hosted (`api.cycleconnect.cc`), доступ к базе — через
+  `docker exec supabase-db psql` на сервере.
 - С российского IP заблокированы Google AI, OpenRouter, Telegram и Open-Meteo —
   весь такой трафик идёт через `SOCKS_PROXY` / туннель.
 
@@ -95,5 +95,3 @@ docker exec -i supabase-db psql -U postgres -d postgres \
 ## Открытые хвосты
 
 - Бэкапы только локальные: нет offsite-копии и не было пробного восстановления.
-- Старый облачный проект Supabase ещё дёргает `/api/strava/cron/process-events`
-  с настоящим `CRON_SECRET` — удалить проект в дашборде и сменить секрет.
