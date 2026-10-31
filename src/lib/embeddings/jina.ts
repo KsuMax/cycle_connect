@@ -1,16 +1,13 @@
-/**
- * Embedding helper — Ollama bge-m3 (1024-dim, multilingual incl. Russian).
- *
- * Requires Ollama running on the same host with bge-m3 pulled:
- *   curl -fsSL https://ollama.com/install.sh | sh
- *   ollama pull bge-m3
- *
- * Env vars:
- *   OLLAMA_URL  — base URL (default: http://localhost:11434)
- */
+/** Embedding helper — Ollama bge-m3 by default, or Gemini when opted in. */
+
+import { proxiedFetch } from "@/lib/net/proxied-fetch";
 
 const OLLAMA_URL = (process.env.OLLAMA_URL ?? "http://localhost:11434").replace(/\/$/, "");
 const MODEL = "bge-m3";
+const EMBEDDING_PROVIDER = process.env.EMBEDDING_PROVIDER === "gemini" ? "gemini" : "ollama";
+const GEMINI_MODEL = process.env.GEMINI_EMBEDDING_MODEL ?? "gemini-embedding-2";
+const GEMINI_TIMEOUT_MS = Math.max(1, Number.parseInt(process.env.GEMINI_EMBEDDING_TIMEOUT_MS ?? "15000", 10) || 15_000);
+const EMBEDDING_DIMENSIONS = 1024;
 
 interface OllamaEmbedResponse {
   embeddings?: number[][];
@@ -49,6 +46,72 @@ async function ollamaEmbed(inputs: string[]): Promise<number[][]> {
   return out;
 }
 
+function normalizeGeminiVector(values: unknown): number[] {
+  if (!Array.isArray(values) || values.length !== EMBEDDING_DIMENSIONS) {
+    throw new Error(`Gemini embedding must contain ${EMBEDDING_DIMENSIONS} dimensions`);
+  }
+  if (!values.every((value) => typeof value === "number" && Number.isFinite(value))) {
+    throw new Error("Gemini embedding contains invalid values");
+  }
+
+  const vector = values as number[];
+  const norm = Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0));
+  if (!Number.isFinite(norm) || norm === 0) throw new Error("Gemini embedding has zero norm");
+  return vector.map((value) => value / norm);
+}
+
+async function geminiEmbedOne(text: string): Promise<number[]> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY is required when EMBEDDING_PROVIDER=gemini");
+
+  let res;
+  try {
+    res = await proxiedFetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:embedContent`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        timeoutMs: GEMINI_TIMEOUT_MS,
+        body: JSON.stringify({
+          content: { parts: [{ text }] },
+          outputDimensionality: EMBEDDING_DIMENSIONS,
+        }),
+      },
+    );
+  } catch {
+    throw new Error("Gemini embedding request failed");
+  }
+
+  if (!res.ok) throw new Error(`Gemini embedding HTTP ${res.status}`);
+
+  let data: { embedding?: { values?: unknown } };
+  try {
+    data = JSON.parse(await res.text()) as { embedding?: { values?: unknown } };
+  } catch {
+    throw new Error("Gemini returned invalid embedding data");
+  }
+  return normalizeGeminiVector(data.embedding?.values);
+}
+
+/** Gemini exposes one text per request; limit document batches to two requests at once. */
+async function geminiEmbed(inputs: string[]): Promise<number[][]> {
+  const out = new Array<number[]>(inputs.length);
+  let nextIndex = 0;
+  const workers = Array.from({ length: Math.min(2, inputs.length) }, async () => {
+    while (nextIndex < inputs.length) {
+      const index = nextIndex++;
+      out[index] = await geminiEmbedOne(inputs[index]);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
+async function embedTexts(inputs: string[]): Promise<number[][]> {
+  if (!inputs.length) return [];
+  return EMBEDDING_PROVIDER === "gemini" ? geminiEmbed(inputs) : ollamaEmbed(inputs);
+}
+
 // In-process LRU cache: stores Promises so concurrent calls for the same query
 // share one in-flight Ollama request (deduplication, not just result caching).
 // Calling embedQuery() early in the SSE handler means the second call inside
@@ -71,7 +134,7 @@ export async function embedQuery(text: string): Promise<number[]> {
     const oldest = QUERY_CACHE.keys().next().value;
     if (oldest !== undefined) QUERY_CACHE.delete(oldest);
   }
-  const p = ollamaEmbed([text]).then(([v]) => v);
+  const p = embedTexts([text]).then(([v]) => v);
   QUERY_CACHE.set(key, { p, expires: now + QUERY_CACHE_TTL_MS });
   // Remove on failure so retries get a fresh attempt
   p.catch(() => QUERY_CACHE.delete(key));
@@ -80,7 +143,7 @@ export async function embedQuery(text: string): Promise<number[]> {
 
 /** Embed route documents in a single batch. */
 export async function embedPassages(texts: string[]): Promise<number[][]> {
-  return ollamaEmbed(texts);
+  return embedTexts(texts);
 }
 
 /**
@@ -89,6 +152,7 @@ export async function embedPassages(texts: string[]): Promise<number[][]> {
  * boot via instrumentation.ts and again when the AI search widget opens.
  */
 export function warmUpEmbeddings(): void {
+  if (EMBEDDING_PROVIDER === "gemini") return;
   ollamaEmbed(["warmup"])
     .then(() => console.log(`[embeddings] warm-up ok: ${MODEL} loaded`))
     .catch((err) =>

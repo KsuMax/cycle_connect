@@ -1,16 +1,13 @@
 /**
  * Lightweight chat wrapper: Gemini → OpenRouter → Ollama → DeepSeek.
  *
- * Every remote provider is called through `proxiedFetch`, so on the prod VPS
- * they egress via the SOCKS5 tunnel. Both Google and OpenRouter reject that
- * VPS's Russian IP outright (400 FAILED_PRECONDITION "User location is not
- * supported" and 403 "Access denied by security policy" respectively), which
- * is what left the grabber with no working LLM. Ollama is local and stays on
- * a direct connection.
+ * Remote providers are called through `proxiedFetch`. Ollama can be disabled
+ * on hosts without local AI using LOCAL_AI_ENABLED=false.
  *
  * Env vars:
- *   GEMINI_API_KEY     — primary; Google AI Studio key (AIza…)
+ *   GEMINI_API_KEY     — primary Google AI Studio key
  *   GEMINI_MODELS      — comma-separated override of the model chain
+ *   LOCAL_AI_ENABLED   — set false to disable all Ollama calls (default true)
  *   OPENROUTER_API_KEY — secondary
  *   OLLAMA_URL         — fallback local (default: http://localhost:11434)
  *   OLLAMA_CHAT_MODEL  — default llama3.2:3b
@@ -22,9 +19,9 @@
 import { proxiedFetch } from "@/lib/net/proxied-fetch";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY ?? "";
-const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 // Ordered by quality; on 429/404 the next model is tried automatically.
-const GEMINI_MODELS = (process.env.GEMINI_MODELS ?? "gemini-3.5-flash,gemini-2.5-flash")
+const GEMINI_MODELS = (process.env.GEMINI_MODELS ?? "gemini-3.5-flash-lite")
   .split(",")
   .map((m) => m.trim())
   .filter(Boolean);
@@ -39,6 +36,7 @@ const OPENROUTER_MODELS = [
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY ?? "";
 const OLLAMA_URL = (process.env.OLLAMA_URL ?? "http://localhost:11434").replace(/\/$/, "");
 const OLLAMA_CHAT_MODEL = process.env.OLLAMA_CHAT_MODEL ?? "llama3.2:3b";
+const LOCAL_AI_ENABLED = process.env.LOCAL_AI_ENABLED !== "false";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://cycleconnect.cc";
 
 export interface ChatMessage {
@@ -52,17 +50,12 @@ interface GeminiCallOptions {
   timeoutMs: number;
   /** Ask for `response_format: json_object`. */
   json: boolean;
-  /**
-   * Gemini 2.5/3.x think before answering and those tokens are billed against
-   * `max_tokens`: with thinking on, a 256-token budget came back with
-   * `finish_reason: "length"` and an EMPTY `content`. "none" disables it —
-   * neither classification nor short prose needs a reasoning pass.
-   */
+  /** Disable provider-side reasoning that consumes the output token budget. */
   reasoningEffort: "none" | "low" | "medium" | "high";
 }
 
 /**
- * One call to Gemini's OpenAI-compatible endpoint.
+ * One call to Gemini's native generateContent endpoint.
  * Returns null when this particular model is unavailable (rate limit, retired
  * model, upstream hiccup) so the caller can try the next one; throws on
  * anything else, e.g. a bad API key — that must not be retried 3× silently.
@@ -72,20 +65,31 @@ async function geminiChat(
   messages: ChatMessage[],
   opts: GeminiCallOptions,
 ): Promise<string | null> {
-  const res = await proxiedFetch(GEMINI_URL, {
+  const systemText = messages
+    .filter((message) => message.role === "system")
+    .map((message) => message.content)
+    .join("\n\n");
+  const contents = messages
+    .filter((message) => message.role !== "system")
+    .map((message) => ({
+      role: message.role === "assistant" ? "model" : "user",
+      parts: [{ text: message.content }],
+    }));
+  const res = await proxiedFetch(`${GEMINI_URL}/${encodeURIComponent(model)}:generateContent`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${GEMINI_API_KEY}`,
+      "x-goog-api-key": GEMINI_API_KEY,
       "Content-Type": "application/json",
     },
     timeoutMs: opts.timeoutMs,
     body: JSON.stringify({
-      model,
-      messages,
-      max_tokens: opts.maxTokens,
-      temperature: opts.temperature,
-      reasoning_effort: opts.reasoningEffort,
-      ...(opts.json ? { response_format: { type: "json_object" } } : {}),
+      ...(systemText ? { systemInstruction: { parts: [{ text: systemText }] } } : {}),
+      contents,
+      generationConfig: {
+        maxOutputTokens: opts.maxTokens,
+        temperature: opts.temperature,
+        ...(opts.json ? { responseMimeType: "application/json" } : {}),
+      },
     }),
   });
   const body = await res.text();
@@ -93,13 +97,11 @@ async function geminiChat(
     console.warn(`[llm] Gemini ${model} unavailable (HTTP ${res.status}), trying next`);
     return null;
   }
-  if (!res.ok) throw new Error(`gemini HTTP ${res.status}: ${body.slice(0, 200)}`);
+  if (!res.ok) throw new Error(`gemini HTTP ${res.status}`);
   const data = JSON.parse(body) as {
-    choices?: Array<{ message?: { content?: string } }>;
-    error?: { message?: string };
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
   };
-  if (data.error) throw new Error(`gemini: ${data.error.message}`);
-  return data.choices?.[0]?.message?.content ?? "";
+  return data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("") ?? "";
 }
 
 /**
@@ -177,7 +179,7 @@ export async function chatJSON(
           console.warn(`[llm] OpenRouter ${model} rate-limited, trying next`);
           continue;
         }
-        if (data.error) throw new Error(`openrouter: ${data.error.message}`);
+        if (data.error) throw new Error(`openrouter request failed (HTTP ${res.status})`);
         const raw = data.choices?.[0]?.message?.content ?? "";
         const match = raw.match(/\{[\s\S]*\}/);
         // Empty content is a real failure mode (reasoning models burning the
@@ -196,34 +198,36 @@ export async function chatJSON(
   }
 
   // ── Tertiary: Ollama local (direct — it runs on this host) ────────────────
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(`${OLLAMA_URL}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: OLLAMA_CHAT_MODEL,
-        messages,
-        stream: false,
-        format: "json",
-        options: { temperature: 0, num_ctx: numCtx },
-        keep_alive: "87600h",
-      }),
-    });
-    if (!res.ok) throw new Error(`ollama HTTP ${res.status}`);
-    const data = await res.json() as { message?: { content?: string }; error?: string };
-    if (data.error) throw new Error(`ollama: ${data.error}`);
-    const content = data.message?.content ?? "{}";
-    return JSON.parse(content) as Record<string, unknown>;
-  } catch (err) {
-    console.warn(
-      "[llm] Ollama unavailable, trying DeepSeek:",
-      err instanceof Error ? err.message : String(err),
-    );
-  } finally {
-    clearTimeout(timer);
+  if (LOCAL_AI_ENABLED) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(`${OLLAMA_URL}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: OLLAMA_CHAT_MODEL,
+          messages,
+          stream: false,
+          format: "json",
+          options: { temperature: 0, num_ctx: numCtx },
+          keep_alive: "87600h",
+        }),
+      });
+      if (!res.ok) throw new Error(`ollama HTTP ${res.status}`);
+      const data = await res.json() as { message?: { content?: string }; error?: string };
+      if (data.error) throw new Error("ollama request failed");
+      const content = data.message?.content ?? "{}";
+      return JSON.parse(content) as Record<string, unknown>;
+    } catch (err) {
+      console.warn(
+        "[llm] Ollama unavailable, trying DeepSeek:",
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   // ── Last resort: DeepSeek ─────────────────────────────────────────────────
@@ -253,7 +257,7 @@ export async function chatJSON(
       choices?: Array<{ message?: { content?: string } }>;
       error?: { message?: string };
     };
-    if (data.error) throw new Error(`deepseek: ${data.error.message}`);
+    if (data.error) throw new Error(`deepseek request failed (HTTP ${res.status})`);
     const raw = data.choices?.[0]?.message?.content ?? "{}";
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) return {};
@@ -370,7 +374,7 @@ export async function chatText(
           console.warn(`[llm.text] OpenRouter ${model} rate-limited, trying next`);
           continue;
         }
-        if (data.error) throw new Error(`openrouter: ${data.error.message}`);
+        if (data.error) throw new Error(`openrouter request failed (HTTP ${res.status})`);
         const text = (data.choices?.[0]?.message?.content ?? "").trim();
         if (!text) {
           console.warn(`[llm.text] OpenRouter ${model} returned empty body`);
@@ -387,7 +391,7 @@ export async function chatText(
     console.warn("[llm.text] All OpenRouter models failed");
   }
 
-  if (!opts.skipOllama) {
+  if (LOCAL_AI_ENABLED && !opts.skipOllama) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -405,7 +409,7 @@ export async function chatText(
       });
       if (!res.ok) throw new Error(`ollama HTTP ${res.status}`);
       const data = (await res.json()) as { message?: { content?: string }; error?: string };
-      if (data.error) throw new Error(`ollama: ${data.error}`);
+      if (data.error) throw new Error("ollama request failed");
       const text = (data.message?.content ?? "").trim();
       if (text) return { text, model: OLLAMA_CHAT_MODEL, provider: "ollama", durationMs: Date.now() - t0 };
     } catch (err) {
@@ -441,7 +445,7 @@ export async function chatText(
     choices?: Array<{ message?: { content?: string } }>;
     error?: { message?: string };
   };
-  if (data.error) throw new Error(`deepseek: ${data.error.message}`);
+  if (data.error) throw new Error(`deepseek request failed (HTTP ${res.status})`);
   const text = (data.choices?.[0]?.message?.content ?? "").trim();
   if (!text) throw new Error("deepseek returned empty body");
   return { text, model: "deepseek-chat", provider: "deepseek", durationMs: Date.now() - t0 };
@@ -452,7 +456,7 @@ export async function chatText(
  * Skipped when a remote provider is configured — Ollama won't be used then.
  */
 export function warmUpOllama(): void {
-  if (GEMINI_API_KEY || OPENROUTER_API_KEY) return;
+  if (!LOCAL_AI_ENABLED || GEMINI_API_KEY || OPENROUTER_API_KEY) return;
   fetch(`${OLLAMA_URL}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

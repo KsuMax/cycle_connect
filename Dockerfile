@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM node:24-alpine AS base
 
 # Установка зависимостей
@@ -12,7 +13,10 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+# Next.js needs env during the build. Mount it without adding it to an image
+# layer, then remove any env copies made by standalone output tracing.
+RUN --mount=type=secret,id=app_env,target=/app/.env.production,required=true \
+    NODE_OPTIONS=--max-old-space-size=1536 npm run build && npm run build:ops && rm -f .next/standalone/.env*
 
 # Продакшн образ
 FROM base AS runner

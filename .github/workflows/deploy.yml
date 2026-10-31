@@ -4,51 +4,32 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
 jobs:
+  check:
+    uses: ./.github/workflows/ci.yml
+
   deploy:
+    needs: check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
       - name: Deploy to server
         uses: appleboy/ssh-action@v1
         with:
           command_timeout: 20m
-          host: 77.222.35.42
-          port: 2222
+          host: 185.186.142.168
+          port: 22
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -eu
             cd /opt/cycleconnect
             git fetch origin main
-            git reset --hard origin/main
-
-            # Sync edge functions (tg-notify, tg-webhook, email-notify)
-            FUNC_SRC=/opt/cycleconnect/supabase/functions
-            FUNC_DST=/root/supabase/docker/volumes/functions
-            for fn in tg-notify tg-webhook email-notify; do
-              if [ -d "$FUNC_SRC/$fn" ]; then
-                mkdir -p "$FUNC_DST/$fn"
-                cp -r "$FUNC_SRC/$fn/." "$FUNC_DST/$fn/"
-                echo "synced $fn"
-              fi
-            done
-            docker restart supabase-edge-functions
-
-            docker build -t cycleconnect:latest .
-            docker stop cycleconnect-app 2>/dev/null || true
-            docker rm cycleconnect-app 2>/dev/null || true
-            docker run -d \
-              --name cycleconnect-app \
-              --restart unless-stopped \
-              -p 127.0.0.1:4000:4000 \
-              --add-host=host.docker.internal:host-gateway \
-              --env-file /opt/cycleconnect/.env.production \
-              -v /opt/srtm:/srv/srtm:ro \
-              -e SRTM_TILE_DIR=/srv/srtm \
-              -e SRTM_RESOLUTION=srtm1 \
-              cycleconnect:latest
-            docker builder prune -f
-            docker image prune -f
-            df -h / | tail -1
-            echo "Deployed"
+            git reset --hard '${{ github.sha }}'
+            bash scripts/vps-deploy.sh
