@@ -10,7 +10,8 @@
     "start": "next start",
     "lint": "eslint --cache --cache-strategy content",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build:ops": "esbuild scripts/reindex-embeddings.ts scripts/ai-smoke.ts --bundle --platform=node --format=cjs --outdir=.next/standalone/.ops --out-extension:.js=.cjs"
   },
   "dependencies": {
     "@mapbox/polyline": "^1.2.1",
@@ -48,6 +49,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "caniuse-lite": "^1.0.30001781",
+    "esbuild": "^0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
     "tailwindcss": "^4",

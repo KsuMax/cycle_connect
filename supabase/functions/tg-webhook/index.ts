@@ -3,12 +3,16 @@
  *
  * Handles:
  *  1. /start <code>  — links chat_id to a CycleConnect profile.
- *  2. Any text       — AI-powered route search via Ollama (llama3.2:3b).
+ *  2. Any text       — AI-powered route search via Gemini, OpenRouter or Ollama.
  *
  * Secrets (set via `supabase secrets set`):
  *   TELEGRAM_BOT_TOKEN
+ *   GEMINI_API_KEY         (optional primary parser)
+ *   GEMINI_MODELS          (optional comma-separated model chain)
+ *   AI_API_BASE            (optional Gemini API/relay base URL)
+ *   OPENROUTER_API_KEY     (fallback provider)
+ *   LOCAL_AI_ENABLED       (set false to disable Ollama; default true)
  *   OLLAMA_URL             (e.g. http://host.docker.internal:11434)
- *   OPENROUTER_API_KEY     (fallback when Ollama is unavailable)
  *   SITE_URL               (e.g. https://cycleconnect.cc)
  *   SUPABASE_SERVICE_ROLE_KEY  — auto-injected
  *   SUPABASE_URL               — auto-injected
@@ -20,6 +24,11 @@ const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN")!;
 const TG_API_BASE = (Deno.env.get("TELEGRAM_API_BASE") ?? "https://api.telegram.org").replace(/\/$/, "");
 const WEBHOOK_SECRET = Deno.env.get("TG_WEBHOOK_SECRET") ?? "";
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY") ?? "";
+const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") ?? Deno.env.get("GOOGLE_API_KEY") ?? "";
+const GEMINI_MODELS = (Deno.env.get("GEMINI_MODELS") ?? "gemini-3.5-flash-lite")
+  .split(",").map((model) => model.trim()).filter(Boolean);
+const AI_API_BASE = (Deno.env.get("AI_API_BASE") ?? "https://generativelanguage.googleapis.com").replace(/\/$/, "");
+const LOCAL_AI_ENABLED = Deno.env.get("LOCAL_AI_ENABLED") !== "false";
 const SITE_URL = Deno.env.get("SITE_URL") ?? "https://cycleconnect.cc";
 const OLLAMA_URL = (Deno.env.get("OLLAMA_URL") ?? "http://host.docker.internal:11434").replace(/\/$/, "");
 const OLLAMA_CHAT_MODEL = Deno.env.get("OLLAMA_CHAT_MODEL") ?? "llama3.2:3b";
@@ -208,7 +217,7 @@ Rules (apply all that match):
 9. Nature words (море, озеро, лес) → search_text
 10. Return {} only if truly nothing can be extracted`;
 
-// ─── AI filter parsing: Ollama primary, OpenRouter fallback ──────────────────
+// ─── AI filter parsing: Gemini → OpenRouter → optional Ollama ───────────────
 
 async function parseAI(query: string): Promise<RouteFilters> {
   const messages = [
@@ -216,42 +225,44 @@ async function parseAI(query: string): Promise<RouteFilters> {
     { role: "user", content: query },
   ];
 
-  // ── Primary: Ollama local ────────────────────────────────────────────────
-  const controller = new AbortController();
-  // 20s: on the 2-vCPU host llama3.2:1b generates ~6.5 tok/s, so a typical
-  // 50-token filter JSON takes 9-12s warm; cold model load adds another ~8s.
-  const timer = setTimeout(() => controller.abort(), 20_000);
-  try {
-    const res = await fetch(`${OLLAMA_URL}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: OLLAMA_CHAT_MODEL,
-        messages,
-        stream: false,
-        format: "json",
-        options: { temperature: 0, num_ctx: 1024 },
-        // -1 = keep the model resident; a finite value here would override the
-        // server-wide OLLAMA_KEEP_ALIVE=-1 and re-arm unloading on every call.
-        keep_alive: -1,
-      }),
-    });
-    if (!res.ok) throw new Error(`ollama HTTP ${res.status}`);
-    const data = await res.json() as { error?: string; message?: { content?: string } };
-    if (data.error) throw new Error(`ollama: ${data.error}`);
-    const content: string = data.message?.content ?? "{}";
-    return JSON.parse(content) as RouteFilters;
-  } catch (err) {
-    console.warn("[tg-webhook] Ollama unavailable, trying OpenRouter:", (err as Error).message);
-  } finally {
-    clearTimeout(timer);
+  if (GEMINI_API_KEY) {
+    for (const model of GEMINI_MODELS) {
+      try {
+        const res = await fetch(
+          `${AI_API_BASE}/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
+            signal: AbortSignal.timeout(15_000),
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+              contents: [{ role: "user", parts: [{ text: query }] }],
+              generationConfig: {
+                maxOutputTokens: 512,
+                temperature: 0.1,
+                responseMimeType: "application/json",
+              },
+            }),
+          },
+        );
+        if (!res.ok) throw new Error(`Gemini HTTP ${res.status}`);
+        const data = await res.json() as {
+          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+        };
+        const raw = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("") ?? "";
+        const match = raw.match(/\{[\s\S]*\}/);
+        if (!match) throw new Error("Gemini returned no JSON filters");
+        return JSON.parse(match[0]) as RouteFilters;
+      } catch (err) {
+        console.warn(`[tg-webhook] Gemini ${model} failed:`, (err as Error).message);
+      }
+    }
   }
 
-  // ── Fallback: OpenRouter ─────────────────────────────────────────────────
-  if (!OPENROUTER_API_KEY) return {};
-  try {
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  // ── Secondary: OpenRouter ────────────────────────────────────────────────
+  if (OPENROUTER_API_KEY) {
+    try {
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
@@ -266,19 +277,49 @@ async function parseAI(query: string): Promise<RouteFilters> {
         temperature: 0.1,
         response_format: { type: "json_object" },
       }),
+      });
+      const data = await res.json() as {
+        error?: { message?: string };
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+      if (data.error) throw new Error(`OpenRouter HTTP ${res.status}`);
+      const raw: string = data.choices?.[0]?.message?.content ?? "";
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (!match) return {};
+      return JSON.parse(match[0]) as RouteFilters;
+    } catch (err) {
+      console.warn("[tg-webhook] OpenRouter failed:", (err as Error).message);
+    }
+  }
+
+  if (!LOCAL_AI_ENABLED) return {};
+
+  // ── Last resort: local Ollama ────────────────────────────────────────────
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20_000);
+  try {
+    const res = await fetch(`${OLLAMA_URL}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: OLLAMA_CHAT_MODEL,
+        messages,
+        stream: false,
+        format: "json",
+        options: { temperature: 0, num_ctx: 1024 },
+        keep_alive: -1,
+      }),
     });
-    const data = await res.json() as {
-      error?: { message?: string };
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    if (data.error) throw new Error(`openrouter: ${data.error?.message}`);
-    const raw: string = data.choices?.[0]?.message?.content ?? "";
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) return {};
-    return JSON.parse(match[0]) as RouteFilters;
+    if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`);
+    const data = await res.json() as { error?: string; message?: { content?: string } };
+    if (data.error) throw new Error("Ollama request failed");
+    return JSON.parse(data.message?.content ?? "{}") as RouteFilters;
   } catch (err) {
-    console.error("[tg-webhook] OpenRouter fallback also failed:", (err as Error).message);
+    console.warn("[tg-webhook] Ollama failed:", (err as Error).message);
     return {};
+  } finally {
+    clearTimeout(timer);
   }
 }
 
