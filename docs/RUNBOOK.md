@@ -20,6 +20,11 @@
   Gateway соединён с приватной сетью (`172.18.0.1` на основном bridge) и отдельным
   egress bridge. Сертификаты Caddy хранятся в
   `/opt/cycleconnect-stack/caddy-data/caddy`.
+- Для `app` задано `extra_hosts: api.cycleconnect.cc:185.186.142.168`.
+  Next.js Image Optimizer должен получать публичный IP Storage: внутренний
+  Docker alias разрешается в `172.18.*` и блокируется защитой от SSRF (HTTP 400).
+  Только приложение использует публичный адрес; backend-сервисы сохраняют
+  внутренние DNS aliases. При следующем переезде обновить эту запись.
 - SRTM-данные объёмом 4 GB перенесены на новый VPS.
 - Четыре DNS A-записи — apex, `api`, `studio`, `www` — переключены на
   `185.186.142.168` и проверены в Cloudflare. Proxy выключен, TTL — Auto.
@@ -109,6 +114,19 @@ curl --fail --max-time 10 -H 'Host: localhost' "http://$gateway_ip/" -o /dev/nul
 
 После завершения DNS-перехода проверяйте публичные домены отдельно. HTTP 200
 главной страницы не проверяет Auth, Storage, Gemini, OAuth или уведомления.
+Проверяйте и оригинальные файлы Storage, и путь `/_next/image`, который реально
+используется обложками и аватарами. Например:
+
+```bash
+cd /opt/cycleconnect
+docker exec -i cc-stage-app node --input-type=module - \
+  'https://api.cycleconnect.cc/storage/v1/object/public/route-images/6073a499-211f-4a8f-b17e-67fb70a3d922/cover.jpg' \
+  'https://api.cycleconnect.cc/storage/v1/object/public/avatars/aa66337e-6462-4c6f-9325-ec535b384452/avatar.jpeg' \
+  < scripts/check-public-images.mjs
+```
+
+Скрипт добавляет уникальный query-параметр: готовый кеш оптимизатора не скроет
+повторную ошибку DNS. Оба вида запросов должны вернуть HTTP 200 и `image/*`.
 
 ### Откат
 
