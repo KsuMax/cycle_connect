@@ -20,6 +20,7 @@ mkdir -m 700 "$backup_dir"
 test -f "$APP_ENV"
 test -f "$STACK_DIR/restore-baseline/graphql-wrapper.sql"
 test -f "$STACK_DIR/restore-baseline/database-settings.sql"
+git -C /opt/cycleconnect rev-parse HEAD > "$backup_dir/source-commit.txt"
 
 docker exec "$DB_CONTAINER" pg_dump -U supabase_admin -d postgres -Fc \
   > "$backup_dir/database.dump"
@@ -32,15 +33,24 @@ tar --create --gzip --file="$backup_dir/storage.tar.gz" \
 
 tar --create --gzip --file="$backup_dir/configs.tar.gz" \
   --xattrs --xattrs-include='*' --acls --numeric-owner \
+  --exclude=opt/cycleconnect-stack/supabase/volumes/db/data \
+  --exclude=opt/cycleconnect-stack/supabase/volumes/storage \
   -C / \
   opt/cycleconnect-stack/compose.json \
   opt/cycleconnect-stack/Caddyfile \
   opt/cycleconnect-stack/db-config \
-  opt/cycleconnect-stack/supabase/volumes/functions \
+  opt/cycleconnect-stack/supabase \
+  opt/cycleconnect-stack/deno-cache \
   opt/cycleconnect-stack/restore-baseline \
   opt/cycleconnect-stack/caddy-data \
   opt/cycleconnect/.env.production \
   etc/systemd/system/cc-egress.service \
+  etc/systemd/system/cc-backup.service \
+  etc/systemd/system/cc-backup.timer \
+  etc/systemd/system/cc-finish-events.service \
+  etc/systemd/system/cc-finish-events.timer \
+  usr/local/bin/cc-backup.sh \
+  root/.ssh/authorized_keys \
   root/.ssh/cc_egress_ed25519 \
   root/.ssh/cc-egress-known_hosts
 
@@ -51,7 +61,7 @@ docker exec -i "$DB_CONTAINER" pg_restore --list \
 tar --list --gzip --file="$backup_dir/storage.tar.gz" > /dev/null
 tar --list --gzip --file="$backup_dir/configs.tar.gz" > /dev/null
 
-(cd "$backup_dir" && sha256sum database.dump globals.sql storage.tar.gz configs.tar.gz > SHA256SUMS)
+(cd "$backup_dir" && sha256sum database.dump globals.sql storage.tar.gz configs.tar.gz source-commit.txt > SHA256SUMS)
 (cd "$backup_dir" && sha256sum --check SHA256SUMS > /dev/null)
 printf 'completed_at_utc=%s\n' "$timestamp" > "$backup_dir/COMPLETE"
 
