@@ -12,7 +12,7 @@
   `cc-stage-rest`, `cc-stage-storage`, `cc-stage-imgproxy`, `cc-stage-kong`,
   `cc-stage-functions`, `cc-stage-realtime`, `cc-stage-gateway`, а также
   `supabase-studio` и `supabase-meta`.
-- Все 12 контейнеров запущены для приватной проверки; Realtime, Edge Functions,
+- Все 12 контейнеров работают на новом VPS; Realtime, Edge Functions,
   Studio и Meta проверялись вместе с Auth, Storage и API.
 - Caddy работает в Docker на gateway. У хоста нет systemd Caddy. Все backend
   ports остаются непубликованными; web-трафик входит через gateway `80/443`,
@@ -21,17 +21,17 @@
   egress bridge. Сертификаты Caddy хранятся в
   `/opt/cycleconnect-stack/caddy-data/caddy`.
 - SRTM-данные объёмом 4 GB перенесены на новый VPS.
-- На момент обновления меняются четыре DNS A-записи: apex, `api`, `studio` и
-  `www`; три уже сохранены, состояние четвёртой ещё загружается. Proxy выключен,
-  TTL — Auto. DNS-переход считать незавершённым, пока не проверены все записи.
+- Четыре DNS A-записи — apex, `api`, `studio`, `www` — переключены на
+  `185.186.142.168` и проверены в Cloudflare. Proxy выключен, TTL — Auto.
+  До истечения DNS-кеша старый IP пересылает запросы на новый VPS.
 - Старый `front` для доменов CycleConnect проксирует TLS на новый VPS,
   сохраняя исходные Host и SNI. Старые CycleConnect app и Edge Functions на нём
   остановлены; CycleConnect cron и watchdog отключены. Их данные оставлены.
   Другие проекты на `front` не менялись.
 - Auth, Storage (включая скачивание 186 файлов), основные browser flows и
   поиск по 30 проиндексированным маршрутам прошли проверки. Реальный вход через Google
-  OAuth в браузере не проверялся. Production startup, финальная переиндексация,
-  DNS и часть финальных проверок ещё продолжаются.
+  OAuth в браузере не проверялся. Финальная переиндексация 30/30 и проверка
+  SHA-256 всех 186 файлов завершены.
 - При одновременном чтении образов с HDD возможны задержки; после тяжёлых
   операций дайте сервисам 15 секунд и повторите проверки. После этой паузы
   health checks всех сервисов проходили; признаков нехватки RAM в этих случаях
@@ -57,14 +57,13 @@ journalctl -u cc-egress --since '15 minutes ago' --no-pager
 
 ## Deploy и проверка
 
-Workflow нового deploy находится в ветке `77fdb21`: CI прошёл, но merge в `main`
-и переключение production deploy ещё pending. Секрет SSH для GitHub подготовлен.
-Workflow повторно использует CI
+Workflow `.github/workflows/deploy.yml` настроен на новый VPS.
+Он повторно использует CI
 (TypeScript и Vitest обязательны, ESLint пока informational), затем по SSH
 обновляет клон до точного GitHub SHA и запускает `scripts/vps-deploy.sh`.
 Деплои сериализованы и не отменяют уже выполняющуюся выкладку.
 
-После merge обычная выкладка запускается push в `main`. Скрипт на VPS:
+Обычная выкладка запускается push в `main`. Скрипт на VPS:
 
 1. Берёт `flock`, сохраняет текущий `cycleconnect:latest` как
    `cycleconnect:previous` и строит новый образ с BuildKit secret из
@@ -167,9 +166,8 @@ production dump и baseline; не запускать все старые миг�
 | `grabber-telegram` | `0 * * * *` |
 | `grabber-forum` | `0 6 * * *` |
 
-Миграция 060 описывает форумный запуск как 06:00 UTC. Настроенный timezone
-pg_cron для исходной БД в документации не зафиксирован; проверить его перед
-пересчётом локального времени:
+Проверено 01.11.2026: `cron.timezone=GMT`, timezone БД — UTC.
+Форумный запуск 06:00 UTC соответствует 09:00 Europe/Moscow. Проверка:
 
 ```bash
 docker exec cc-stage-db psql -U postgres -d postgres -c \
